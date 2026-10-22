@@ -3,27 +3,27 @@ import SwiftUI
 struct MainView: View {
     @Environment(AppModel.self) private var model
     @State private var showsDetail = true
+    @State private var showsAdd = false
+    @FocusState private var filterFocused: Bool
 
     var body: some View {
         @Bindable var model = model
-        let items = model.visibleItems
 
         VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                TextField("Filter", text: $model.filterText)
-                    .textFieldStyle(.roundedBorder)
-                    .controlSize(.small)
-                    .frame(maxWidth: 260)
-                Text("\(items.count) items")
-                    .font(.caption)
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-                Spacer()
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
+            filterBar
             Divider()
-            ItemTableView(items: items, viewer: model.viewer, selection: $model.selection)
+            ItemTableView(
+                rows: model.rows,
+                viewer: model.viewer,
+                selection: $model.selection,
+                sort: model.sort,
+                focusRequest: model.tableFocusRequest,
+                badges: { _ in [] },
+                onAction: { model.perform($0, on: $1) },
+                onSort: { model.sort = $0 },
+                onToggleSection: { model.toggleCollapsed($0) },
+                onFocusFilter: { model.requestFilterFocus() }
+            )
         }
         .frame(minWidth: 640, maxHeight: .infinity)
         .inspector(isPresented: $showsDetail) {
@@ -31,6 +31,13 @@ struct MainView: View {
                 .inspectorColumnWidth(min: 360, ideal: 520, max: 1000)
         }
         .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button("Add", systemImage: "plus") { showsAdd = true }
+                    .help("Track a PR or issue by number or URL")
+                    .popover(isPresented: $showsAdd, arrowEdge: .bottom) {
+                        AddItemView { showsAdd = false }
+                    }
+            }
             ToolbarItem(placement: .primaryAction) {
                 SyncStatusView()
             }
@@ -41,7 +48,80 @@ struct MainView: View {
                 .help("Show or hide the detail pane")
             }
         }
+        .onChange(of: model.filterFocusRequest) { filterFocused = true }
         .task { model.start() }
+    }
+
+    private var filterBar: some View {
+        @Bindable var model = model
+        return HStack(spacing: 8) {
+            TextField("Filter (/)", text: $model.filterText)
+                .textFieldStyle(.roundedBorder)
+                .controlSize(.small)
+                .frame(maxWidth: 260)
+                .focused($filterFocused)
+                .onSubmit { model.requestTableFocus() }
+                .onKeyPress(.escape) {
+                    if model.filterText.isEmpty { model.requestTableFocus() } else { model.filterText = "" }
+                    return .handled
+                }
+                .help("Text, or tokens like is:pr turn:me author:x label:x ci:fail p:h org:redhat is:untracked")
+            Text("\(model.visibleCount) items")
+                .font(.caption)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+            Text("j/k move · 1/2/3 priority · p pin · d drop from focus · n mark read · o open · u untrack")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .lineLimit(1)
+                .truncationMode(.head)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+    }
+}
+
+private struct AddItemView: View {
+    @Environment(AppModel.self) private var model
+    let dismiss: () -> Void
+    @State private var input = ""
+    @State private var error: String?
+    @State private var isAdding = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            TextField("Number or URL", text: $input)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 260)
+                .onSubmit(add)
+                .disabled(isAdding)
+            if let error {
+                Text(error).font(.caption).foregroundStyle(.red)
+            }
+            HStack {
+                Spacer()
+                if isAdding { ProgressView().controlSize(.small) }
+                Button("Add", action: add)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(input.isEmpty || isAdding)
+            }
+        }
+        .padding(12)
+    }
+
+    private func add() {
+        isAdding = true
+        error = nil
+        Task {
+            do {
+                try await model.addItem(input)
+                dismiss()
+            } catch {
+                self.error = error.localizedDescription
+            }
+            isAdding = false
+        }
     }
 }
 
@@ -69,7 +149,7 @@ private struct SyncStatusView: View {
                 }
             }
             if let rateLimit = model.rateLimit {
-                Text("api \(rateLimit.remaining)")
+                Text("api \(String(rateLimit.remaining))")
                     .foregroundStyle(rateLimit.remaining < 500 ? .orange : .secondary)
                     .help("GraphQL rate limit resets \(rateLimit.resetAt.formatted(.relative(presentation: .named)))")
             }

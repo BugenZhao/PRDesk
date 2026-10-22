@@ -1,6 +1,6 @@
 import AppKit
 
-/// Columns of the item table and how each renders an item.
+/// Columns of the item table and how each renders a row.
 enum ItemColumn: String, CaseIterable {
     case unread, priority, number, title, author, review, turn, ci, size, age, updated
 
@@ -28,7 +28,7 @@ enum ItemColumn: String, CaseIterable {
         case .priority: 16
         case .number: 42
         case .title: 520
-        case .author: 120
+        case .author: 150
         case .review: 64
         case .turn: 40
         case .ci: 54
@@ -45,11 +45,30 @@ enum ItemColumn: String, CaseIterable {
         }
     }
 
+    var sortKey: ItemSort.Key? {
+        switch self {
+        case .unread: nil
+        case .priority: .priority
+        case .number: .number
+        case .title: .title
+        case .author: .author
+        case .review: .review
+        case .turn: .turn
+        case .ci: .ci
+        case .size: .size
+        case .age: .age
+        case .updated: .updated
+        }
+    }
+
     func makeTableColumn() -> NSTableColumn {
         let column = NSTableColumn(identifier: identifier)
         column.title = header
         column.width = width
         column.headerCell.alignment = alignment == .trailing ? .right : .left
+        if let sortKey {
+            column.sortDescriptorPrototype = NSSortDescriptor(key: sortKey.rawValue, ascending: false)
+        }
         if self == .title {
             // Sized by the table to fill the remaining width; see `Coordinator.fitTitleColumn`.
             column.minWidth = 160
@@ -62,57 +81,73 @@ enum ItemColumn: String, CaseIterable {
     }
 
     @MainActor
-    func runs(for item: Item, viewer: String?, now: Date) -> [CellRun] {
+    func runs(for row: ItemRow, viewer: String?, badges: (String) -> [CellRun], now: Date) -> [CellRun] {
+        let item = row.item
         switch self {
-        case .unread, .priority, .turn:
-            // Local state and turn tracking arrive in milestone 2.
-            []
+        case .unread:
+            return row.insight.isUnread ? [.dot(.controlAccentColor)] : []
+
+        case .priority:
+            guard let priority = row.state.priority else { return [] }
+            return [.chip(priority.letter, color: priority.color)]
 
         case .number:
-            [.text(String(item.number), color: .secondaryLabelColor, font: CellFont.digits)]
+            return [.text(String(item.number), color: .secondaryLabelColor, font: CellFont.digits)]
 
         case .title:
-            titleRuns(item)
+            return titleRuns(row, now: now)
 
         case .author:
-            [.text(item.author ?? "ghost", flexible: true)]
+            return [.text(item.author ?? "ghost", flexible: true)] + (item.author.map(badges) ?? [])
 
         case .review:
-            reviewRuns(item, viewer: viewer)
+            return reviewRuns(row, viewer: viewer)
 
-        case .ci:
-            ciRuns(item)
-
-        case .size:
-            if let additions = item.additions, let deletions = item.deletions {
-                [
-                    .text("+\(additions)", color: .systemGreen, font: CellFont.digits),
-                    .text("−\(deletions)", color: .systemRed, font: CellFont.digits),
-                ]
-            } else {
-                []
+        case .turn:
+            return switch row.insight.turn {
+            case .me: [.text("me", color: .systemOrange, font: CellFont.smallBold)]
+            case .them: [.text("them", color: .tertiaryLabelColor, font: CellFont.small)]
+            case nil: []
             }
 
+        case .ci:
+            return ciRuns(item)
+
+        case .size:
+            guard let additions = item.additions, let deletions = item.deletions else { return [] }
+            return [
+                .text("+\(additions)", color: .systemGreen, font: CellFont.digits),
+                .text("−\(deletions)", color: .systemRed, font: CellFont.digits),
+            ]
+
         case .age:
-            [.text(item.createdAt.compactAge(relativeTo: now), color: .secondaryLabelColor, font: CellFont.digits)]
+            return [.text(item.createdAt.compactAge(relativeTo: now), color: .secondaryLabelColor, font: CellFont.digits)]
 
         case .updated:
-            [.text(item.updatedAt.compactAge(relativeTo: now), color: .secondaryLabelColor, font: CellFont.digits)]
+            return [.text(item.updatedAt.compactAge(relativeTo: now), color: .secondaryLabelColor, font: CellFont.digits)]
         }
     }
 
-    private func titleRuns(_ item: Item) -> [CellRun] {
-        var runs: [CellRun] = [.symbol(item.kindSymbol, color: item.stateColor), .text(item.title, flexible: true)]
+    private func titleRuns(_ row: ItemRow, now: Date) -> [CellRun] {
+        let item = row.item
+        var runs: [CellRun] = [
+            .symbol(item.kindSymbol, color: item.stateColor),
+            .text(item.title, font: row.insight.isUnread ? CellFont.regularBold : CellFont.regular, flexible: true),
+        ]
         if item.isDraft, item.isOpen { runs.append(.chip("draft", color: .secondaryLabelColor)) }
         switch item.state {
         case .merged: runs.append(.chip("merged", color: .systemPurple))
         case .closed: runs.append(.chip("closed", color: .systemRed))
         case .open: if item.mergeable == "CONFLICTING" { runs.append(.chip("conflicts", color: .systemRed)) }
         }
+        if let summary = row.insight.summary, let at = row.insight.summaryAt {
+            runs.append(.text("\(summary) \(at.compactAge(relativeTo: now))", color: .tertiaryLabelColor, font: CellFont.small, maxWidth: 180))
+        }
         return runs
     }
 
-    private func reviewRuns(_ item: Item, viewer: String?) -> [CellRun] {
+    private func reviewRuns(_ row: ItemRow, viewer: String?) -> [CellRun] {
+        let item = row.item
         guard item.kind == .pullRequest else { return [] }
         var runs: [CellRun] = []
         switch viewer.flatMap(item.review(by:))?.state {
@@ -123,7 +158,7 @@ enum ItemColumn: String, CaseIterable {
                 runs.append(.text("✓\(item.approvalCount)", color: .systemGreen, font: CellFont.small))
             }
         }
-        if let viewer, item.isOpen, item.isReviewRequested(from: viewer) {
+        if item.isOpen, row.insight.isReviewRequestedFromMe {
             runs.append(.chip("req", color: .systemOrange))
         }
         return runs
@@ -146,6 +181,25 @@ enum ItemColumn: String, CaseIterable {
             runs.append(.chip("rdy", color: .systemGreen))
         }
         return runs
+    }
+}
+
+extension ItemState.Priority {
+    var color: NSColor {
+        switch self {
+        case .high: .systemRed
+        case .medium: .systemOrange
+        case .low: .secondaryLabelColor
+        }
+    }
+
+    /// Row background tint, or nil for none.
+    var rowTint: NSColor? {
+        switch self {
+        case .high: .systemOrange.withAlphaComponent(0.16)
+        case .medium: .systemYellow.withAlphaComponent(0.16)
+        case .low: nil
+        }
     }
 }
 

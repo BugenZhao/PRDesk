@@ -3,7 +3,8 @@ import AppKit
 /// One visual piece of a table cell. Runs are laid out left to right on a single line.
 enum CellRun {
     /// Text; a `flexible` run absorbs any shortage of width by truncating.
-    case text(String, color: NSColor = .labelColor, font: NSFont = CellFont.regular, flexible: Bool = false)
+    /// `maxWidth` caps a non-flexible run, which then truncates.
+    case text(String, color: NSColor = .labelColor, font: NSFont = CellFont.regular, flexible: Bool = false, maxWidth: CGFloat? = nil)
     /// Small rounded tag tinted with `color`.
     case chip(String, color: NSColor)
     case dot(NSColor)
@@ -13,8 +14,10 @@ enum CellRun {
 /// NSFont is immutable, so sharing these across isolation domains is safe.
 enum CellFont {
     nonisolated(unsafe) static let regular = NSFont.systemFont(ofSize: 12)
+    nonisolated(unsafe) static let regularBold = NSFont.systemFont(ofSize: 12, weight: .semibold)
     nonisolated(unsafe) static let digits = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)
     nonisolated(unsafe) static let small = NSFont.systemFont(ofSize: 11)
+    nonisolated(unsafe) static let smallBold = NSFont.systemFont(ofSize: 11, weight: .semibold)
     nonisolated(unsafe) static let chip = NSFont.systemFont(ofSize: 10, weight: .medium)
 }
 
@@ -59,8 +62,8 @@ final class RunsCellView: NSTableCellView {
 
     private func naturalWidth(_ run: CellRun) -> CGFloat {
         switch run {
-        case let .text(string, _, font, _):
-            ceil(string.size(withAttributes: [.font: font]).width)
+        case let .text(string, _, font, _, maxWidth):
+            min(ceil(string.size(withAttributes: [.font: font]).width), maxWidth ?? .infinity)
         case let .chip(string, _):
             ceil(string.size(withAttributes: [.font: CellFont.chip]).width) + 2 * Self.chipPadding
         case .dot:
@@ -73,7 +76,7 @@ final class RunsCellView: NSTableCellView {
     private func draw(_ run: CellRun, in rect: NSRect) {
         guard rect.width > 0 else { return }
         switch run {
-        case let .text(string, color, font, _):
+        case let .text(string, color, font, _, _):
             drawText(string, color: emphasized ? .alternateSelectedControlTextColor : color, font: font, in: rect)
 
         case let .chip(string, color):
@@ -126,6 +129,6 @@ final class RunsCellView: NSTableCellView {
 
 private extension CellRun {
     var isFlexible: Bool {
-        if case let .text(_, _, _, flexible) = self { flexible } else { false }
+        if case let .text(_, _, _, flexible, _) = self { flexible } else { false }
     }
 }

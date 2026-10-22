@@ -1,62 +1,137 @@
 import Foundation
 
-/// The issue/PR search used for syncing, and the response shapes it decodes into.
-enum SearchQuery {
+/// GraphQL queries that fetch list-level item data, and the response shapes they decode into.
+enum ItemQuery {
     static let pageSize = 50
     /// GitHub search never returns more than this many results for one query.
     static let resultCap = 1000
 
-    static let text = """
-    query($q: String!, $after: String) {
-      search(query: $q, type: ISSUE, first: \(pageSize), after: $after) {
-        issueCount
-        pageInfo { hasNextPage endCursor }
-        nodes {
-          __typename
-          ... on PullRequest {
-            id number title url state isDraft createdAt updatedAt closedAt
-            author { login avatarUrl }
-            additions deletions reviewDecision mergeable
-            labels(first: 20) { nodes { name color } }
-            reviewRequests(first: 30) {
-              nodes { requestedReviewer { __typename ... on User { login } ... on Team { slug } } }
-            }
-            latestOpinionatedReviews(first: 30) { nodes { author { login } state submittedAt } }
-            commits(last: 1) {
-              nodes {
-                commit {
-                  statusCheckRollup {
-                    state
-                    contexts(first: 1) {
-                      totalCount
-                      checkRunCountsByState { state count }
-                      statusContextCountsByState { state count }
-                    }
-                  }
-                }
-              }
-            }
-          }
-          ... on Issue {
-            id number title url state createdAt updatedAt closedAt
-            author { login avatarUrl }
-            labels(first: 20) { nodes { name color } }
-            assignees(first: 10) { nodes { login } }
-          }
-        }
+    private static let actor = "{ __typename login }"
+
+    /// Recent events used for Turn, unread state and the summary next to the title.
+    private static let prEvents = """
+    timelineItems(last: 12, itemTypes: [ISSUE_COMMENT, PULL_REQUEST_REVIEW, PULL_REQUEST_COMMIT, HEAD_REF_FORCE_PUSHED_EVENT, MERGED_EVENT, CLOSED_EVENT, REOPENED_EVENT, READY_FOR_REVIEW_EVENT, REVIEW_REQUESTED_EVENT]) {
+      nodes {
+        __typename
+        ... on IssueComment { author \(actor) createdAt }
+        ... on PullRequestReview { author \(actor) state submittedAt createdAt }
+        ... on PullRequestCommit { commit { committedDate author { user { login } } } }
+        ... on HeadRefForcePushedEvent { actor \(actor) createdAt }
+        ... on MergedEvent { actor \(actor) createdAt }
+        ... on ClosedEvent { actor \(actor) createdAt }
+        ... on ReopenedEvent { actor \(actor) createdAt }
+        ... on ReadyForReviewEvent { actor \(actor) createdAt }
+        ... on ReviewRequestedEvent { actor \(actor) createdAt requestedReviewer { ... on User { login } } }
       }
     }
     """
 
-    static let viewerText = "query { viewer { login } }"
+    private static let issueEvents = """
+    timelineItems(last: 12, itemTypes: [ISSUE_COMMENT, CLOSED_EVENT, REOPENED_EVENT]) {
+      nodes {
+        __typename
+        ... on IssueComment { author \(actor) createdAt }
+        ... on ClosedEvent { actor \(actor) createdAt }
+        ... on ReopenedEvent { actor \(actor) createdAt }
+      }
+    }
+    """
 
-    struct Variables: Encodable, Sendable {
+    static let fragments = """
+    fragment PRFields on PullRequest {
+      id number title url state isDraft createdAt updatedAt closedAt
+      author { login avatarUrl }
+      additions deletions reviewDecision mergeable
+      labels(first: 20) { nodes { name color } }
+      reviewRequests(first: 30) {
+        nodes { requestedReviewer { __typename ... on User { login } ... on Team { slug } } }
+      }
+      latestOpinionatedReviews(first: 30) { nodes { author { login } state submittedAt } }
+      commits(last: 1) {
+        nodes {
+          commit {
+            statusCheckRollup {
+              state
+              contexts(first: 1) {
+                totalCount
+                checkRunCountsByState { state count }
+                statusContextCountsByState { state count }
+              }
+            }
+          }
+        }
+      }
+      \(prEvents)
+    }
+    fragment IssueFields on Issue {
+      id number title url state createdAt updatedAt closedAt
+      author { login avatarUrl }
+      labels(first: 20) { nodes { name color } }
+      assignees(first: 10) { nodes { login } }
+      \(issueEvents)
+    }
+    """
+
+    static let search = """
+    query($q: String!, $after: String) {
+      search(query: $q, type: ISSUE, first: \(pageSize), after: $after) {
+        issueCount
+        pageInfo { hasNextPage endCursor }
+        nodes { __typename ...PRFields ...IssueFields }
+      }
+    }
+    \(fragments)
+    """
+
+    static let nodes = """
+    query($ids: [ID!]!) {
+      nodes(ids: $ids) { __typename ...PRFields ...IssueFields }
+    }
+    \(fragments)
+    """
+
+    static let byNumber = """
+    query($owner: String!, $name: String!, $number: Int!) {
+      repository(owner: $owner, name: $name) {
+        issueOrPullRequest(number: $number) { __typename ...PRFields ...IssueFields }
+      }
+    }
+    \(fragments)
+    """
+
+    static let viewer = "query { viewer { login } }"
+
+    // MARK: Variables and responses
+
+    struct SearchVariables: Encodable, Sendable {
         var q: String
         var after: String?
     }
 
-    struct Response: Decodable, Sendable {
+    struct NodesVariables: Encodable, Sendable {
+        var ids: [String]
+    }
+
+    struct NumberVariables: Encodable, Sendable {
+        var owner: String
+        var name: String
+        var number: Int
+    }
+
+    struct SearchResponse: Decodable, Sendable {
         let search: Connection
+    }
+
+    struct NodesResponse: Decodable, Sendable {
+        let nodes: [Node?]
+    }
+
+    struct NumberResponse: Decodable, Sendable {
+        struct Repository: Decodable, Sendable {
+            let issueOrPullRequest: Node?
+        }
+
+        let repository: Repository?
     }
 
     struct ViewerResponse: Decodable, Sendable {
@@ -111,6 +186,19 @@ enum SearchQuery {
     struct Actor: Decodable, Sendable {
         let login: String
         let avatarUrl: String?
+    }
+
+    /// An event actor; `__typename` tells bots apart.
+    struct TypedActor: Decodable, Sendable {
+        let typename: String?
+        let login: String
+
+        private enum CodingKeys: String, CodingKey {
+            case typename = "__typename"
+            case login
+        }
+
+        var isBot: Bool { typename == "Bot" || Item.Event.isBotLogin(login) }
     }
 
     struct Label: Decodable, Sendable {
@@ -180,6 +268,61 @@ enum SearchQuery {
         }
     }
 
+    /// One timeline node; which fields are present depends on `__typename`.
+    struct TimelineNode: Decodable, Sendable {
+        struct CommitInfo: Decodable, Sendable {
+            struct Author: Decodable, Sendable { let user: Login? }
+            let committedDate: Date
+            let author: Author?
+        }
+
+        let typename: String
+        let author: TypedActor?
+        let actor: TypedActor?
+        let createdAt: Date?
+        let submittedAt: Date?
+        let state: String?
+        let commit: CommitInfo?
+        /// Empty for team requests.
+        let requestedReviewer: ReviewRequest.Reviewer?
+
+        private enum CodingKeys: String, CodingKey {
+            case typename = "__typename"
+            case author, actor, createdAt, submittedAt, state, commit, requestedReviewer
+        }
+
+        var event: Item.Event? {
+            let who = author ?? actor
+            func make(_ kind: Item.Event.Kind, at date: Date?, target: String? = nil) -> Item.Event? {
+                date.map { Item.Event(kind: kind, actor: who?.login, isBot: who?.isBot ?? false, at: $0, target: target) }
+            }
+            switch typename {
+            case "IssueComment":
+                return make(.comment, at: createdAt)
+            case "PullRequestReview":
+                // A pending review is the viewer's unsubmitted draft.
+                guard state != "PENDING" else { return nil }
+                let kind: Item.Event.Kind = switch state {
+                case "APPROVED": .approved
+                case "CHANGES_REQUESTED": .changesRequested
+                default: .reviewed
+                }
+                return make(kind, at: submittedAt ?? createdAt)
+            case "PullRequestCommit":
+                guard let commit else { return nil }
+                let login = commit.author?.user?.login
+                return Item.Event(kind: .commit, actor: login, isBot: login.map(Item.Event.isBotLogin) ?? false, at: commit.committedDate, target: nil)
+            case "HeadRefForcePushedEvent": return make(.forcePush, at: createdAt)
+            case "MergedEvent": return make(.merged, at: createdAt)
+            case "ClosedEvent": return make(.closed, at: createdAt)
+            case "ReopenedEvent": return make(.reopened, at: createdAt)
+            case "ReadyForReviewEvent": return make(.readyForReview, at: createdAt)
+            case "ReviewRequestedEvent": return make(.reviewRequested, at: createdAt, target: requestedReviewer?.login)
+            default: return nil
+            }
+        }
+    }
+
     struct PullRequest: Decodable, Sendable {
         let id: String
         let number: Int
@@ -199,6 +342,7 @@ enum SearchQuery {
         let reviewRequests: Nodes<ReviewRequest>
         let latestOpinionatedReviews: Nodes<Review>
         let commits: Nodes<Commit>
+        let timelineItems: Nodes<TimelineNode>
 
         func item(fetchedAt: Date) -> Item {
             Item(
@@ -228,6 +372,7 @@ enum SearchQuery {
                     return reviewer.login ?? reviewer.slug.map { "team:\($0)" }
                 },
                 assignees: [],
+                events: timelineItems.values.compactMap(\.event),
                 fetchedAt: fetchedAt
             )
         }
@@ -245,6 +390,7 @@ enum SearchQuery {
         let author: Actor?
         let labels: Nodes<Label>
         let assignees: Nodes<Login>
+        let timelineItems: Nodes<TimelineNode>
 
         func item(fetchedAt: Date) -> Item {
             Item(
@@ -269,6 +415,7 @@ enum SearchQuery {
                 reviews: [],
                 reviewRequests: [],
                 assignees: assignees.values.map(\.login),
+                events: timelineItems.values.compactMap(\.event),
                 fetchedAt: fetchedAt
             )
         }

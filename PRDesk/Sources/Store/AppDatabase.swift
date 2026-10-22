@@ -14,9 +14,13 @@ final class AppDatabase: Sendable {
 
     /// Opens `~/Library/Application Support/PR Desk/db.sqlite`.
     static func openDefault() throws -> AppDatabase {
+        try AppDatabase(path: directory.appending(path: "db.sqlite").path(percentEncoded: false))
+    }
+
+    static var directory: URL {
         let dir = URL.applicationSupportDirectory.appending(path: "PR Desk", directoryHint: .isDirectory)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return try AppDatabase(path: dir.appending(path: "db.sqlite").path(percentEncoded: false))
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
     }
 
     private static var migrator: DatabaseMigrator {
@@ -51,11 +55,28 @@ final class AppDatabase: Sendable {
                 t.column("value", .text).notNull()
             }
         }
+        migrator.registerMigration("v2") { db in
+            try db.alter(table: "item") { t in
+                t.add(column: "events", .jsonText).notNull().defaults(to: "[]")
+            }
+            try db.create(table: "itemState") { t in
+                t.primaryKey("number", .integer)
+                t.column("priority", .integer)
+                t.column("pinnedAt", .datetime)
+                t.column("focusDismissedAt", .datetime)
+                t.column("viewedAt", .datetime)
+                t.column("seenAt", .datetime)
+                t.column("untrackedAt", .datetime)
+                t.column("manual", .boolean).notNull().defaults(to: false)
+            }
+            // Events were not fetched before; force the next sync to start over.
+            try db.execute(sql: "DELETE FROM meta WHERE key = 'lastSyncStartedAt'")
+        }
         return migrator
     }
 }
 
-// MARK: - Writes
+// MARK: - Items
 
 extension AppDatabase {
     func upsert(_ items: [Item]) async throws {
@@ -67,6 +88,35 @@ extension AppDatabase {
         }
     }
 
+    func items(numbers: [Int]) async throws -> [Item] {
+        try await reader.read { db in
+            try Item.filter(numbers.contains(Item.Columns.number)).fetchAll(db)
+        }
+    }
+}
+
+// MARK: - Local state
+
+extension AppDatabase {
+    /// Loads (or creates) the state for `number`, applies `change`, and saves it.
+    func updateState(_ number: Int, _ change: @escaping @Sendable (inout ItemState) -> Void) async throws {
+        try await writer.write { db in
+            var state = try ItemState.fetchOne(db, key: number) ?? ItemState(number: number)
+            change(&state)
+            try state.save(db)
+        }
+    }
+
+    func manualNumbers() async throws -> [Int] {
+        try await reader.read { db in
+            try Int.fetchAll(db, sql: "SELECT number FROM itemState WHERE manual AND untrackedAt IS NULL")
+        }
+    }
+}
+
+// MARK: - Meta
+
+extension AppDatabase {
     func meta(_ key: String) async throws -> String? {
         try await reader.read { db in
             try String.fetchOne(db, sql: "SELECT value FROM meta WHERE key = ?", arguments: [key])
@@ -85,11 +135,29 @@ extension AppDatabase {
 
 // MARK: - Observation
 
+/// Everything the list needs from the database, observed as one value.
+struct Snapshot: Equatable, Sendable {
+    var items: [Item] = []
+    var states: [Int: ItemState] = [:]
+    /// Unread before this moment is ignored, so a first sync doesn't mark everything unread.
+    var baseline: Date?
+}
+
 extension AppDatabase {
-    /// All cached items, most recently updated first.
-    func observeItems() -> AsyncValueObservation<[Item]> {
+    static let baselineKey = "unreadBaseline"
+
+    func observeSnapshot() -> AsyncValueObservation<Snapshot> {
         ValueObservation
-            .tracking { db in try Item.order(Item.Columns.updatedAt.desc).fetchAll(db) }
+            .tracking { db in
+                let baseline = try String
+                    .fetchOne(db, sql: "SELECT value FROM meta WHERE key = ?", arguments: [Self.baselineKey])
+                    .flatMap { try? Date($0, strategy: .iso8601) }
+                return try Snapshot(
+                    items: Item.order(Item.Columns.updatedAt.desc).fetchAll(db),
+                    states: Dictionary(uniqueKeysWithValues: ItemState.fetchAll(db).map { ($0.number, $0) }),
+                    baseline: baseline
+                )
+            }
             .removeDuplicates()
             .values(in: reader)
     }

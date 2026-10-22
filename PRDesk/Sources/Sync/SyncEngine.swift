@@ -8,25 +8,40 @@ struct SyncResult: Sendable {
     var rateLimit: RateLimit?
 }
 
-/// Pulls tracked PRs and issues from GitHub search into the local database.
+enum SyncError: LocalizedError {
+    case notFound(Int)
+
+    var errorDescription: String? {
+        switch self {
+        case let .notFound(number): "#\(number) was not found in \(SyncEngine.repo)."
+        }
+    }
+}
+
+/// Pulls tracked PRs and issues from GitHub into the local database.
 ///
 /// The first sync looks back `initialLookback`; later syncs only ask for items
 /// updated since the previous sync started (minus some slack for search index lag).
+/// Items added by hand don't match the searches, so they are refreshed by id.
 actor SyncEngine {
-    static let repo = "vllm-project/vllm"
+    static let owner = "vllm-project"
+    static let name = "vllm"
+    static let repo = "\(owner)/\(name)"
     static let initialLookback: TimeInterval = 90 * 24 * 3600
     private static let indexSlack: TimeInterval = 5 * 60
+    private static let manualRefreshInterval: TimeInterval = 5 * 60
     private static let lastSyncKey = "lastSyncStartedAt"
     private static let viewerKey = "viewer"
     private static let windowLength: TimeInterval = 10 * 24 * 3600
     private static let maxConcurrentFetches = 6
 
-    private let client: GraphQLClient
+    let client: GitHubClient
     private let db: AppDatabase
     private let logger = Logger(subsystem: "com.bugenzhao.PRDesk", category: "Sync")
     private var isSyncing = false
+    private var manualRefreshedAt: Date?
 
-    init(client: GraphQLClient, db: AppDatabase) {
+    init(client: GitHubClient, db: AppDatabase) {
         self.client = client
         self.db = db
     }
@@ -38,7 +53,7 @@ actor SyncEngine {
         defer { isSyncing = false }
 
         let startedAt = Date()
-        let viewer = try await resolveViewer()
+        let viewer = try await viewer()
         let since: Date = if let last = try await db.meta(Self.lastSyncKey).flatMap(Self.parse) {
             last.addingTimeInterval(-Self.indexSlack)
         } else {
@@ -51,7 +66,7 @@ actor SyncEngine {
         // are cut into windows fetched in parallel.
         let windows = Self.windows(from: since, to: startedAt)
         let jobs = qualifiers.flatMap { qualifier in windows.map { (qualifier, $0.from, $0.to) } }
-        let fetched = try await withThrowingTaskGroup(of: Int.self) { group in
+        var fetched = try await withThrowingTaskGroup(of: Int.self) { group in
             var pending = jobs.makeIterator()
             var total = 0
             for _ in 0 ..< Self.maxConcurrentFetches {
@@ -66,17 +81,55 @@ actor SyncEngine {
             }
             return total
         }
+        fetched += try await refreshManualItemsIfNeeded()
 
         try await db.setMeta(Self.lastSyncKey, Self.format(startedAt))
+        if try await db.meta(AppDatabase.baselineKey) == nil {
+            try await db.setMeta(AppDatabase.baselineKey, Self.format(startedAt))
+        }
         logger.info("Synced \(fetched) items updated since \(since, privacy: .public)")
         return await SyncResult(viewer: viewer, fetched: fetched, finishedAt: Date(), rateLimit: client.rateLimit)
     }
 
-    private func resolveViewer() async throws -> String {
+    func viewer() async throws -> String {
         if let viewer = try await db.meta(Self.viewerKey) { return viewer }
-        let response = try await client.query(SearchQuery.viewerText, variables: [String: String](), as: SearchQuery.ViewerResponse.self)
+        let response = try await client.query(ItemQuery.viewer, variables: [String: String](), as: ItemQuery.ViewerResponse.self)
         try await db.setMeta(Self.viewerKey, response.viewer.login)
         return response.viewer.login
+    }
+
+    /// Fetches one item by number and stores it.
+    func fetchItem(number: Int) async throws -> Item {
+        let response = try await client.query(
+            ItemQuery.byNumber,
+            variables: ItemQuery.NumberVariables(owner: Self.owner, name: Self.name, number: number),
+            as: ItemQuery.NumberResponse.self
+        )
+        guard let item = response.repository?.issueOrPullRequest?.item(fetchedAt: Date()) else {
+            throw SyncError.notFound(number)
+        }
+        try await db.upsert([item])
+        return item
+    }
+
+    /// Re-fetches the given items by node id.
+    func refresh(ids: [String]) async throws -> Int {
+        var count = 0
+        for chunk in stride(from: 0, to: ids.count, by: ItemQuery.pageSize).map({ Array(ids[$0 ..< min($0 + ItemQuery.pageSize, ids.count)]) }) {
+            let response = try await client.query(ItemQuery.nodes, variables: ItemQuery.NodesVariables(ids: chunk), as: ItemQuery.NodesResponse.self)
+            let now = Date()
+            let items = response.nodes.compactMap { $0?.item(fetchedAt: now) }
+            try await db.upsert(items)
+            count += items.count
+        }
+        return count
+    }
+
+    private func refreshManualItemsIfNeeded() async throws -> Int {
+        if let last = manualRefreshedAt, Date().timeIntervalSince(last) < Self.manualRefreshInterval { return 0 }
+        manualRefreshedAt = Date()
+        let ids = try await db.items(numbers: db.manualNumbers()).filter(\.isOpen).map(\.id)
+        return try await refresh(ids: ids)
     }
 
     /// Fetches every item matching `qualifier` updated in `[from, to]`, writing each page as it arrives.
@@ -87,8 +140,12 @@ actor SyncEngine {
         var after: String?
         var count = 0
         repeat {
-            let page = try await client.query(SearchQuery.text, variables: SearchQuery.Variables(q: q, after: after), as: SearchQuery.Response.self).search
-            if after == nil, page.issueCount > SearchQuery.resultCap {
+            let page = try await client.query(
+                ItemQuery.search,
+                variables: ItemQuery.SearchVariables(q: q, after: after),
+                as: ItemQuery.SearchResponse.self
+            ).search
+            if after == nil, page.issueCount > ItemQuery.resultCap {
                 let end = to ?? Date()
                 if end.timeIntervalSince(from) > 3600 {
                     let mid = from.addingTimeInterval(end.timeIntervalSince(from) / 2)
@@ -120,7 +177,7 @@ actor SyncEngine {
         return result
     }
 
-    private static func format(_ date: Date) -> String {
+    static func format(_ date: Date) -> String {
         // e.g. 2026-10-22T10:00:00Z, which search accepts in `updated:` ranges.
         date.formatted(.iso8601)
     }

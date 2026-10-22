@@ -3,6 +3,15 @@ import Foundation
 import Observation
 import os
 
+enum ItemAction {
+    case priority(ItemState.Priority?)
+    case togglePin
+    case dismissFocus
+    case markRead
+    case toggleUntrack
+    case openInBrowser
+}
+
 @MainActor
 @Observable
 final class AppModel {
@@ -14,57 +23,78 @@ final class AppModel {
 
     /// Closed or merged items stay visible this long after closing.
     static let closedRetention: TimeInterval = 14 * 24 * 3600
+    static let recentLimit = 8
     private static let pollInterval: Duration = .seconds(60)
     /// Minimum gap before re-syncing when the app is activated.
     private static let activationThreshold: TimeInterval = 15
+    /// How long an item must stay selected before it counts as viewed.
+    private static let dwellBeforeViewed: Duration = .milliseconds(1200)
 
-    private(set) var items: [Item] = []
     private(set) var viewer: String?
     private(set) var syncState: SyncState = .idle
     private(set) var lastSyncedAt: Date?
     private(set) var rateLimit: RateLimit?
 
-    var selection: Item.ID?
-    var filterText = ""
+    /// The flattened table: section headers and their item rows.
+    private(set) var rows: [TableRow] = []
+    /// Number of distinct items that pass the filter.
+    private(set) var visibleCount = 0
 
-    @ObservationIgnored private let db: AppDatabase
-    @ObservationIgnored private let engine: SyncEngine
+    var filterText = "" { didSet { rebuild() } }
+    var sort: ItemSort { didSet { Defaults.set(sort, for: .sort); rebuild() } }
+    var collapsed: Set<ListSection> { didSet { Defaults.set(collapsed, for: .collapsed); rebuild() } }
+    var selection: TableSelection? { didSet { selectionChanged(from: oldValue) } }
+
+    /// Bumped to move keyboard focus to the filter field or back to the table.
+    private(set) var filterFocusRequest = 0
+    private(set) var tableFocusRequest = 0
+
+    /// `seenAt` of the selected item when it was opened, before opening moved it forward.
+    private(set) var selectedItemPreviousSeenAt: Date?
+
+    @ObservationIgnored private var snapshot = Snapshot()
+    @ObservationIgnored private var itemsByID: [Item.ID: Item] = [:]
+    @ObservationIgnored let db: AppDatabase
+    @ObservationIgnored let engine: SyncEngine
     @ObservationIgnored private var tasks: [Task<Void, Never>] = []
+    @ObservationIgnored private var dwellTask: Task<Void, Never>?
     @ObservationIgnored private let logger = Logger(subsystem: "com.bugenzhao.PRDesk", category: "App")
 
     init(db: AppDatabase) {
         self.db = db
-        engine = SyncEngine(client: GraphQLClient(), db: db)
-    }
-
-    var visibleItems: [Item] {
-        let cutoff = Date().addingTimeInterval(-Self.closedRetention)
-        let query = filterText.trimmingCharacters(in: .whitespaces).lowercased()
-        return items.filter { item in
-            guard item.isOpen || (item.closedAt ?? item.updatedAt) >= cutoff else { return false }
-            guard !query.isEmpty else { return true }
-            return item.title.lowercased().contains(query)
-                || String(item.number).hasPrefix(query)
-                || (item.author?.lowercased().contains(query) ?? false)
-        }
+        engine = SyncEngine(client: GitHubClient(), db: db)
+        sort = Defaults.get(.sort) ?? ItemSort()
+        collapsed = Defaults.get(.collapsed) ?? [.all]
     }
 
     var selectedItem: Item? {
-        selection.flatMap { id in items.first { $0.id == id } }
+        selection.flatMap { itemsByID[$0.itemID] }
     }
+
+    func state(for item: Item) -> ItemState {
+        snapshot.states[item.number] ?? ItemState(number: item.number)
+    }
+
+    // MARK: Lifecycle
 
     func start() {
         guard tasks.isEmpty else { return }
         tasks.append(Task { [weak self, db] in
             do {
-                for try await items in db.observeItems() {
-                    self?.items = items
+                for try await snapshot in db.observeSnapshot() {
+                    guard let self else { return }
+                    self.snapshot = snapshot
+                    rebuild()
                 }
             } catch {
-                self?.logger.error("Item observation failed: \(error)")
+                self?.logger.error("Observation failed: \(String(describing: error), privacy: .public)")
             }
         })
         tasks.append(Task { [weak self] in
+            if let viewer = try? await self?.engine.viewer() {
+                self?.viewer = viewer
+                self?.rebuild()
+            }
             while !Task.isCancelled {
                 await self?.sync()
                 try? await Task.sleep(for: Self.pollInterval)
@@ -84,14 +114,155 @@ final class AppModel {
         syncState = .syncing
         do {
             if let result = try await engine.sync() {
-                viewer = result.viewer
+                if viewer != result.viewer {
+                    viewer = result.viewer
+                    rebuild()
+                }
                 lastSyncedAt = result.finishedAt
                 rateLimit = result.rateLimit
             }
             syncState = .idle
         } catch {
-            logger.error("Sync failed: \(error)")
+            logger.error("Sync failed: \(String(describing: error), privacy: .public)")
             syncState = .failed(error.localizedDescription)
         }
+    }
+
+    // MARK: Actions
+
+    func perform(_ action: ItemAction, on itemID: Item.ID) {
+        guard let item = itemsByID[itemID] else { return }
+        let now = Date()
+        switch action {
+        case let .priority(priority):
+            let current = state(for: item).priority
+            updateState(item) { $0.priority = priority == current ? nil : priority }
+        case .togglePin:
+            updateState(item) { $0.pinnedAt = $0.pinnedAt == nil ? now : nil }
+        case .dismissFocus:
+            updateState(item) { $0.focusDismissedAt = now }
+        case .markRead:
+            updateState(item) { $0.seenAt = now }
+        case .toggleUntrack:
+            updateState(item) { $0.untrackedAt = $0.untrackedAt == nil ? now : nil }
+        case .openInBrowser:
+            if let url = URL(string: item.url) { NSWorkspace.shared.open(url) }
+        }
+    }
+
+    /// Fetches an item by number or URL and tracks it by hand.
+    func addItem(_ input: String) async throws {
+        let digits = input.split(whereSeparator: { !$0.isNumber }).last.flatMap { Int($0) }
+        guard let number = digits else { throw SyncError.notFound(0) }
+        let item = try await engine.fetchItem(number: number)
+        try await db.updateState(number) { state in
+            state.manual = true
+            state.untrackedAt = nil
+            state.pinnedAt = state.pinnedAt ?? Date()
+        }
+        selection = TableSelection(section: .pinned, itemID: item.id)
+    }
+
+    func requestFilterFocus() { filterFocusRequest += 1 }
+    func requestTableFocus() { tableFocusRequest += 1 }
+
+    func toggleCollapsed(_ section: ListSection) {
+        if collapsed.contains(section) { collapsed.remove(section) } else { collapsed.insert(section) }
+    }
+
+    private func updateState(_ item: Item, _ change: @escaping @Sendable (inout ItemState) -> Void) {
+        Task {
+            do {
+                try await db.updateState(item.number, change)
+            } catch {
+                logger.error("Failed to update state of #\(item.number): \(error)")
+            }
+        }
+    }
+
+    private func selectionChanged(from old: TableSelection?) {
+        guard selection?.itemID != old?.itemID else { return }
+        dwellTask?.cancel()
+        guard let item = selectedItem else {
+            selectedItemPreviousSeenAt = nil
+            return
+        }
+        selectedItemPreviousSeenAt = [state(for: item).seenAt, snapshot.baseline].compactMap(\.self).max()
+        dwellTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.dwellBeforeViewed)
+            guard !Task.isCancelled, let self else { return }
+            let now = Date()
+            updateState(item) { state in
+                state.viewedAt = now
+                state.seenAt = now
+            }
+        }
+    }
+
+    // MARK: Rows
+
+    private func rebuild() {
+        itemsByID = Dictionary(uniqueKeysWithValues: snapshot.items.map { ($0.id, $0) })
+        let cutoff = Date().addingTimeInterval(-Self.closedRetention)
+        let filter = ItemFilter(filterText)
+        let orgs = { (_: String) in [Org]() }
+
+        let visible: [ItemRow] = snapshot.items.compactMap { item in
+            let state = state(for: item)
+            let insight = ItemInsight(item: item, state: state, viewer: viewer, baseline: snapshot.baseline)
+            let row = ItemRow(item: item, state: state, insight: insight)
+            if !insight.isTracked, !filter.showsUntracked { return nil }
+            if !item.isOpen, (item.closedAt ?? item.updatedAt) < cutoff, !state.isPinned { return nil }
+            return filter.matches(row, orgs: orgs) ? row : nil
+        }
+        visibleCount = visible.count
+
+        let ordered = visible.sorted(by: sort.areInIncreasingOrder)
+        let recent = visible
+            .filter { $0.state.viewedAt != nil }
+            .sorted { $0.state.viewedAt! > $1.state.viewedAt! }
+            .prefix(Self.recentLimit)
+        let pinned = ordered.filter(\.state.isPinned)
+        let focus = ordered.filter(Self.isFocus)
+        let rest = ordered.filter { !$0.state.isPinned && !Self.isFocus($0) }
+
+        var rows: [TableRow] = []
+        for (section, members) in [(ListSection.recent, Array(recent)), (.pinned, pinned), (.focus, focus), (.all, rest)] {
+            guard !members.isEmpty || section == .focus else { continue }
+            // While filtering, show every match rather than hiding some in collapsed sections.
+            let isCollapsed = filter.isEmpty && collapsed.contains(section)
+            rows.append(.header(section, count: members.count, collapsed: isCollapsed))
+            if !isCollapsed {
+                rows += members.map { .item(section, $0) }
+            }
+        }
+        self.rows = rows
+    }
+
+    private static func isFocus(_ row: ItemRow) -> Bool {
+        guard row.item.isOpen, row.insight.isTracked else { return false }
+        // Review requests on drafts (often automatic, via CODEOWNERS) wait until the PR is ready.
+        let requested = row.insight.isReviewRequestedFromMe && !row.item.isDraft
+        let wanted = row.insight.turn == .me || row.state.priority == .high || requested
+        guard wanted else { return false }
+        if let dismissed = row.state.focusDismissedAt {
+            return (row.insight.othersActivityAt ?? .distantPast) > dismissed
+        }
+        return true
+    }
+}
+
+/// Small typed wrapper over UserDefaults for UI preferences.
+enum Defaults {
+    enum Key: String {
+        case sort, collapsed
+    }
+
+    static func get<T: Decodable>(_ key: Key) -> T? {
+        UserDefaults.standard.data(forKey: key.rawValue).flatMap { try? JSONDecoder().decode(T.self, from: $0) }
+    }
+
+    static func set(_ value: some Encodable, for key: Key) {
+        UserDefaults.standard.set(try? JSONEncoder().encode(value), forKey: key.rawValue)
     }
 }

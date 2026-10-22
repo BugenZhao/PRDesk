@@ -33,6 +33,27 @@ struct Item: Codable, Hashable, Identifiable, Sendable {
         var pending: Int
     }
 
+    /// A recent timeline event, kept for Turn, unread state and the title summary.
+    struct Event: Codable, Hashable, Sendable {
+        enum Kind: String, Codable, Sendable {
+            case comment, approved, changesRequested, reviewed
+            case commit, forcePush, merged, closed, reopened, readyForReview, reviewRequested
+        }
+
+        var kind: Kind
+        var actor: String?
+        var isBot: Bool
+        var at: Date
+        /// For `reviewRequested`: the requested user.
+        var target: String?
+
+        private static let knownBots: Set = ["mergify", "github-actions", "claude", "copilot-pull-request-reviewer", "dependabot"]
+
+        static func isBotLogin(_ login: String) -> Bool {
+            login.hasSuffix("[bot]") || knownBots.contains(login.lowercased())
+        }
+    }
+
     /// GraphQL node id.
     var id: String
     var number: Int
@@ -59,6 +80,8 @@ struct Item: Codable, Hashable, Identifiable, Sendable {
     /// Pending review requests: user logins, or `team:<slug>`.
     var reviewRequests: [String]
     var assignees: [String]
+    /// Most recent timeline events, oldest first.
+    var events: [Event]
     var fetchedAt: Date
 }
 
@@ -66,9 +89,16 @@ extension Item: FetchableRecord, PersistableRecord {
     static let databaseTableName = "item"
 
     enum Columns {
+        static let id = Column(CodingKeys.id)
         static let number = Column(CodingKeys.number)
         static let updatedAt = Column(CodingKeys.updatedAt)
     }
+}
+
+/// Logins are case-insensitive on GitHub.
+func sameLogin(_ a: String?, _ b: String?) -> Bool {
+    guard let a, let b else { return false }
+    return a.caseInsensitiveCompare(b) == .orderedSame
 }
 
 extension Item {

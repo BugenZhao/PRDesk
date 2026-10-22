@@ -28,7 +28,7 @@ enum GraphQLClientError: LocalizedError {
     }
 }
 
-actor GraphQLClient {
+actor GitHubClient {
     private static let endpoint = URL(string: "https://api.github.com/graphql")!
     private let logger = Logger(subsystem: "com.bugenzhao.PRDesk", category: "GraphQL")
     private let session: URLSession
