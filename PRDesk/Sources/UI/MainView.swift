@@ -103,7 +103,7 @@ private struct StatusBar: View {
 
     static let height: CGFloat = 22
 
-    private static let shortcuts = "j/k move · w/b/s/m working/backlog/skip/mute · 1/2/3 priority · p pin · n mark read · a add · c comment · o open · +/- vote author · / filter · ⌘[ ⌘] back/forward · esc deselect"
+    private static let shortcuts = "j/k move · w/b/s/m working/backlog/skip/mute · 1/2/3 priority · p pin · n mark read · a add · c comment · o open · ⇧⌘C copy link · +/- vote author · / filter · ⌘[ ⌘] back/forward · esc deselect"
     private static let filterHelp = "Filter with text, or tokens like status:triage is:pr turn:me author:x label:x ci:fail p:h org:redhat vote:down merged:>=10 is:first"
 
     private static let boardURL = URL(string: "https://github.com/orgs/\(BoardQuery.owner)/projects/\(BoardQuery.number)")!
