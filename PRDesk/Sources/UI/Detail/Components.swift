@@ -88,6 +88,25 @@ struct BadgeIcons: View {
     }
 }
 
+/// An item's state icon in its state color, as in the list.
+struct StateIconView: View {
+    let item: Item
+    var size: CGFloat = 14
+
+    var body: some View {
+        Group {
+            switch item.stateIcon {
+            case let .asset(name): Image(name).renderingMode(.template).resizable()
+            case let .symbol(name): Image(systemName: name).resizable()
+            }
+        }
+        .scaledToFit()
+        .frame(width: size, height: size)
+        .foregroundStyle(Color(nsColor: item.stateColor))
+        .help(item.stateDescription)
+    }
+}
+
 /// A small rounded tag.
 struct Chip: View {
     let text: String

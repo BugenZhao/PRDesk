@@ -15,7 +15,7 @@ let project = Project(
             // Not Tuist's default plist, which names a Main storyboard this app doesn't have.
             infoPlist: .file(path: "PRDesk/Info.plist"),
             sources: ["PRDesk/Sources/**"],
-            resources: ["PRDesk/AppIcon.icon"],
+            resources: ["PRDesk/AppIcon.icon", "PRDesk/Assets.xcassets"],
             dependencies: [
                 .package(product: "GRDB"),
             ],

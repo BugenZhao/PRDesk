@@ -75,6 +75,10 @@ are used off the main actor); no glass on content (cards, chips, rows).
 - Only user-initiated selection counts as opening an item (viewed, unread cleared, notification
   marked read). Selections the table makes itself go through `AppModel.autoSelect`; otherwise a
   row leaving the list selects its neighbor, which gets read and leaves too, in a chain.
+- PR state icons in `PRDesk/Assets.xcassets` (`pr-open`, `pr-draft`, `pr-conflict`, `pr-merged`,
+  `pr-closed`) are glyphs from the anthropicons font inside the local Claude desktop app
+  (`app.asar`), exported as template SVGs at `opsz` 16. They are Anthropic's assets: fine for this
+  personal app, don't publish them.
 - The app icon is an Icon Composer bundle (`PRDesk/AppIcon.icon`: `icon.json` + SVG layers on a
   1024 canvas). Layers must be filled shapes — strokes render as solid fills. Keep same-colored
   parts in one layer and make pieces overlap rather than abut, or the glass rendering shows

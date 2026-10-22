@@ -135,15 +135,9 @@ enum ItemColumn: String, CaseIterable {
     private func titleRuns(_ row: ItemRow, now: Date) -> [CellRun] {
         let item = row.item
         var runs: [CellRun] = [
-            .symbol(item.kindSymbol, color: item.stateColor),
+            .icon(item.stateIcon, color: item.stateColor),
             titleRun(item.title, bold: row.insight.isUnread),
         ]
-        if item.isDraft, item.isOpen { runs.append(.chip("draft", color: .secondaryLabelColor)) }
-        switch item.state {
-        case .merged: runs.append(.chip("merged", color: .systemPurple))
-        case .closed: runs.append(.chip("closed", color: .systemRed))
-        case .open: break
-        }
         if let note = row.note {
             runs.append(.chip(note.reasonLabel, color: .controlAccentColor))
         }
@@ -242,22 +236,42 @@ extension ItemState.Priority {
     }
 }
 
+/// The icon for an item's kind and state.
+enum StateIcon: Hashable {
+    /// A template image in the asset catalog: the PR state glyphs from the Claude app's
+    /// anthropicons font.
+    case asset(String)
+    case symbol(String)
+}
+
 extension Item {
-    var kindSymbol: String {
-        switch kind {
-        case .pullRequest: "arrow.triangle.pull"
-        case .issue: state == .open ? "circle.circle" : "checkmark.circle"
+    var hasConflicts: Bool { isOpen && mergeable == "CONFLICTING" }
+
+    /// Each PR state has its own glyph; draft wins over conflicts. Issues use SF Symbols.
+    var stateIcon: StateIcon {
+        switch (kind, state) {
+        case (.pullRequest, .open): .asset(isDraft ? "pr-draft" : hasConflicts ? "pr-conflict" : "pr-open")
+        case (.pullRequest, .merged): .asset("pr-merged")
+        case (.pullRequest, .closed): .asset("pr-closed")
+        case (.issue, .open): .symbol("circle.circle")
+        case (.issue, _): .symbol("checkmark.circle")
         }
     }
 
-    var hasConflicts: Bool { isOpen && mergeable == "CONFLICTING" }
+    var stateDescription: String {
+        switch (kind, state) {
+        case (.pullRequest, .open): isDraft ? "Draft" : hasConflicts ? "Open, merge conflicts" : "Open"
+        case (_, .merged): "Merged"
+        case (_, .closed): "Closed"
+        case (.issue, .open): "Open"
+        }
+    }
 
     /// GitHub's state colors: open green, draft gray, merged/completed purple, closed PR red;
-    /// an open PR with merge conflicts is yellow instead of carrying a separate tag.
+    /// an open, ready PR with merge conflicts is yellow.
     var stateColor: NSColor {
         switch (kind, state) {
-        case (.pullRequest, .open) where hasConflicts: .systemYellow
-        case (.pullRequest, .open): isDraft ? .secondaryLabelColor : .systemGreen
+        case (.pullRequest, .open): isDraft ? .secondaryLabelColor : hasConflicts ? .systemYellow : .systemGreen
         case (.pullRequest, .merged): .systemPurple
         case (.pullRequest, .closed): .systemRed
         case (.issue, .open): .systemGreen

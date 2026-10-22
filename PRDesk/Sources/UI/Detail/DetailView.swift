@@ -94,12 +94,8 @@ private struct DetailHeader: View {
                 AvatarView(login: item.author, size: 16)
                 LoginText(login: item.author)
                 BadgeIcons(login: item.author)
+                StateIconView(item: item)
                 stateChip
-                if item.hasConflicts {
-                    Image(systemName: item.kindSymbol)
-                        .foregroundStyle(Color(nsColor: item.stateColor))
-                        .help("Has merge conflicts")
-                }
                 if let ci = item.ci {
                     Button { tab = .checks } label: { CISummary(ci: ci) }
                         .buttonStyle(.plain)

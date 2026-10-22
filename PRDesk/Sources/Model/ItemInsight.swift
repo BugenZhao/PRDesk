@@ -57,7 +57,11 @@ struct ItemInsight: Hashable, Sendable {
             isTracked = true
         }
 
-        let latest = human.last { $0.kind != .reviewRequested || isMe($0.target) }
+        // Merging also closes; on a merged PR the merge is the event worth naming.
+        let latest = human.last { event in
+            if event.kind == .reviewRequested { return isMe(event.target) }
+            return !(item.state == .merged && event.kind == .closed)
+        }
         summary = latest.map { Self.describe($0, isMe: isMe($0.actor)) }
         summaryAt = latest?.at
 

@@ -9,6 +9,8 @@ enum CellRun {
     case chip(String, color: NSColor)
     case dot(NSColor)
     case symbol(String, color: NSColor)
+    /// An item state icon (asset template or SF Symbol), tinted.
+    case icon(StateIcon, color: NSColor)
     /// Differently colored pieces of one string that truncate together, e.g. a dimmed title prefix.
     case segments([(text: String, color: NSColor)], font: NSFont = CellFont.regular, flexible: Bool = false)
     /// Small rounded image, e.g. an org avatar.
@@ -73,7 +75,7 @@ final class RunsCellView: NSTableCellView {
             ceil(string.size(withAttributes: [.font: CellFont.chip]).width) + 2 * Self.chipPadding
         case .dot:
             Self.dotSize
-        case .symbol:
+        case .symbol, .icon:
             Self.symbolSize
         case .image:
             Self.imageSize
@@ -142,6 +144,21 @@ final class RunsCellView: NSTableCellView {
 
         case let .image(image):
             drawImage(image, in: rect)
+
+        case let .icon(.symbol(name), color):
+            draw(.symbol(name, color: color), in: rect)
+
+        case let .icon(.asset(name), color):
+            guard let image = NSImage(named: name) else { return }
+            let size = Self.symbolSize
+            let target = NSRect(x: rect.minX + (rect.width - size) / 2, y: rect.midY - size / 2, width: size, height: size)
+            // Tint the template: draw it in a transparency layer, then fill the color over its alpha.
+            let context = NSGraphicsContext.current!.cgContext
+            context.beginTransparencyLayer(auxiliaryInfo: nil)
+            image.draw(in: target, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+            (emphasized ? NSColor.alternateSelectedControlTextColor : color).setFill()
+            target.fill(using: .sourceIn)
+            context.endTransparencyLayer()
         }
     }
 
