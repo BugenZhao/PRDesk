@@ -52,7 +52,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 | **Done** | 已合并或关闭；由 board 自带的 workflow 设置，app 不写 | 不变 |
 
 - 名字只描述"我做了什么"，不评价 PR 本身，因为 org 里的人可能看得到 board
-- 从 Skipped / Muted 改成别的状态时，订阅恢复为 SUBSCRIBED
+- 设成 Skipped / Muted 时先记下当时的订阅（SUBSCRIBED 或 UNSUBSCRIBED），改成别的状态时恢复成记下的那个；没有记录的（比如在加这条规则之前设的）恢复为 SUBSCRIBED。所以撤销一次 skip 会准确回到原来的订阅
 - **Skipped 和 Muted 只在 app 里有区别**：GitHub 已经不能对单个 PR / issue 彻底屏蔽通知（GraphQL 的 `IGNORED` 和 REST 把通知线程设为 ignored 都不生效，后者只会删掉线程订阅），所以两者在 GitHub 上都只是 UNSUBSCRIBED：被 @ 或被请求 review 时仍会通知。app 里的区别是：
   - Skipped 会被唤醒（见下），Muted 不会，一直留在 Muted
   - Inbox 和未读数不计 Muted 条目的通知，Skipped 的照常计
@@ -140,7 +140,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 | `⌘` / `⇧` 点击 | 多选；下面的快捷键和右键菜单作用于所有选中条目（右键的行不在选区里时只作用于该行）。切换类操作按整体切换：都已是该状态则清除，否则全部设置 |
 | `/` | 聚焦过滤框 |
 | `w` / `b` / `s` / `m` | Status 设为 Working / Backlog / Skipped / Muted；再按一次同一个键清除 Status（回到未分诊）；被唤醒的 Skipped 条目按 `s` 是重新 skip，不清除 |
-| `⌘Z` / `⇧⌘Z` | 列表有焦点时，撤销 / 重做列表里的操作：Status、Priority、Pin、作者投票（Mark as read、Close 不能撤销）；文本框里仍是文字的撤销 |
+| `⌘Z` / `⇧⌘Z` | 列表有焦点时，撤销 / 重做列表里的操作：Status、Priority、Pin、作者投票（Mark as read、Close 不能撤销）；同一条目的 board 写入按顺序发出，撤销不会抢在原操作前面到达 GitHub；文本框里仍是文字的撤销 |
 | `1` / `2` / `3` / `0` | Priority 设为 H / M / L / 清除 |
 | `p` | 置顶 / 取消置顶 |
 | `n` | 标为已读 |

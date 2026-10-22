@@ -9,6 +9,8 @@ struct ItemState: Codable, Hashable, Sendable {
     var viewedAt: Date?
     /// Activity by others after this is unread. Opening an item or `n` moves it forward.
     var seenAt: Date?
+    /// The viewer's subscription when the item went Skipped or Muted, put back when it leaves them.
+    var subscriptionBeforeQuiet: String?
 
     init(number: Int) {
         self.number = number

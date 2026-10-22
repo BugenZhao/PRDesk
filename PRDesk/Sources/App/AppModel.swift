@@ -424,7 +424,7 @@ final class AppModel {
         let previous = changes.map { (item: $0.item, status: board(for: $0.item)?.triage) }
         registerUndo("Set Status") { $0.setTriage(previous) }
         let what = changes.count == 1 ? "#\(changes[0].item.number)" : "\(changes.count) items"
-        writeBoard("set the status of \(what)") { engine in
+        writeBoard("set the status of \(what)", numbers: changes.map(\.item.number)) { engine in
             for change in changes {
                 try await engine.setTriage(change.status, number: change.item.number, contentID: change.item.id)
             }
@@ -436,7 +436,7 @@ final class AppModel {
         let previous = changes.map { (item: $0.item, priority: board(for: $0.item)?.priorityValue) }
         registerUndo("Set Priority") { $0.setPriority(previous) }
         let what = changes.count == 1 ? "#\(changes[0].item.number)" : "\(changes.count) items"
-        writeBoard("set the priority of \(what)") { engine in
+        writeBoard("set the priority of \(what)", numbers: changes.map(\.item.number)) { engine in
             for change in changes {
                 try await engine.setPriority(change.priority, number: change.item.number, contentID: change.item.id)
             }
@@ -462,8 +462,14 @@ final class AppModel {
         }
     }
 
-    private func writeBoard(_ what: String, _ write: @escaping @Sendable (SyncEngine) async throws -> Void) {
-        Task { [engine, logger] in
+    /// The latest board write for each item. A write waits for those of its items before it, so an
+    /// undo never reaches GitHub ahead of what it undoes; other items' writes don't wait.
+    @ObservationIgnored private var pendingBoardWrites: [Int: Task<Void, Never>] = [:]
+
+    private func writeBoard(_ what: String, numbers: [Int], _ write: @escaping @Sendable (SyncEngine) async throws -> Void) {
+        let earlier = numbers.compactMap { pendingBoardWrites[$0] }
+        let task = Task { [engine, logger] in
+            for task in earlier { await task.value }
             do {
                 try await write(engine)
             } catch {
@@ -475,6 +481,7 @@ final class AppModel {
                 }
             }
         }
+        for number in numbers { pendingBoardWrites[number] = task }
     }
 
     /// Updates affiliation data for everyone who appears in the list.

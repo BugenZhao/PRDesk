@@ -155,6 +155,11 @@ final class AppDatabase: Sendable {
                 t.add(column: "itemUpdatedAt", .datetime)
             }
         }
+        migrator.registerMigration("v13") { db in
+            try db.alter(table: "itemState") { t in
+                t.add(column: "subscriptionBeforeQuiet", .text)
+            }
+        }
         return migrator
     }
 }
@@ -219,6 +224,10 @@ extension AppDatabase {
 
 extension AppDatabase {
     /// Loads (or creates) the state for `number`, applies `change`, and saves it.
+    func state(_ number: Int) async throws -> ItemState? {
+        try await reader.read { db in try ItemState.fetchOne(db, key: number) }
+    }
+
     func updateState(_ number: Int, _ change: @escaping @Sendable (inout ItemState) -> Void) async throws {
         try await writer.write { db in
             var state = try ItemState.fetchOne(db, key: number) ?? ItemState(number: number)

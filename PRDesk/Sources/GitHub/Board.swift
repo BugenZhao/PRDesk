@@ -295,15 +295,40 @@ extension SyncEngine {
         }
     }
 
-    /// Moves the subscription along with a Status change: quiet statuses turn notifications down,
-    /// leaving them turns them back on. Setting the same status again (renewing a woken skip)
-    /// applies its subscription again, since a mention may have subscribed the viewer since.
+    /// Moves the subscription along with a Status change: going quiet records the viewer's
+    /// subscription and unsubscribes; leaving puts the recorded one back (SUBSCRIBED if none was
+    /// recorded), so undoing a skip restores exactly what was there. Setting the same status again
+    /// (renewing a woken skip) unsubscribes again, since a mention may have subscribed the viewer.
     private func followSubscription(from previous: TriageStatus?, to status: TriageStatus?, number: Int, contentID: String) async throws {
         let renewing = status != nil && status == previous
-        let subscription = status?.subscription ?? (previous?.isQuiet == true ? "SUBSCRIBED" : nil)
-        if let subscription, renewing || subscription != previous?.subscription {
-            try await setSubscription(subscription, subjectID: contentID)
+        if let quiet = status?.subscription {
+            if previous?.isQuiet != true {
+                let current = try await viewerSubscription(subjectID: contentID)
+                try await db.updateState(number) { $0.subscriptionBeforeQuiet = current }
+            }
+            if renewing || quiet != previous?.subscription {
+                try await setSubscription(quiet, subjectID: contentID)
+            }
+        } else if previous?.isQuiet == true {
+            // GitHub no longer takes IGNORED on an issue or PR; unsubscribing comes closest.
+            let recorded = try await db.state(number)?.subscriptionBeforeQuiet
+            try await setSubscription(recorded.map { $0 == "IGNORED" ? "UNSUBSCRIBED" : $0 } ?? "SUBSCRIBED", subjectID: contentID)
+            try await db.updateState(number) { $0.subscriptionBeforeQuiet = nil }
         }
+    }
+
+    /// `SUBSCRIBED`, `UNSUBSCRIBED` or `IGNORED`.
+    private func viewerSubscription(subjectID: String) async throws -> String? {
+        struct Variables: Encodable, Sendable { let id: String }
+        struct Response: Decodable, Sendable {
+            struct Node: Decodable, Sendable { let viewerSubscription: String? }
+            let node: Node?
+        }
+        return try await client.query(
+            "query($id: ID!) { node(id: $id) { ... on Subscribable { viewerSubscription } } }",
+            variables: Variables(id: subjectID),
+            as: Response.self
+        ).node?.viewerSubscription
     }
 
     /// Follows Status changes made outside the app (on the web) with the subscription, as
