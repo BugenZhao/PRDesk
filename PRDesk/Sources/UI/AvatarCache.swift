@@ -47,14 +47,30 @@ final class AvatarCache {
     }
 
     private func load(_ key: String) async {
-        guard let data = await Self.fetch(key), let image = NSImage(data: data) else { return }
+        guard let data = await Self.fetch(key), let image = NSImage(data: data) else {
+            // Try again later rather than never: the network may be back by then.
+            try? await Task.sleep(for: Self.retryDelay)
+            loading.remove(key)
+            return
+        }
         images[key] = image
-        version += 1
+        loading.remove(key)
+        scheduleVersionBump()
     }
 
-    /// An avatar's image data, from disk or GitHub, for web pages.
-    nonisolated static func data(for login: String) async -> Data? {
-        await fetch(login.lowercased())
+    private static let retryDelay: Duration = .seconds(300)
+    @ObservationIgnored private var isBumpScheduled = false
+
+    /// A list's worth of avatars arrives at once; everything showing them redraws once per batch
+    /// rather than once per image.
+    private func scheduleVersionBump() {
+        guard !isBumpScheduled else { return }
+        isBumpScheduled = true
+        Task {
+            try? await Task.sleep(for: .milliseconds(100))
+            isBumpScheduled = false
+            version += 1
+        }
     }
 
     /// Disk and network I/O, off the main thread: this is reached while the table builds cells.
