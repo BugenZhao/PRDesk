@@ -304,7 +304,12 @@ enum DetailQuery {
             }
             switch typename {
             case "IssueComment":
-                return make(.comment, at: createdAt)
+                var entry = make(.comment, at: createdAt)
+                // "[AUTOMATED] @codex review" and the like are tooling, hidden with the bots.
+                if bodyText?.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("[AUTOMATED]") == true {
+                    entry?.isBot = true
+                }
+                return entry
             case "PullRequestReview":
                 guard state != "PENDING" else { return nil }
                 let kind: TimelineEntry.Kind = switch state {

@@ -110,6 +110,10 @@ final class AppDatabase: Sendable {
                 t.column("votedAt", .datetime).notNull()
             }
         }
+        migrator.registerMigration("v8") { db in
+            // Cached timelines predate hiding "[AUTOMATED]" comments with the bots.
+            try db.execute(sql: "DELETE FROM detailCache")
+        }
         return migrator
     }
 }
