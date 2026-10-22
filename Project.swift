@@ -15,12 +15,17 @@ let project = Project(
             // Not Tuist's default plist, which names a Main storyboard this app doesn't have.
             infoPlist: .file(path: "PRDesk/Info.plist"),
             sources: ["PRDesk/Sources/**"],
+            resources: ["PRDesk/AppIcon.icon"],
             dependencies: [
                 .package(product: "GRDB"),
             ],
             settings: .settings(
                 base: [
                     "SWIFT_VERSION": "6.0",
+                    // Icon Composer icon (PRDesk/AppIcon.icon), compiled by actool.
+                    "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
+                    // No asset-catalog accent color; the app follows the system accent.
+                    "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": "",
                     "MARKETING_VERSION": "0.1",
                     "CURRENT_PROJECT_VERSION": "1",
                     // Local-only app: sign to run locally, no sandbox (needs to run `gh`).

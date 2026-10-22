@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <g fill="#1E3A8A">
+    <!-- left trunk between the two left nodes -->
+    <rect x="369" y="423" width="38" height="178"/>
+    <!-- right trunk, curving up and over to the arrow -->
+    <rect x="617" y="470" width="38" height="131"/>
+    <path d="M655 470 A129 129 0 0 0 526 341 L526 379 A91 91 0 0 1 617 470 Z"/>
+    <rect x="496" y="341" width="40" height="38"/>
+    <!-- arrowhead pointing back to the base branch -->
+    <rect x="457" y="320" width="96" height="38" rx="19" transform="rotate(-45 505 339)"/>
+    <rect x="457" y="362" width="96" height="38" rx="19" transform="rotate(45 505 381)"/>
+  </g>
+</svg>

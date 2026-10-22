@@ -69,3 +69,8 @@ are used off the main actor); no glass on content (cards, chips, rows).
 - Heavy fields in the list search (e.g. comment bodies) push pages past GitHub's time limit
   (502s and truncated JSON); keep the list query lean and fetch detail on selection.
 - Never post to GitHub (comments, reviews, marking notifications read) while testing.
+- The app icon is an Icon Composer bundle (`PRDesk/AppIcon.icon`: `icon.json` + SVG layers on a
+  1024 canvas). Layers must be filled shapes — strokes render as solid fills. Preview without
+  Icon Composer: `xcrun actool --compile OUT --platform macosx --minimum-deployment-target 26.0
+  --app-icon AppIcon --output-partial-info-plist OUT/info.plist PRDesk/AppIcon.icon`, then
+  `iconutil -c iconset OUT/AppIcon.icns` (light appearance only).
