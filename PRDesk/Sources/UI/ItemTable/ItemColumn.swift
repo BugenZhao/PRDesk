@@ -135,12 +135,12 @@ enum ItemColumn: String, CaseIterable {
 
         case .size:
             guard let additions = item.additions, let deletions = item.deletions else { return [] }
-            // Additions to the left, deletions to the right; only the signs are colored, so the
-            // numbers stay quieter than the green and red of Review and CI.
+            // Additions to the left, deletions to the right, in deeper shades than the green and
+            // red of Review and CI.
             return [
-                .segments([("+", .systemGreen), (String(additions), .secondaryLabelColor)], font: CellFont.digits),
+                .text("+\(additions)", color: .diffAdded, font: CellFont.digits),
                 .spring,
-                .segments([("−", .systemRed), (String(deletions), .secondaryLabelColor)], font: CellFont.digits),
+                .text("−\(deletions)", color: .diffRemoved, font: CellFont.digits),
             ]
 
         case .age:
@@ -229,6 +229,21 @@ enum ItemColumn: String, CaseIterable {
         let failed: CellRun? = ci.failed > 0 ? .text(String(ci.failed), color: .systemRed, font: CellFont.digits) : nil
         let dot: CellRun = .symbol(isReady ? "circle.fill" : "circle", color: color, pointSize: Self.markPointSize)
         return [.slot(dot, width: Self.markSlot), .slot(failed, width: Self.countSlot)]
+    }
+}
+
+extension NSColor {
+    /// Diff stat colors, a shade deeper than the system green and red (GitHub's diff palette).
+    static let diffAdded = NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            ? NSColor(srgbRed: 0.18, green: 0.63, blue: 0.26, alpha: 1)
+            : NSColor(srgbRed: 0.10, green: 0.50, blue: 0.22, alpha: 1)
+    }
+
+    static let diffRemoved = NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            ? NSColor(srgbRed: 0.85, green: 0.21, blue: 0.20, alpha: 1)
+            : NSColor(srgbRed: 0.81, green: 0.13, blue: 0.18, alpha: 1)
     }
 }
 
