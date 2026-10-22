@@ -74,10 +74,9 @@ actor SyncEngine {
         // and commenters, but not review requests or reviews.
         let qualifier = "(involves:\(viewer) OR review-requested:\(viewer) OR reviewed-by:\(viewer) OR label:rust)"
         // Search pages are slow (GitHub computes mergeability and CI counts per PR), so long ranges
-        // are cut into windows fetched in parallel, with full pages; a short incremental range
-        // uses small ones.
+        // are cut into windows fetched in parallel; a short incremental range uses small pages.
         let windows = Self.windows(from: since, to: startedAt)
-        let pageSize = windows.count > 1 ? ItemQuery.pageSize : ItemQuery.incrementalPageSize
+        let pageSize = windows.count > 1 ? ItemQuery.fullSyncPageSize : ItemQuery.incrementalPageSize
         var fetched = try await withThrowingTaskGroup(of: Int.self) { group in
             var pending = windows.makeIterator()
             var total = 0

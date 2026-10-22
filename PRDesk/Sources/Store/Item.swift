@@ -44,15 +44,37 @@ struct Item: Codable, Hashable, Identifiable, Sendable {
 
         var kind: Kind
         var actor: String?
-        var isBot: Bool
+        /// By a bot or agent account; such events don't count as people's activity.
+        var isAutomated: Bool
         var at: Date
         /// For `reviewRequested`: the requested user; for `mentioned`: the mentioned user.
         var target: String?
 
-        private static let knownBots: Set = ["mergify", "github-actions", "claude", "copilot-pull-request-reviewer", "dependabot"]
+        /// Accounts that act for tools rather than people, besides GitHub's `[bot]` logins.
+        private static let automationLogins: Set = [
+            "mergify", "github-actions", "claude", "copilot-pull-request-reviewer", "dependabot", "vllm-agent",
+        ]
 
-        static func isBotLogin(_ login: String) -> Bool {
-            login.hasSuffix("[bot]") || knownBots.contains(login.lowercased())
+        static func isAutomationLogin(_ login: String) -> Bool {
+            login.hasSuffix("[bot]") || automationLogins.contains(login.lowercased())
+        }
+
+        /// Agents and bots people summon with a mention, as in "@codex review".
+        private static let summonedAgents = ["codex", "claude", "gemini-code-assist", "copilot", "cursor", "coderabbitai", "mergify"]
+
+        /// A comment that only drives tooling: "[AUTOMATED] …", or nothing but commands such as
+        /// "@codex review", "@claude review" or "/ci run" (one per line, a few lines at most).
+        static func isCommand(_ body: String) -> Bool {
+            let text = body.trimmingCharacters(in: .whitespacesAndNewlines)
+            if text.hasPrefix("[AUTOMATED]") { return true }
+            let lines = text.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+            guard !lines.isEmpty, lines.count <= 3 else { return false }
+            return lines.allSatisfy { line in
+                let lower = line.lowercased()
+                // "/ci run", but not a path like "/path/to/file".
+                if lower.wholeMatch(of: /\/[a-z][\w-]*(\s.*)?/) != nil { return true }
+                return summonedAgents.contains { lower.hasPrefix("@\($0) ") || lower == "@\($0)" }
+            }
         }
     }
 

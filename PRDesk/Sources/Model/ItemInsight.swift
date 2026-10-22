@@ -27,7 +27,7 @@ struct ItemInsight: Hashable, Sendable {
 
     init(item: Item, state: ItemState?, viewer: String?, baseline: Date?) {
         let isMe = { (login: String?) in sameLogin(login, viewer) }
-        let human = item.events.filter { !$0.isBot && $0.actor != nil }
+        let human = item.events.filter { !$0.isAutomated && $0.actor != nil }
 
         let othersActivity = human.filter { event in
             guard !isMe(event.actor) else { return false }
@@ -79,7 +79,7 @@ struct ItemInsight: Hashable, Sendable {
             switch event.kind {
             case .mentioned where isMe(event.target):
                 asks.append(DirectAsk(at: event.at, reason: "mentioned you"))
-            case .reviewRequested where isMe(event.target) && !event.isBot && isManual(event, item: item, isMe: isMe):
+            case .reviewRequested where isMe(event.target) && !event.isAutomated && isManual(event, item: item, isMe: isMe):
                 asks.append(DirectAsk(at: event.at, reason: "@\(event.actor ?? "ghost") requested your review"))
             default:
                 break

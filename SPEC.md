@@ -180,7 +180,11 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 - **Comment**：board 的 Comment 字段，可直接编辑，回车或失焦时保存
 - **Conversation**：
   - 时间线包括评论、review（含行内评论的摘要和 diff hunk）、push、label、状态变化
-  - 可"显示 bot"，可全部展开 / 折叠
+  - "Show automated" 默认关闭，关闭时隐藏自动化内容：
+    - bot 和 agent 账号（`[bot]` 账号、mergify、github-actions、vllm-agent 等）的事件
+    - 只有命令的评论：`[AUTOMATED] …`，或每行都是 `@codex review`、`@claude review`、`/ci …` 这类命令（最多 3 行）
+  - 列表的摘要、Turn、未读都不计这些账号的动作（列表不抓评论正文，所以命令评论在列表里仍算参与）
+  - 可全部展开 / 折叠
   - 自上次查看以来的新内容高亮，并自动滚到第一条新内容
 - **Checks**：按状态分组列出 check runs 和 statuses，失败的置顶，点击打开日志 URL
 - **Files**（v1 只读）：变更文件列表和 diff

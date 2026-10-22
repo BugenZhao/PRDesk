@@ -141,6 +141,13 @@ final class AppDatabase: Sendable {
                 t.add(column: "mergedFetchedAt", .datetime)
             }
         }
+        migrator.registerMigration("v11") { db in
+            // Stored events and timelines renamed `isBot` to `isAutomated`, and more comments now count
+            // as automated; fetch items and details again.
+            try db.execute(sql: "DELETE FROM item")
+            try db.execute(sql: "DELETE FROM detailCache")
+            try db.execute(sql: "DELETE FROM meta WHERE key = 'lastSyncStartedAt'")
+        }
         return migrator
     }
 }

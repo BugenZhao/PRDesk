@@ -48,7 +48,7 @@ actor AffiliationEngine {
             try await db.setMeta(Self.membersFetchedKey, SyncEngine.format(Date()))
         }
 
-        let people = logins.map { $0.lowercased() }.filter { !Item.Event.isBotLogin($0) }.sorted()
+        let people = logins.map { $0.lowercased() }.filter { !Item.Event.isAutomationLogin($0) }.sorted()
         let known = try await db.userInfos()
         let cutoff = Date().addingTimeInterval(-Self.userRefreshInterval)
         let stale = people.filter { force || (known[$0]?.fetchedAt ?? .distantPast) < cutoff }
@@ -61,7 +61,7 @@ actor AffiliationEngine {
         let now = Date()
         // Missing counts first, then the oldest; the rest wait for later rounds.
         let mergedStale = authors.map { $0.lowercased() }
-            .filter { !Item.Event.isBotLogin($0) }
+            .filter { !Item.Event.isAutomationLogin($0) }
             .compactMap { login -> (String, Date)? in
                 guard let user = current[login] else { return nil }
                 guard let count = user.mergedCount, let at = user.mergedFetchedAt else { return (login, .distantPast) }

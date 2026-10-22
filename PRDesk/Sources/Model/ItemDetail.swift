@@ -27,7 +27,7 @@ struct TimelineEntry: Codable, Equatable, Identifiable, Sendable {
     var id: String
     var kind: Kind
     var actor: String?
-    var isBot: Bool
+    var isAutomated: Bool
     var at: Date
     var url: String?
     var bodyHTML: String?

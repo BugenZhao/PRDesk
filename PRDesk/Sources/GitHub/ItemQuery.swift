@@ -2,9 +2,13 @@ import Foundation
 
 /// GraphQL queries that fetch list-level item data, and the response shapes they decode into.
 enum ItemQuery {
+    /// Batch size for fetching items by id.
     static let pageSize = 50
-    /// Page size for incremental syncs, which usually find a handful of changes. GitHub charges
-    /// for the nodes a page could return (50 per page costs 6 points, 20 costs 2).
+    /// Search page size for a full sync. Pages of 50 tracked PRs (with CI and reviews) often run
+    /// past GitHub's time limit and fail with 502s; 25 don't, at about the same total cost.
+    static let fullSyncPageSize = 25
+    /// Search page size for incremental syncs, which usually find a handful of changes. GitHub
+    /// charges for the nodes a page could return (50 per page costs 6 points, 20 costs 2).
     static let incrementalPageSize = 20
     /// GitHub search never returns more than this many results for one query.
     static let resultCap = 1000
@@ -212,7 +216,7 @@ enum ItemQuery {
             case login
         }
 
-        var isBot: Bool { typename == "Bot" || Item.Event.isBotLogin(login) }
+        var isAutomated: Bool { typename == "Bot" || Item.Event.isAutomationLogin(login) }
     }
 
     struct Label: Decodable, Sendable {
@@ -308,7 +312,7 @@ enum ItemQuery {
         var event: Item.Event? {
             let who = author ?? actor
             func make(_ kind: Item.Event.Kind, at date: Date?, target: String? = nil) -> Item.Event? {
-                date.map { Item.Event(kind: kind, actor: who?.login, isBot: who?.isBot ?? false, at: $0, target: target) }
+                date.map { Item.Event(kind: kind, actor: who?.login, isAutomated: who?.isAutomated ?? false, at: $0, target: target) }
             }
             switch typename {
             case "IssueComment":
@@ -325,7 +329,7 @@ enum ItemQuery {
             case "PullRequestCommit":
                 guard let commit else { return nil }
                 let login = commit.author?.user?.login
-                return Item.Event(kind: .commit, actor: login, isBot: login.map(Item.Event.isBotLogin) ?? false, at: commit.committedDate, target: nil)
+                return Item.Event(kind: .commit, actor: login, isAutomated: login.map(Item.Event.isAutomationLogin) ?? false, at: commit.committedDate, target: nil)
             case "HeadRefForcePushedEvent": return make(.forcePush, at: createdAt)
             case "MergedEvent": return make(.merged, at: createdAt)
             case "ClosedEvent": return make(.closed, at: createdAt)
@@ -334,7 +338,7 @@ enum ItemQuery {
             case "ReviewRequestedEvent": return make(.reviewRequested, at: createdAt, target: requestedReviewer?.login)
             case "MentionedEvent":
                 // Nobody acted as far as activity goes; the actor is who was mentioned.
-                return createdAt.map { Item.Event(kind: .mentioned, actor: nil, isBot: false, at: $0, target: actor?.login) }
+                return createdAt.map { Item.Event(kind: .mentioned, actor: nil, isAutomated: false, at: $0, target: actor?.login) }
             default: return nil
             }
         }

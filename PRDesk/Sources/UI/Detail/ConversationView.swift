@@ -8,7 +8,7 @@ struct ConversationView: View {
     /// Entries by others after this are highlighted as new.
     let previousSeenAt: Date?
 
-    @AppStorage("showBots") private var showBots = false
+    @AppStorage("showAutomated") private var showAutomated = false
     /// Per-card expansion chosen by the user, overriding the default.
     @State private var expanded: [String: Bool] = [:]
     @State private var expandAll: Bool?
@@ -65,8 +65,9 @@ struct ConversationView: View {
 
     private func toolbar(cardCount: Int) -> some View {
         HStack(spacing: 10) {
-            Toggle("Show bots", isOn: $showBots)
+            Toggle("Show automated", isOn: $showAutomated)
                 .toggleStyle(.checkbox)
+                .help("Bots and agent accounts (such as vllm-agent), and comments that only run commands, like @codex review or /ci")
             Text("\(cardCount) comment\(cardCount == 1 ? "" : "s")")
                 .foregroundStyle(.secondary)
             Spacer()
@@ -145,7 +146,7 @@ struct ConversationView: View {
     /// Groups consecutive commits by the same person, and drops bots unless shown.
     private func makeBlocks() -> [Block] {
         var blocks: [Block] = []
-        for entry in detail.entries where showBots || !entry.isBot {
+        for entry in detail.entries where showAutomated || !entry.isAutomated {
             if entry.kind == .commit {
                 if case var .commits(group) = blocks.last, sameLogin(group[0].actor, entry.actor) {
                     group.append(entry)

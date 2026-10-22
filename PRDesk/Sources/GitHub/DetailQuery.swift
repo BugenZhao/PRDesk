@@ -298,16 +298,16 @@ enum DetailQuery {
             let who = author ?? actor
             func make(_ kind: TimelineEntry.Kind, at date: Date?, detail: String? = nil, color: String? = nil) -> TimelineEntry? {
                 date.map {
-                    TimelineEntry(id: id, kind: kind, actor: who?.login, isBot: who?.isBot ?? false, at: $0, url: url,
+                    TimelineEntry(id: id, kind: kind, actor: who?.login, isAutomated: who?.isAutomated ?? false, at: $0, url: url,
                                   bodyHTML: bodyHTML, bodyText: bodyText, detail: detail, color: color)
                 }
             }
             switch typename {
             case "IssueComment":
                 var entry = make(.comment, at: createdAt)
-                // "[AUTOMATED] @codex review" and the like are tooling, hidden with the bots.
-                if bodyText?.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("[AUTOMATED]") == true {
-                    entry?.isBot = true
+                // "@codex review", "/ci run" and the like drive tooling; hidden with the automation.
+                if let bodyText, Item.Event.isCommand(bodyText) {
+                    entry?.isAutomated = true
                 }
                 return entry
             case "PullRequestReview":
@@ -328,7 +328,7 @@ enum DetailQuery {
             case "PullRequestCommit":
                 guard let commit else { return nil }
                 let login = commit.author?.user?.login
-                return TimelineEntry(id: id, kind: .commit, actor: login ?? commit.author?.name, isBot: login.map(Item.Event.isBotLogin) ?? false,
+                return TimelineEntry(id: id, kind: .commit, actor: login ?? commit.author?.name, isAutomated: login.map(Item.Event.isAutomationLogin) ?? false,
                                      at: commit.committedDate, url: url, detail: "\(commit.abbreviatedOid) \(commit.messageHeadline)")
             case "HeadRefForcePushedEvent": return make(.forcePush, at: createdAt, detail: afterCommit?.abbreviatedOid)
             case "MergedEvent": return make(.merged, at: createdAt)
