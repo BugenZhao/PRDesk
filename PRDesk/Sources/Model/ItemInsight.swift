@@ -5,6 +5,13 @@ enum Turn: String, Sendable {
     case me, them
 }
 
+/// Someone turning to the viewer directly: what wakes a Skipped item (SPEC §3.1).
+struct DirectAsk: Hashable, Sendable {
+    var at: Date
+    /// E.g. "mentioned you", "@x requested your review", "@x replied".
+    var reason: String
+}
+
 /// Facts derived from an item, its local state and the viewer.
 struct ItemInsight: Hashable, Sendable {
     var turn: Turn?
@@ -15,16 +22,8 @@ struct ItemInsight: Hashable, Sendable {
     var summary: String?
     var summaryAt: Date?
     var isReviewRequestedFromMe: Bool
-    /// The pending request looks deliberate rather than automatic (e.g. CODEOWNERS on open or push).
-    var isManualRequest: Bool
-    /// The viewer has commented on, reviewed or pushed to the item (bots excluded).
-    var hasParticipated: Bool
-    /// The viewer authored the item.
-    var isMine: Bool
-    /// Latest activity by any person (bots excluded), as far as the recent events tell.
-    var lastHumanActivityAt: Date
-    /// An untracked item comes back when it is requested for review again afterwards.
-    var isTracked: Bool
+    /// The latest time someone turned to the viewer directly, as far as the recent events tell.
+    var directAsk: DirectAsk?
 
     init(item: Item, state: ItemState?, viewer: String?, baseline: Date?) {
         let isMe = { (login: String?) in sameLogin(login, viewer) }
@@ -36,26 +35,16 @@ struct ItemInsight: Hashable, Sendable {
             return event.kind != .reviewRequested || isMe(event.target)
         }
         othersActivityAt = othersActivity.map(\.at).max()
-        // Only recent events are known; if they are all bots, people may have been active just
-        // before them, so fall back to the update time rather than calling the item stale.
-        lastHumanActivityAt = human.map(\.at).max() ?? (item.events.isEmpty ? item.createdAt : item.updatedAt)
-        isMine = isMe(item.author)
 
         let seen = [state?.seenAt, baseline].compactMap(\.self).max() ?? .distantPast
         isUnread = (othersActivityAt ?? .distantPast) > seen
 
         isReviewRequestedFromMe = viewer.map(item.isReviewRequested(from:)) ?? false
-        isManualRequest = isReviewRequestedFromMe && Self.isManualRequest(item: item, isMe: isMe)
         // Opinionated reviews are known for the whole PR; other activity only from recent events.
         let myReview = viewer.flatMap(item.review(by:))
         let myLast = ([myReview?.submittedAt] + human.filter { isMe($0.actor) }.map(\.at)).compactMap(\.self).max()
-        hasParticipated = myLast != nil || myReview != nil
 
-        if let untrackedAt = state?.untrackedAt {
-            isTracked = human.contains { $0.kind == .reviewRequested && isMe($0.target) && $0.at > untrackedAt }
-        } else {
-            isTracked = true
-        }
+        directAsk = Self.directAsk(item: item, human: human, myLast: myLast, isMe: isMe)
 
         // Merging also closes; on a merged PR the merge is the event worth naming.
         let latest = human.last { event in
@@ -65,8 +54,7 @@ struct ItemInsight: Hashable, Sendable {
         summary = latest.map { Self.describe($0, isMe: isMe($0.actor), isAuthor: sameLogin($0.actor, item.author)) }
         summaryAt = latest?.at
 
-        turn = item.isOpen ? Self.turn(item: item, human: human, myLast: myLast, isMe: isMe,
-                                        requested: isReviewRequestedFromMe, manualRequest: isManualRequest) : nil
+        turn = item.isOpen ? Self.turn(item: item, human: human, myLast: myLast, isMe: isMe, requested: isReviewRequestedFromMe) : nil
     }
 
     /// Requests made by the author right when the PR was opened, marked ready or pushed to are
@@ -74,11 +62,7 @@ struct ItemInsight: Hashable, Sendable {
     private static let automaticWindow: TimeInterval = 120
     private static let pushWindow: TimeInterval = 300
 
-    private static func isManualRequest(item: Item, isMe: (String?) -> Bool) -> Bool {
-        guard let request = item.events.last(where: { $0.kind == .reviewRequested && isMe($0.target) }) else {
-            // The request event fell out of the recent window; assume the common, automatic case.
-            return false
-        }
+    private static func isManual(_ request: Item.Event, item: Item, isMe: (String?) -> Bool) -> Bool {
         if isMe(request.actor) { return false }
         if !sameLogin(request.actor, item.author) { return true }
         if abs(request.at.timeIntervalSince(item.createdAt)) < automaticWindow { return false }
@@ -88,9 +72,31 @@ struct ItemInsight: Hashable, Sendable {
         return !nearPush
     }
 
+    /// A mention, a deliberate review request, or others talking after the viewer took part.
+    private static func directAsk(item: Item, human: [Item.Event], myLast: Date?, isMe: (String?) -> Bool) -> DirectAsk? {
+        var asks: [DirectAsk] = []
+        for event in item.events {
+            switch event.kind {
+            case .mentioned where isMe(event.target):
+                asks.append(DirectAsk(at: event.at, reason: "mentioned you"))
+            case .reviewRequested where isMe(event.target) && !event.isBot && isManual(event, item: item, isMe: isMe):
+                asks.append(DirectAsk(at: event.at, reason: "@\(event.actor ?? "ghost") requested your review"))
+            default:
+                break
+            }
+        }
+        if let myLast {
+            let talk: Set<Item.Event.Kind> = [.comment, .approved, .changesRequested, .reviewed]
+            if let reply = human.last(where: { !isMe($0.actor) && talk.contains($0.kind) && $0.at > myLast }) {
+                asks.append(DirectAsk(at: reply.at, reason: "@\(reply.actor ?? "ghost") replied"))
+            }
+        }
+        return asks.max { $0.at < $1.at }
+    }
+
     private static func turn(
         item: Item, human: [Item.Event], myLast: Date?, isMe: (String?) -> Bool,
-        requested: Bool, manualRequest: Bool
+        requested: Bool
     ) -> Turn? {
         let mine = human.filter { isMe($0.actor) }
         /// Conversation by others (comments and reviews), ignoring pushes and bookkeeping.
@@ -111,10 +117,7 @@ struct ItemInsight: Hashable, Sendable {
             return .them
 
         case .pullRequest:
-            if requested, !item.isDraft {
-                // An automatic request on a PR I've never touched is a queue entry, not my move yet.
-                return manualRequest || myLast != nil ? .me : nil
-            }
+            if requested, !item.isDraft { return .me }
             guard let myLast else { return .them }
             // After my review or comment, the ball is back with me once the author or others respond.
             let responses = human.filter { !isMe($0.actor) && $0.kind != .reviewRequested }
@@ -142,6 +145,7 @@ struct ItemInsight: Hashable, Sendable {
         case .reopened: "reopened by \(who)"
         case .readyForReview: "\(who) marked ready"
         case .reviewRequested: "\(who) requested your review"
+        case .mentioned: "you were mentioned"
         }
     }
 }

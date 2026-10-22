@@ -126,6 +126,7 @@ private struct DetailHeader: View {
             }
 
             controls
+            BoardCommentField(item: item, saved: model.board(for: item)?.comment ?? "")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -146,25 +147,44 @@ private struct DetailHeader: View {
     }
 
     private var controls: some View {
-        HStack(spacing: 8) {
+        let board = model.board(for: item)
+        return HStack(spacing: 8) {
+            Picker("Status", selection: Binding(
+                get: { board?.triage },
+                set: { status in
+                    if let status {
+                        if status != board?.triage { model.perform(.triage(status), on: item.id) }
+                    } else if let current = board?.triage {
+                        // Choosing the current status again clears it.
+                        model.perform(.triage(current), on: item.id)
+                    }
+                }
+            )) {
+                Text("Triage").tag(TriageStatus?.none)
+                Divider()
+                ForEach(TriageStatus.allCases, id: \.self) { Text($0.rawValue).tag(Optional($0)) }
+            }
+            .labelsHidden()
+            .fixedSize()
+            .help("Status on the board (w/b/s/m)")
+
             Picker("Priority", selection: Binding(
-                get: { state.priority },
+                get: { board?.priorityValue },
                 set: { model.perform(.priority($0), on: item.id) }
             )) {
-                ForEach(ItemState.Priority.allCases, id: \.self) { Text($0.letter).tag(Optional($0)) }
-                Text("–").tag(ItemState.Priority?.none)
+                ForEach(Priority.allCases, id: \.self) { Text($0.letter).tag(Optional($0)) }
+                Text("–").tag(Priority?.none)
             }
             .pickerStyle(.segmented)
             .labelsHidden()
             .fixedSize()
-            .help("Priority (1/2/3, 0 to clear)")
+            .help("Priority on the board (1/2/3, 0 to clear)")
 
             Button(state.isPinned ? "Unpin" : "Pin", systemImage: state.isPinned ? "pin.slash" : "pin") {
                 model.perform(.togglePin, on: item.id)
             }
-            Button(state.untrackedAt == nil ? "Untrack" : "Track", systemImage: state.untrackedAt == nil ? "eye.slash" : "eye") {
-                model.perform(.toggleUntrack, on: item.id)
-            }
+            .labelStyle(.iconOnly)
+            .help(state.isPinned ? "Unpin (p)" : "Pin (p)")
             Spacer()
             if model.detailState == .loading {
                 ProgressView().controlSize(.small)
@@ -177,6 +197,34 @@ private struct DetailHeader: View {
                 .help("Open on GitHub (o)")
         }
         .controlSize(.small)
+    }
+}
+
+/// The board's Comment field: a note on the item, saved on Return or when focus leaves.
+private struct BoardCommentField: View {
+    @Environment(AppModel.self) private var model
+    let item: Item
+    let saved: String
+    @State private var text = ""
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        TextField("Comment", text: $text, axis: .vertical)
+            .lineLimit(1 ... 4)
+            .textFieldStyle(.roundedBorder)
+            .controlSize(.small)
+            .focused($isFocused)
+            .onSubmit(save)
+            .onChange(of: isFocused) { if !isFocused { save() } }
+            // Reload when another item is shown or the board changes, but not under the cursor.
+            .task(id: "\(item.number)\n\(saved)") {
+                if !isFocused { text = saved }
+            }
+            .help("Comment on the board")
+    }
+
+    private func save() {
+        model.setComment(text, for: item)
     }
 }
 

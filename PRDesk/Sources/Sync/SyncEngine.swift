@@ -22,24 +22,29 @@ enum SyncError: LocalizedError {
 ///
 /// The first sync looks back `initialLookback`; later syncs only ask for items
 /// updated since the previous sync started (minus some slack for search index lag).
-/// Items added by hand don't match the searches, so they are refreshed by id.
+/// Items on the triage board are tracked too; those no search finds are refreshed by id.
 actor SyncEngine {
     static let owner = "vllm-project"
     static let name = "vllm"
     static let repo = "\(owner)/\(name)"
     static let initialLookback: TimeInterval = 90 * 24 * 3600
     private static let indexSlack: TimeInterval = 5 * 60
-    private static let manualRefreshInterval: TimeInterval = 5 * 60
+    private static let boardRefreshInterval: TimeInterval = 5 * 60
     private static let lastSyncKey = "lastSyncStartedAt"
     private static let viewerKey = "viewer"
     private static let windowLength: TimeInterval = 10 * 24 * 3600
     private static let maxConcurrentFetches = 6
 
     let client: GitHubClient
-    private let db: AppDatabase
+    let db: AppDatabase
     private let logger = Logger(subsystem: "com.bugenzhao.PRDesk", category: "Sync")
     private var isSyncing = false
-    private var manualRefreshedAt: Date?
+    private var boardRefreshedAt: Date?
+    /// Ids needed to write to the board, from the latest board sync.
+    var boardSchema: BoardQuery.Schema?
+    /// When the app last wrote each board item, so a sync that read the board just before
+    /// doesn't undo the write locally.
+    var boardWrites: [Int: Date] = [:]
 
     init(client: GitHubClient, db: AppDatabase) {
         self.client = client
@@ -61,7 +66,7 @@ actor SyncEngine {
         }
 
         // `involves:` covers author, assignee, mentions and commenters, but not review requests or reviews.
-        let qualifiers = ["involves:\(viewer)", "review-requested:\(viewer)", "reviewed-by:\(viewer)"]
+        let qualifiers = ["involves:\(viewer)", "review-requested:\(viewer)", "reviewed-by:\(viewer)", "label:rust"]
         // Search pages are slow (GitHub computes mergeability and CI counts per PR), so long ranges
         // are cut into windows fetched in parallel.
         let windows = Self.windows(from: since, to: startedAt)
@@ -81,7 +86,7 @@ actor SyncEngine {
             }
             return total
         }
-        fetched += try await refreshManualItemsIfNeeded()
+        fetched += try await refreshBoardItems(syncBoard())
 
         try await db.setMeta(Self.lastSyncKey, Self.format(startedAt))
         if try await db.meta(AppDatabase.baselineKey) == nil {
@@ -125,10 +130,15 @@ actor SyncEngine {
         return count
     }
 
-    private func refreshManualItemsIfNeeded() async throws -> Int {
-        if let last = manualRefreshedAt, Date().timeIntervalSince(last) < Self.manualRefreshInterval { return 0 }
-        manualRefreshedAt = Date()
-        let ids = try await db.items(numbers: db.manualNumbers()).filter(\.isOpen).map(\.id)
+    /// Fetches board items missing locally at once, and refreshes the open ones now and then, since
+    /// the searches may not cover them.
+    private func refreshBoardItems(_ contentIDs: [String]) async throws -> Int {
+        let known = try await db.itemStates()
+        var ids = contentIDs.filter { known[$0] == nil }
+        if boardRefreshedAt.map({ Date().timeIntervalSince($0) >= Self.boardRefreshInterval }) ?? true {
+            boardRefreshedAt = Date()
+            ids += contentIDs.filter { known[$0] == .open }
+        }
         return try await refresh(ids: ids)
     }
 

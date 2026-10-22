@@ -26,6 +26,14 @@ enum ItemQuery {
     }
     """
 
+    /// Who was @mentioned and when, kept apart so mentions of others don't crowd out the events.
+    /// A MentionedEvent's actor is the person mentioned, not the one who wrote the mention.
+    private static let mentions = """
+    mentions: timelineItems(last: 5, itemTypes: [MENTIONED_EVENT]) {
+      nodes { __typename ... on MentionedEvent { actor \(actor) createdAt } }
+    }
+    """
+
     private static let issueEvents = """
     timelineItems(last: 12, itemTypes: [ISSUE_COMMENT, CLOSED_EVENT, REOPENED_EVENT]) {
       nodes {
@@ -62,6 +70,7 @@ enum ItemQuery {
         }
       }
       \(prEvents)
+      \(mentions)
     }
     fragment IssueFields on Issue {
       id number title url state createdAt updatedAt closedAt
@@ -69,6 +78,7 @@ enum ItemQuery {
       labels(first: 20) { nodes { name color } }
       assignees(first: 10) { nodes { login } }
       \(issueEvents)
+      \(mentions)
     }
     """
 
@@ -318,6 +328,9 @@ enum ItemQuery {
             case "ReopenedEvent": return make(.reopened, at: createdAt)
             case "ReadyForReviewEvent": return make(.readyForReview, at: createdAt)
             case "ReviewRequestedEvent": return make(.reviewRequested, at: createdAt, target: requestedReviewer?.login)
+            case "MentionedEvent":
+                // Nobody acted as far as activity goes; the actor is who was mentioned.
+                return createdAt.map { Item.Event(kind: .mentioned, actor: nil, isBot: false, at: $0, target: actor?.login) }
             default: return nil
             }
         }
@@ -343,6 +356,7 @@ enum ItemQuery {
         let latestOpinionatedReviews: Nodes<Review>
         let commits: Nodes<Commit>
         let timelineItems: Nodes<TimelineNode>
+        let mentions: Nodes<TimelineNode>
 
         func item(fetchedAt: Date) -> Item {
             Item(
@@ -372,7 +386,7 @@ enum ItemQuery {
                     return reviewer.login ?? reviewer.slug.map { "team:\($0)" }
                 },
                 assignees: [],
-                events: timelineItems.values.compactMap(\.event),
+                events: events(timelineItems, mentions),
                 fetchedAt: fetchedAt
             )
         }
@@ -391,6 +405,7 @@ enum ItemQuery {
         let labels: Nodes<Label>
         let assignees: Nodes<Login>
         let timelineItems: Nodes<TimelineNode>
+        let mentions: Nodes<TimelineNode>
 
         func item(fetchedAt: Date) -> Item {
             Item(
@@ -415,11 +430,16 @@ enum ItemQuery {
                 reviews: [],
                 reviewRequests: [],
                 assignees: assignees.values.map(\.login),
-                events: timelineItems.values.compactMap(\.event),
+                events: events(timelineItems, mentions),
                 fetchedAt: fetchedAt
             )
         }
     }
+}
+
+/// Timeline events and mentions in time order.
+private func events(_ timeline: ItemQuery.Nodes<ItemQuery.TimelineNode>, _ mentions: ItemQuery.Nodes<ItemQuery.TimelineNode>) -> [Item.Event] {
+    (timeline.values + mentions.values).compactMap(\.event).sorted { $0.at < $1.at }
 }
 
 private extension Item.State {

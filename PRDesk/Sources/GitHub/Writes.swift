@@ -44,7 +44,7 @@ private struct Ignored: Decodable, Sendable {
 
 /// Debug builds launched with `-PRDeskDryRunWrites YES` log writes to GitHub instead of sending
 /// them, so flows that comment or mark notifications read can be tested safely.
-private func isDryRun(_ what: @autoclosure () -> String) -> Bool {
+func isDryRun(_ what: @autoclosure () -> String) -> Bool {
     #if DEBUG
         if UserDefaults.standard.bool(forKey: "PRDeskDryRunWrites") {
             let message = what()

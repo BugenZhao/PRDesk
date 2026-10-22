@@ -8,17 +8,17 @@ struct MenuBarContent: View {
     private static let limit = 15
 
     var body: some View {
-        let focus = model.focusItems
-        Section("Focus · \(focus.count)") {
-            ForEach(focus.prefix(Self.limit), id: \.item.id) { row in
+        let working = model.workingItems
+        Section("Working · \(working.count)") {
+            ForEach(working.prefix(Self.limit), id: \.item.id) { row in
                 Button {
                     show { model.reveal(row.item.id) }
                 } label: {
                     Text(label(row))
                 }
             }
-            if focus.count > Self.limit {
-                Text("and \(focus.count - Self.limit) more").foregroundStyle(.secondary)
+            if working.count > Self.limit {
+                Text("and \(working.count - Self.limit) more").foregroundStyle(.secondary)
             }
         }
         Divider()
@@ -37,7 +37,8 @@ struct MenuBarContent: View {
     private func label(_ row: ItemRow) -> String {
         var parts: [String] = []
         if row.insight.isUnread { parts.append("●") }
-        if let priority = row.state.priority { parts.append(priority.letter) }
+        if row.insight.turn == .me { parts.append("→") }
+        if let priority = row.priority { parts.append(priority.letter) }
         parts.append("#\(row.item.number) \(row.item.title)")
         return parts.joined(separator: " ")
     }

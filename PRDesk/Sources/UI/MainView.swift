@@ -45,7 +45,7 @@ struct MainView: View {
             }
             ToolbarItem(placement: .navigation) {
                 Button("Add", systemImage: "plus") { showsAdd = true }
-                    .help("Track a PR or issue by number or URL")
+                    .help("Add a PR or issue to the board by number or URL")
                     .popover(isPresented: $showsAdd, arrowEdge: .bottom) {
                         AddItemView { showsAdd = false }
                     }
@@ -71,6 +71,12 @@ struct MainView: View {
             }
         }
         .onChange(of: model.filterFocusRequest) { filterFocused = true }
+        .alert(
+            "Board not updated",
+            isPresented: Binding(get: { model.writeError != nil }, set: { if !$0 { model.writeError = nil } }),
+            actions: { Button("OK") {} },
+            message: { Text(model.writeError ?? "") }
+        )
         .task {
             #if DEBUG
                 // `-PRDeskAppearance dark|light` forces an appearance, for checking both without
@@ -96,13 +102,13 @@ struct MainView: View {
                     if model.filterText.isEmpty { model.requestTableFocus() } else { model.filterText = "" }
                     return .handled
                 }
-                .help("Text, or tokens like is:pr turn:me author:x label:x ci:fail p:h org:redhat is:untracked")
+                .help("Text, or tokens like status:triage is:pr turn:me author:x label:x ci:fail p:h org:redhat vote:down")
             Text("\(model.visibleCount) items")
                 .font(.caption)
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
             Spacer(minLength: 8)
-            Text("j/k move · 1/2/3 priority · p pin · d drop from focus · n mark read · c comment · o open · u untrack · +/- vote author")
+            Text("j/k move · w/b/s/m working/backlog/skip/mute · 1/2/3 priority · p pin · n mark read · c comment · o open · +/- vote author")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
                 .lineLimit(1)

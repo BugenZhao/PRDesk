@@ -90,7 +90,7 @@ enum ItemColumn: String, CaseIterable {
             return row.insight.isUnread || unreadNote ? [.dot(.controlAccentColor)] : []
 
         case .priority:
-            guard let priority = row.state.priority else { return [] }
+            guard let priority = row.priority else { return [] }
             return [.chip(priority.letter, color: priority.color)]
 
         case .number:
@@ -140,9 +140,20 @@ enum ItemColumn: String, CaseIterable {
         ]
         if let note = row.note {
             runs.append(.chip(note.reasonLabel, color: .controlAccentColor))
+            // The Inbox has no triage sections, so say where the item stands.
+            if let triage = row.triage {
+                runs.append(.chip(triage.rawValue.lowercased(), color: .secondaryLabelColor))
+            }
+        }
+        if let reason = row.wakeReason {
+            runs.append(.chip(reason, color: .systemPurple))
         }
         if let summary = row.insight.summary, let at = row.insight.summaryAt {
             runs.append(.text("\(summary) \(at.compactAge(relativeTo: now))", color: .tertiaryLabelColor, font: CellFont.small, maxWidth: 180))
+        }
+        if let comment = row.comment {
+            runs.append(.symbol("text.bubble", color: .tertiaryLabelColor))
+            runs.append(.text(comment, color: .secondaryLabelColor, font: CellFont.small, maxWidth: 320))
         }
         return runs
     }
@@ -217,7 +228,7 @@ extension Badge {
     }
 }
 
-extension ItemState.Priority {
+extension Priority {
     var color: NSColor {
         switch self {
         case .high: .systemRed

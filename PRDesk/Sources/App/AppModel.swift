@@ -4,11 +4,12 @@ import Observation
 import os
 
 enum ItemAction {
-    case priority(ItemState.Priority?)
+    /// Sets the board Status; choosing the current one again clears it (back to Triage).
+    case triage(TriageStatus)
+    /// Sets the board Priority; choosing the current one again clears it.
+    case priority(Priority?)
     case togglePin
-    case dismissFocus
     case markRead
-    case toggleUntrack
     case openInBrowser
     /// Vote on the item's author; voting the same way again clears the vote.
     case voteAuthor(Vote)
@@ -58,8 +59,11 @@ final class AppModel {
     }
 
     var unreadInboxCount: Int { inbox.count { !$0.isRead } }
-    /// All Focus items regardless of the filter, most recently updated first (for the menu bar).
-    private(set) var focusItems: [ItemRow] = []
+    /// Working and Good items regardless of the filter, the viewer's move first (for the menu bar).
+    private(set) var workingItems: [ItemRow] = []
+
+    /// The last write to the board that failed, shown until dismissed.
+    var writeError: String?
 
     /// Bumped to move keyboard focus to the filter field or back to the table.
     private(set) var filterFocusRequest = 0
@@ -101,7 +105,7 @@ final class AppModel {
         engine = SyncEngine(client: client, db: db)
         affiliationEngine = AffiliationEngine(client: client, db: db)
         sort = Defaults.get(.sort) ?? ItemSort()
-        collapsed = Defaults.get(.collapsed) ?? [.all]
+        collapsed = Defaults.get(.collapsed) ?? ListSection.defaultCollapsed
     }
 
     var selectedItem: Item? {
@@ -128,6 +132,20 @@ final class AppModel {
 
     func state(for item: Item) -> ItemState {
         snapshot.states[item.number] ?? ItemState(number: item.number)
+    }
+
+    func board(for item: Item) -> BoardEntry? {
+        snapshot.board[item.number]
+    }
+
+    private func row(for item: Item) -> ItemRow {
+        let state = state(for: item)
+        return ItemRow(
+            item: item, state: state,
+            insight: ItemInsight(item: item, state: state, viewer: viewer, baseline: snapshot.baseline),
+            authorVote: vote(for: item.author),
+            board: board(for: item)
+        )
     }
 
     // MARK: Lifecycle
@@ -280,8 +298,9 @@ final class AppModel {
         return files
     }
 
-    /// Shows an item in the dashboard's Focus section, clearing anything that would hide it.
-    func reveal(_ itemID: Item.ID, in section: ListSection = .focus) {
+    /// Shows an item in the dashboard section it belongs to, clearing anything that would hide it.
+    func reveal(_ itemID: Item.ID) {
+        guard let item = itemsByID[itemID], let section = ListSection.triageSection(of: row(for: item)) else { return }
         mode = .dashboard
         filterText = ""
         collapsed.remove(section)
@@ -294,19 +313,25 @@ final class AppModel {
     func perform(_ action: ItemAction, on itemID: Item.ID) {
         guard let item = itemsByID[itemID] else { return }
         let now = Date()
+        let entry = board(for: item)
         switch action {
+        case let .triage(status):
+            let next = entry?.triage == status ? nil : status
+            writeBoard("set the status of #\(item.number)") { engine in
+                try await engine.setTriage(next, number: item.number, contentID: item.id)
+            }
         case let .priority(priority):
-            let current = state(for: item).priority
-            updateState(item) { $0.priority = priority == current ? nil : priority }
+            let current = entry?.priorityValue
+            let next = priority == current ? nil : priority
+            guard next != current else { return }
+            writeBoard("set the priority of #\(item.number)") { engine in
+                try await engine.setPriority(next, number: item.number, contentID: item.id)
+            }
         case .togglePin:
             updateState(item) { $0.pinnedAt = $0.pinnedAt == nil ? now : nil }
-        case .dismissFocus:
-            updateState(item) { $0.focusDismissedAt = now }
         case .markRead:
             updateState(item) { $0.seenAt = now }
             markNotificationRead(number: item.number)
-        case .toggleUntrack:
-            updateState(item) { $0.untrackedAt = $0.untrackedAt == nil ? now : nil }
         case .openInBrowser:
             if let url = URL(string: item.url) { NSWorkspace.shared.open(url) }
         case let .voteAuthor(vote):
@@ -315,17 +340,42 @@ final class AppModel {
         }
     }
 
-    /// Fetches an item by number or URL and tracks it by hand.
+    /// Saves the item's board Comment, if it changed.
+    func setComment(_ comment: String, for item: Item) {
+        let text = comment.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard text != (board(for: item)?.comment ?? "") else { return }
+        writeBoard("save the comment on #\(item.number)") { engine in
+            try await engine.setComment(text, number: item.number, contentID: item.id)
+        }
+    }
+
+    /// Runs a board write, reporting failure in `writeError`.
+    private func writeBoard(_ what: String, _ write: @escaping @Sendable (SyncEngine) async throws -> Void) {
+        Task { [engine, logger] in
+            do {
+                try await write(engine)
+            } catch {
+                logger.error("Failed to \(what, privacy: .public): \(String(describing: error), privacy: .public)")
+                self.writeError = "Couldn't \(what): \(error.localizedDescription)"
+            }
+        }
+    }
+
+    /// Fetches an item by number or URL and adds it to the board (without a Status), so it stays
+    /// tracked even if no search finds it.
     func addItem(_ input: String) async throws {
         let digits = input.split(whereSeparator: { !$0.isNumber }).last.flatMap { Int($0) }
         guard let number = digits else { throw SyncError.notFound(0) }
         let item = try await engine.fetchItem(number: number)
-        try await db.updateState(number) { state in
-            state.manual = true
-            state.untrackedAt = nil
-            state.pinnedAt = state.pinnedAt ?? Date()
-        }
-        selection = TableSelection(section: .pinned, itemID: item.id)
+        try await engine.addToBoard(number: number, contentID: item.id)
+        mode = .dashboard
+        filterText = ""
+        // The snapshot with the new item may not have arrived yet; build its row from what's known.
+        var row = row(for: item)
+        if row.board == nil { row.board = try await db.boardEntry(number: number) }
+        let section = ListSection.triageSection(of: row) ?? .triage
+        collapsed.remove(section)
+        selection = TableSelection(section: section, itemID: item.id)
     }
 
     /// Updates affiliation data for everyone who appears in the list.
@@ -438,6 +488,8 @@ final class AppModel {
 
     // MARK: Rows
 
+    private static let dashboardSections: [ListSection] = [.recent, .pinned, .working, .good, .triage, .backlog, .closed, .skipped, .muted]
+
     private func rebuild() {
         itemsByID = Dictionary(uniqueKeysWithValues: snapshot.items.map { ($0.id, $0) })
         let cutoff = Date().addingTimeInterval(-Self.closedRetention)
@@ -446,13 +498,15 @@ final class AppModel {
         let orgs = { (login: String) in affiliations.badges(for: login).map(\.org) }
 
         let candidates: [ItemRow] = snapshot.items.compactMap { item in
-            let state = state(for: item)
-            let insight = ItemInsight(item: item, state: state, viewer: viewer, baseline: snapshot.baseline)
-            if !insight.isTracked, !filter.showsUntracked { return nil }
-            if !item.isOpen, (item.closedAt ?? item.updatedAt) < cutoff, !state.isPinned { return nil }
-            return ItemRow(item: item, state: state, insight: insight, authorVote: vote(for: item.author))
+            let row = row(for: item)
+            // Items of the other tracker sharing the board are none of the app's business.
+            if row.board?.isForeign == true { return nil }
+            if !item.isOpen, (item.closedAt ?? item.updatedAt) < cutoff, !row.state.isPinned { return nil }
+            return row
         }
-        focusItems = candidates.filter(Self.isFocus)
+        workingItems = Self.yourMoveFirst(candidates
+            .filter { [.working, .good].contains(ListSection.triageSection(of: $0)) }
+            .sorted { $0.item.updatedAt > $1.item.updatedAt })
         let visible = filter.isEmpty ? candidates : candidates.filter { filter.matches($0, orgs: orgs) }
 
         visibleCount = visible.count
@@ -461,12 +515,7 @@ final class AppModel {
             let byNumber = Dictionary(uniqueKeysWithValues: snapshot.items.map { ($0.number, $0) })
             let rows: [ItemRow] = inbox.compactMap { note in
                 guard let item = byNumber[note.number] else { return nil }
-                let state = state(for: item)
-                var row = ItemRow(
-                    item: item, state: state,
-                    insight: ItemInsight(item: item, state: state, viewer: viewer, baseline: snapshot.baseline),
-                    authorVote: vote(for: item.author)
-                )
+                var row = row(for: item)
                 row.note = note
                 return filter.matches(row, orgs: orgs) ? row : nil
             }
@@ -476,62 +525,37 @@ final class AppModel {
         }
 
         let ordered = visible.sorted(by: sort.areInIncreasingOrder)
-        let recent = visible
+        var members: [ListSection: [ItemRow]] = [:]
+        members[.recent] = Array(visible
             .filter { $0.state.viewedAt != nil }
             .sorted { $0.state.viewedAt! > $1.state.viewedAt! }
-            .prefix(Self.recentLimit)
-        let pinned = ordered.filter(\.state.isPinned)
-        let focus = ordered.filter(Self.isFocus)
-        let requests = ordered.filter { !$0.state.isPinned && Self.isQueuedRequest($0) }
-        let rest = ordered.filter { !$0.state.isPinned && !Self.isFocus($0) && !Self.isQueuedRequest($0) }
+            .prefix(Self.recentLimit))
+        members[.pinned] = ordered.filter(\.state.isPinned)
+        for row in ordered {
+            if let section = ListSection.triageSection(of: row) { members[section, default: []].append(row) }
+        }
+        members[.working] = Self.yourMoveFirst(members[.working] ?? [])
+        // Downvoted authors still get triaged, just last.
+        let triage = members[.triage] ?? []
+        members[.triage] = triage.filter { $0.authorVote != .down } + triage.filter { $0.authorVote == .down }
 
         var rows: [TableRow] = []
-        let sections = [(ListSection.recent, Array(recent)), (.pinned, pinned), (.focus, focus), (.requests, requests), (.all, rest)]
-        for (section, members) in sections {
-            guard !members.isEmpty || section == .focus else { continue }
+        for section in Self.dashboardSections {
+            let items = members[section] ?? []
+            guard !items.isEmpty || section == .working || section == .triage else { continue }
             // While filtering, show every match rather than hiding some in collapsed sections.
             let isCollapsed = filter.isEmpty && collapsed.contains(section)
-            rows.append(.header(section, count: members.count, collapsed: isCollapsed))
+            rows.append(.header(section, count: items.count, collapsed: isCollapsed))
             if !isCollapsed {
-                rows += members.map { .item(section, $0) }
+                rows += items.map { .item(section, $0) }
             }
         }
         self.rows = rows
     }
 
-    /// Items that need the viewer: their turn (which includes deliberate review requests and
-    /// follow-ups on things they took part in), or marked high priority.
-    private static func isFocus(_ row: ItemRow) -> Bool {
-        guard row.item.isOpen, row.insight.isTracked, !isDismissed(row) else { return false }
-        if row.state.priority == .high { return true }
-        // Downvoted authors never claim attention; only an explicit H on the item overrides that.
-        if row.authorVote == .down { return false }
-        // Own PRs nobody has touched in a while (e.g. parked drafts with conflicts) aren't urgent.
-        if row.item.kind == .pullRequest, row.insight.isMine,
-           Date().timeIntervalSince(row.insight.lastHumanActivityAt) > ownStaleAfter
-        {
-            return false
-        }
-        return row.insight.turn == .me
-    }
-
-    private static let ownStaleAfter: TimeInterval = 30 * 24 * 3600
-
-    /// Requests in queue for later: automatic (CODEOWNERS-style) review requests on ready PRs the
-    /// viewer hasn't touched, until they go quiet for `requestStaleAfter`.
-    private static func isQueuedRequest(_ row: ItemRow) -> Bool {
-        guard row.item.isOpen, row.insight.isTracked, !isDismissed(row), !isFocus(row) else { return false }
-        let insight = row.insight
-        guard insight.isReviewRequestedFromMe, !insight.isManualRequest, !insight.hasParticipated, !row.item.isDraft else { return false }
-        return Date().timeIntervalSince(row.item.updatedAt) < requestStaleAfter
-    }
-
-    private static let requestStaleAfter: TimeInterval = 14 * 24 * 3600
-
-    /// `d` hides an item from Focus and Review requests until someone else acts on it.
-    private static func isDismissed(_ row: ItemRow) -> Bool {
-        guard let dismissed = row.state.focusDismissedAt else { return false }
-        return (row.insight.othersActivityAt ?? .distantPast) <= dismissed
+    /// Stable partition putting items whose turn is the viewer's first.
+    private static func yourMoveFirst(_ rows: [ItemRow]) -> [ItemRow] {
+        rows.filter { $0.insight.turn == .me } + rows.filter { $0.insight.turn != .me }
     }
 }
 

@@ -2,8 +2,9 @@ import Foundation
 
 /// A parsed filter string: free text plus `key:value` tokens.
 ///
-/// Supported tokens: `is:pr|issue|draft|open|closed|merged|unread|pinned|untracked`,
-/// `turn:me|them`, `author:x`, `label:x`, `ci:fail|pending|pass`, `p:h|m|l`, `org:x`, `vote:up|down|none`.
+/// Supported tokens: `is:pr|issue|draft|open|closed|merged|unread|pinned`,
+/// `status:triage|working|backlog|skipped|muted`, `turn:me|them`, `author:x`, `label:x`,
+/// `ci:fail|pending|pass`, `p:h|m|l`, `org:x`, `vote:up|down|none`.
 /// A leading `-` negates a token.
 struct ItemFilter: Equatable {
     struct Token: Equatable {
@@ -12,7 +13,7 @@ struct ItemFilter: Equatable {
         var negated: Bool
     }
 
-    private static let keys: Set = ["is", "turn", "author", "label", "ci", "p", "org", "vote"]
+    private static let keys: Set = ["is", "status", "turn", "author", "label", "ci", "p", "org", "vote"]
 
     var text: [String] = []
     var tokens: [Token] = []
@@ -30,11 +31,6 @@ struct ItemFilter: Equatable {
     }
 
     var isEmpty: Bool { text.isEmpty && tokens.isEmpty }
-
-    /// Whether untracked items should be shown at all.
-    var showsUntracked: Bool {
-        tokens.contains { $0.key == "is" && $0.value == "untracked" && !$0.negated }
-    }
 
     func matches(_ row: ItemRow, orgs: (String) -> [Org]) -> Bool {
         let item = row.item
@@ -64,8 +60,12 @@ struct ItemFilter: Equatable {
             case "merged": item.state == .merged
             case "unread": row.insight.isUnread
             case "pinned": row.state.isPinned
-            case "untracked": row.state.untrackedAt != nil
             default: false
+            }
+        case "status":
+            return switch value {
+            case "triage", "untriaged": row.triage == nil || row.wakeReason != nil
+            default: row.triage?.rawValue.lowercased() == value
             }
         case "turn":
             return row.insight.turn?.rawValue == value
@@ -82,7 +82,7 @@ struct ItemFilter: Equatable {
             default: false
             }
         case "p":
-            return row.state.priority?.letter.lowercased() == value
+            return row.priority?.letter.lowercased() == value
         case "vote":
             return switch value {
             case "up": row.authorVote == .up

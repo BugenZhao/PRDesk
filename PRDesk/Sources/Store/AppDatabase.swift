@@ -114,6 +114,27 @@ final class AppDatabase: Sendable {
             // Cached timelines predate hiding "[AUTOMATED]" comments with the bots.
             try db.execute(sql: "DELETE FROM detailCache")
         }
+        migrator.registerMigration("v9") { db in
+            // Triage moved to the board; local priority, dismissals and untracking are gone.
+            try db.alter(table: "itemState") { t in
+                t.drop(column: "priority")
+                t.drop(column: "focusDismissedAt")
+                t.drop(column: "untrackedAt")
+                t.drop(column: "manual")
+            }
+            try db.create(table: "boardItem") { t in
+                t.primaryKey("number", .integer)
+                t.column("itemID", .text).notNull()
+                t.column("contentID", .text).notNull()
+                t.column("status", .text)
+                t.column("statusAt", .datetime)
+                t.column("priority", .text)
+                t.column("comment", .text)
+                t.column("isArchived", .boolean).notNull()
+            }
+            // New `label:rust` search and mention events; fetch everything again.
+            try db.execute(sql: "DELETE FROM meta WHERE key = 'lastSyncStartedAt'")
+        }
         return migrator
     }
 }
@@ -130,9 +151,14 @@ extension AppDatabase {
         }
     }
 
-    func items(numbers: [Int]) async throws -> [Item] {
+    /// States of all cached items by node id.
+    func itemStates() async throws -> [String: Item.State] {
         try await reader.read { db in
-            try Item.filter(numbers.contains(Item.Columns.number)).fetchAll(db)
+            let rows = try Row.fetchAll(db, sql: "SELECT id, state FROM item")
+            return Dictionary(uniqueKeysWithValues: rows.compactMap { row -> (String, Item.State)? in
+                guard let state = Item.State(rawValue: row["state"]) else { return nil }
+                return (row["id"], state)
+            })
         }
     }
 }
@@ -169,11 +195,32 @@ extension AppDatabase {
             try state.save(db)
         }
     }
+}
 
-    func manualNumbers() async throws -> [Int] {
-        try await reader.read { db in
-            try Int.fetchAll(db, sql: "SELECT number FROM itemState WHERE manual AND untrackedAt IS NULL")
+// MARK: - Board
+
+extension AppDatabase {
+    /// Replaces the cached board with `entries`, except for `keeping`: numbers the app has just
+    /// written, whose local value is newer than what the sync read.
+    func replaceBoard(_ entries: [BoardEntry], keeping: Set<Int>) async throws {
+        try await writer.write { db in
+            let kept = try BoardEntry.filter(keys: Array(keeping)).fetchAll(db)
+            try BoardEntry.deleteAll(db)
+            for entry in entries where !keeping.contains(entry.number) {
+                try entry.insert(db)
+            }
+            for entry in kept {
+                try entry.insert(db)
+            }
         }
+    }
+
+    func boardEntry(number: Int) async throws -> BoardEntry? {
+        try await reader.read { db in try BoardEntry.fetchOne(db, key: number) }
+    }
+
+    func saveBoardEntry(_ entry: BoardEntry) async throws {
+        try await writer.write { db in try entry.save(db) }
     }
 }
 
@@ -206,6 +253,8 @@ struct Snapshot: Equatable, Sendable {
     var baseline: Date?
     /// Votes by lowercased login.
     var votes: [String: Vote] = [:]
+    /// The triage board, by item number.
+    var board: [Int: BoardEntry] = [:]
 }
 
 extension AppDatabase {
@@ -221,7 +270,8 @@ extension AppDatabase {
                     items: Item.order(Item.Columns.updatedAt.desc).fetchAll(db),
                     states: Dictionary(uniqueKeysWithValues: ItemState.fetchAll(db).map { ($0.number, $0) }),
                     baseline: baseline,
-                    votes: Dictionary(uniqueKeysWithValues: AuthorVote.fetchAll(db).map { ($0.login, $0.vote) })
+                    votes: Dictionary(uniqueKeysWithValues: AuthorVote.fetchAll(db).map { ($0.login, $0.vote) }),
+                    board: Dictionary(uniqueKeysWithValues: BoardEntry.fetchAll(db).map { ($0.number, $0) })
                 )
             }
             .removeDuplicates()

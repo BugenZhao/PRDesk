@@ -38,13 +38,15 @@ struct Item: Codable, Hashable, Identifiable, Sendable {
         enum Kind: String, Codable, Sendable {
             case comment, approved, changesRequested, reviewed
             case commit, forcePush, merged, closed, reopened, readyForReview, reviewRequested
+            /// `target` was @mentioned; the event has no actor.
+            case mentioned
         }
 
         var kind: Kind
         var actor: String?
         var isBot: Bool
         var at: Date
-        /// For `reviewRequested`: the requested user.
+        /// For `reviewRequested`: the requested user; for `mentioned`: the mentioned user.
         var target: String?
 
         private static let knownBots: Set = ["mergify", "github-actions", "claude", "copilot-pull-request-reviewer", "dependabot"]

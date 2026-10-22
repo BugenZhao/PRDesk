@@ -120,7 +120,7 @@ struct ItemTableView: NSViewRepresentable {
                 if let row = index(of: selection) {
                     select(row)
                 } else if let replacement = nearestItemRow(to: lastSelectedRow) {
-                    // The selected item left its section (e.g. dismissed from Focus): select its neighbor.
+                    // The selected item left its section (e.g. triaged out of Triage): select its neighbor.
                     select(replacement)
                     let id = rows[replacement].selectionID
                     DispatchQueue.main.async { self.parent.onAutoSelect(id) }
@@ -175,14 +175,16 @@ struct ItemTableView: NSViewRepresentable {
             case "c": parent.onFocusComposer()
             default:
                 let action: ItemAction? = switch key {
+                case "w": .triage(.working)
+                case "b": .triage(.backlog)
+                case "s": .triage(.skipped)
+                case "m": .triage(.muted)
                 case "1": .priority(.high)
                 case "2": .priority(.medium)
                 case "3": .priority(.low)
                 case "0": .priority(nil)
                 case "p": .togglePin
-                case "d": .dismissFocus
                 case "n": .markRead
-                case "u": .toggleUntrack
                 case "+", "=": .voteAuthor(.up)
                 case "-": .voteAuthor(.down)
                 case "o", "\r": .openInBrowser
@@ -246,19 +248,21 @@ struct ItemTableView: NSViewRepresentable {
 
         private static let menuActions: [(String, ItemAction)] = [
             ("Open in Browser", .openInBrowser),
+            ("Working", .triage(.working)),
+            ("Backlog", .triage(.backlog)),
+            ("Skipped", .triage(.skipped)),
+            ("Muted", .triage(.muted)),
             ("High Priority", .priority(.high)),
             ("Medium Priority", .priority(.medium)),
             ("Low Priority", .priority(.low)),
             ("Clear Priority", .priority(nil)),
             ("Pin / Unpin", .togglePin),
-            ("Remove from Focus", .dismissFocus),
             ("Mark as Read", .markRead),
-            ("Untrack / Track", .toggleUntrack),
             ("Upvote Author", .voteAuthor(.up)),
             ("Downvote Author", .voteAuthor(.down)),
         ]
         /// Indices of `menuActions` after which a separator goes.
-        private static let menuSeparatorsAfter: Set = [0, 4, 8]
+        private static let menuSeparatorsAfter: Set = [0, 4, 8, 10]
 
         func makeContextMenu() -> NSMenu {
             let menu = NSMenu()
@@ -285,11 +289,14 @@ struct ItemTableView: NSViewRepresentable {
         func menuNeedsUpdate(_ menu: NSMenu) {
             let enabled = clickedItemID != nil
             for item in menu.items { item.isHidden = !enabled }
-            // Check the vote item matching the clicked author's current vote.
+            // Check the items matching the clicked row's status, priority and author vote.
             guard let table, rows.indices.contains(table.clickedRow), case let .item(_, row) = rows[table.clickedRow] else { return }
             for item in menu.items where item.action == #selector(performMenuAction(_:)) {
-                if case let .voteAuthor(vote) = Self.menuActions[item.tag].1 {
-                    item.state = row.authorVote == vote ? .on : .off
+                item.state = switch Self.menuActions[item.tag].1 {
+                case let .triage(status): row.triage == status ? .on : .off
+                case let .priority(priority?): row.priority == priority ? .on : .off
+                case let .voteAuthor(vote): row.authorVote == vote ? .on : .off
+                default: .off
                 }
             }
         }
@@ -367,7 +374,7 @@ struct ItemTableView: NSViewRepresentable {
                 return view
             }()
             if case let .item(_, itemRow) = rows[row] {
-                view.tint = itemRow.state.priority?.rowTint
+                view.tint = itemRow.priority?.rowTint
             } else {
                 view.tint = nil
             }
