@@ -108,8 +108,10 @@ are used off the main actor); no glass on content (cards, chips, rows).
   leave alone.
 - Menu commands live in `AppCommands`, apart from the scenes, and read only observed flags that
   change when they flip (`hasSelection`, `canGoBack`, `selectionIsPullRequest`): reading the
-  selection there rebuilds the menus and redraws the menu bar extra on every move. Don't use
-  `focusedSceneValue` for them either; publishing the detail tab that way left the web pages blank.
+  selection there rebuilds the menus and redraws the menu bar extra on every move.
+- A background test copy sometimes shows the detail web pages empty (seen on builds old and new)
+  while the page reports every render as done; this hasn't been seen in the front app. Don't
+  bisect on it from background screenshots alone.
 - List rows draw their cells into the row's layer (`canDrawSubviewsIntoLayer`). Never fade a cell
   with `alphaValue` (AppKit then renders it offscreen, ~50 ms a row; use `RunsCellView.opacity`),
   and don't set per-cell tooltips (the table shows one for the hovered cell, worked out lazily).
