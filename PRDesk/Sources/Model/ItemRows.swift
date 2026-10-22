@@ -69,7 +69,7 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
         case .skipped:
             "Status Skipped: ignored for now. Unsubscribed, so GitHub only notifies on mentions or when you take part. Back in Triage when someone asks you directly; s skips it again."
         case .muted:
-            "Status Muted: dropped for good. Unsubscribed and the notification thread ignored, so the Inbox and unread counts leave it out."
+            "Status Muted: dropped for good. Never back in Triage, and the Inbox and unread counts leave it out. Unsubscribed like Skipped: GitHub can't ignore an item, so it still notifies on mentions and review requests."
         case .inbox:
             "GitHub notifications for this repository where you take part. Not tied to the board."
         }

@@ -301,13 +301,8 @@ extension SyncEngine {
     private func followSubscription(from previous: TriageStatus?, to status: TriageStatus?, number: Int, contentID: String) async throws {
         let renewing = status != nil && status == previous
         let subscription = status?.subscription ?? (previous?.isQuiet == true ? "SUBSCRIBED" : nil)
-        // Only the notification thread can be muted for good, and only once it exists.
-        let threadIgnored: Bool? = status == .muted ? true : previous == .muted ? false : nil
         if let subscription, renewing || subscription != previous?.subscription {
             try await setSubscription(subscription, subjectID: contentID)
-        }
-        if let threadIgnored, let thread = try await notificationThread(number: number) {
-            try await setThread(thread, ignored: threadIgnored)
         }
     }
 
@@ -339,32 +334,6 @@ extension SyncEngine {
             let (id, option) = try Self.option(schema.priority, named: priority.optionName, in: "Priority")
             return (id, FieldValue(singleSelectOptionId: option))
         }
-    }
-
-    /// The viewer's notification thread for the item, if there is one. Notifications come newest
-    /// first; threads older than a few hundred notifications are not looked for.
-    private func notificationThread(number: Int) async throws -> String? {
-        for page in 1 ... 10 {
-            let batch = try await client.rest(
-                "GET", "/repos/\(Self.repo)/notifications",
-                query: [
-                    URLQueryItem(name: "all", value: "true"),
-                    URLQueryItem(name: "per_page", value: "50"),
-                    URLQueryItem(name: "page", value: String(page)),
-                ],
-                as: [NotificationDTO].self
-            )
-            if let note = batch.first(where: { $0.subject.url?.hasSuffix("/\(number)") == true }) { return note.id }
-            if batch.count < 50 { break }
-        }
-        return nil
-    }
-
-    /// An ignored thread sends nothing, not even mentions; otherwise the thread is subscribed.
-    private func setThread(_ threadID: String, ignored: Bool) async throws {
-        if isDryRun("set thread \(threadID) ignored: \(ignored)") { return }
-        struct Body: Encodable, Sendable { let ignored: Bool }
-        try await client.rest("PUT", "/notifications/threads/\(threadID)/subscription", json: Body(ignored: ignored))
     }
 
     /// `SUBSCRIBED` or `UNSUBSCRIBED` (only when participating or mentioned).

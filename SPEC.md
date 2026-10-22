@@ -47,11 +47,14 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 | **Working** | 现在要管 | 不变 |
 | **Backlog** | 想管，但以后再说（包括停滞了、暂时不想关心的） | 不变 |
 | **Skipped** | 质量不高或优先级不高，暂时忽略 | UNSUBSCRIBED（只在参与或被 @ 时通知） |
-| **Muted** | 彻底不管，相当于友好的 close | UNSUBSCRIBED，并把已有的通知线程设为 ignored（完全不通知）；GitHub 不支持对单个 PR / issue 设 IGNORED，所以还没有通知线程的条目之后被 @ 仍会通知。Inbox 和未读数不计 Muted 条目的通知 |
+| **Muted** | 彻底不管，相当于友好的 close | UNSUBSCRIBED（和 Skipped 一样） |
 | **Done** | 已合并或关闭；由 board 自带的 workflow 设置，app 不写 | 不变 |
 
 - 名字只描述"我做了什么"，不评价 PR 本身，因为 org 里的人可能看得到 board
-- 从 Skipped / Muted 改成别的状态时，订阅恢复为 SUBSCRIBED（Muted 的通知线程也取消 ignored）
+- 从 Skipped / Muted 改成别的状态时，订阅恢复为 SUBSCRIBED
+- **Skipped 和 Muted 只在 app 里有区别**：GitHub 已经不能对单个 PR / issue 彻底屏蔽通知（GraphQL 的 `IGNORED` 和 REST 把通知线程设为 ignored 都不生效，后者只会删掉线程订阅），所以两者在 GitHub 上都只是 UNSUBSCRIBED：被 @ 或被请求 review 时仍会通知。app 里的区别是：
+  - Skipped 会被唤醒（见下），Muted 不会，一直留在 Muted
+  - Inbox 和未读数不计 Muted 条目的通知，Skipped 的照常计
 - 改订阅需要 token 有 `notifications` scope（`gh auth refresh -h github.com -s notifications`）
 - **我自己开的条目**：没有 Status 时当作 Working（显示和过滤都算），不进 Triage，因为没有什么要分诊的；这个默认不写到 board。按 `w` / `b` / `s` / `m` 照常写 Status；在详情里选 Triage 不清除这个默认
 - **Priority**：board 上的单选字段，High / Medium / Low
