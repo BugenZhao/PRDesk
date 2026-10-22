@@ -43,6 +43,8 @@ final class WebDocument: NSObject {
         // Diffs are built as they come near the screen; find needs the rest too.
         if action == .showFindInterface, document.kind == .files { document.run("PRDesk.buildExpandedFiles()") }
         document.textFinder.performAction(action)
+        // The finder installs its bar but, unlike when closing it, doesn't say it is visible.
+        if action == .showFindInterface { document.textFinder.findBarContainer?.isFindBarVisible = true }
     }
 
     /// Created on first use: views holding a document are initialized far more often than shown.
@@ -221,6 +223,9 @@ final class DocumentWebView: WKWebView {
         "WKMenuItemIdentifierDownloadMedia", "WKMenuItemIdentifierInspectElement",
     ]
 
+    /// Read-only, so the find bar offers no Replace.
+    override var isEditable: Bool { false }
+
     /// The list's single-key shortcuts (j/k, w/b/s/m, 1/2/3, …) keep working while reading the
     /// page; the page has no text fields of its own to type into.
     override func keyDown(with event: NSEvent) {
@@ -290,6 +295,8 @@ struct WebDocumentView: NSViewRepresentable {
 final class WebDocumentContainer: NSView, @MainActor NSTextFinderBarContainer {
     private weak var webView: NSView?
 
+    override var isFlipped: Bool { true }
+
     func host(_ document: WebDocument) {
         let webView = document.webView
         guard webView.superview !== self else { return }
@@ -297,41 +304,69 @@ final class WebDocumentContainer: NSView, @MainActor NSTextFinderBarContainer {
         addSubview(webView)
         self.webView = webView
         document.textFinder.findBarContainer = self
-        needsLayout = true
+        arrange()
     }
 
     var findBarView: NSView? {
         didSet {
-            oldValue?.removeFromSuperview()
-            if let findBarView { addSubview(findBarView) }
-            needsLayout = true
+            if let oldValue {
+                oldValue.removeFromSuperview()
+                NotificationCenter.default.removeObserver(self, name: NSView.frameDidChangeNotification, object: oldValue)
+            }
+            if let findBarView {
+                findBarView.isHidden = !findBarShown
+                addSubview(findBarView)
+                // The bar settles its height after it is shown, without saying so.
+                findBarView.postsFrameChangedNotifications = true
+                NotificationCenter.default.addObserver(
+                    self, selector: #selector(findBarFrameChanged),
+                    name: NSView.frameDidChangeNotification, object: findBarView
+                )
+            }
+            arrange()
         }
     }
 
-    var isFindBarVisible = false {
-        didSet {
-            findBarView?.isHidden = !isFindBarVisible
-            needsLayout = true
+    @objc private func findBarFrameChanged() {
+        arrange()
+    }
+
+    private var findBarShown = false
+
+    /// Spelled out for AppKit, which hides the bar through `setFindBarVisible:`, a name Swift
+    /// wouldn't give this property on its own.
+    var isFindBarVisible: Bool {
+        @objc(isFindBarVisible) get { findBarShown }
+        @objc(setFindBarVisible:) set {
+            findBarShown = newValue
+            findBarView?.isHidden = !newValue
+            arrange()
         }
     }
 
     func findBarViewDidChangeHeight() {
-        needsLayout = true
+        arrange()
     }
 
     func contentView() -> NSView? {
         webView
     }
 
-    override func layout() {
-        super.layout()
-        var content = bounds
-        if isFindBarVisible, let findBarView {
-            let height = findBarView.frame.height
-            findBarView.frame = NSRect(x: 0, y: bounds.maxY - height, width: bounds.width, height: height)
-            content.size.height -= height
+    override func resizeSubviews(withOldSize oldSize: NSSize) {
+        super.resizeSubviews(withOldSize: oldSize)
+        arrange()
+    }
+
+    /// The find bar across the top, the page below it.
+    private func arrange() {
+        var top: CGFloat = 0
+        if findBarShown, let findBarView {
+            top = findBarView.frame.height
+            let frame = NSRect(x: 0, y: 0, width: bounds.width, height: top)
+            if findBarView.frame != frame { findBarView.frame = frame }
         }
-        webView?.frame = content
+        let frame = NSRect(x: 0, y: top, width: bounds.width, height: max(0, bounds.height - top))
+        if webView?.frame != frame { webView?.frame = frame }
     }
 }
 

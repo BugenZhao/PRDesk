@@ -301,6 +301,28 @@ const PRDesk = (() => {
     return result;
   }
 
+  /**
+   * A wrapped line continues at its own indentation: the leading spaces become non-breaking (so
+   * the line can't break right after them) and the indentation turns into a hanging indent.
+   */
+  function hangingIndent(html, text) {
+    const leading = /^[ \t]*/.exec(text)[0];
+    if (!leading) return { html, indent: 0 };
+    const indent = [...leading].reduce((width, c) => width + (c === "\t" ? 4 : 1), 0);
+    const spaces = leading.replaceAll(" ", "&nbsp;");
+    // The highlighted HTML may open spans before the indentation.
+    return { html: html.replace(/^((?:<span[^>]*>)*)[ \t]+/, (_, spans) => spans + spaces), indent };
+  }
+
+  // Copies of the diff get ordinary spaces back.
+  addEventListener("copy", (event) => {
+    if (document.documentElement.dataset.page !== "files") return;
+    const text = getSelection().toString();
+    if (!text.includes("\u00a0")) return;
+    event.clipboardData.setData("text/plain", text.replaceAll("\u00a0", " "));
+    event.preventDefault();
+  });
+
   const linesPerChunk = 200;
   const lineHeight = 16;
 
@@ -326,7 +348,9 @@ const PRDesk = (() => {
         if (line.kind === "h") {
           parts.push(`<div class="l h">${code[i]}</div>`);
         } else {
-          parts.push(`<div class="l ${line.kind}"><span class="n" data-n="${line.old ?? ""}"></span><span class="n" data-n="${line.now ?? ""}"></span><span class="c">${code[i]}</span></div>`);
+          const { html, indent } = hangingIndent(code[i], line.text);
+          const style = indent ? ` style="--i: ${indent}ch"` : "";
+          parts.push(`<div class="l ${line.kind}"><span class="n" data-n="${line.old ?? ""}"></span><span class="n" data-n="${line.now ?? ""}"></span><span class="c"${style}>${html}</span></div>`);
         }
       }
       parts.push("</div>");

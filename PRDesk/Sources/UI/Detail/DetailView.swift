@@ -30,6 +30,9 @@ struct DetailView: View {
                 ContentUnavailableView("No Selection", systemImage: "sidebar.right", description: Text("Select a PR or issue."))
             }
         }
+        // Start WebKit and load the page ahead of the first selection, which otherwise shows
+        // nothing for a second or so.
+        .onAppear { _ = timelinePage.webView }
         .toolbar {
             // In the inspector's part of the window toolbar, over the pane it switches, only for a
             // PR. Otherwise an invisible spacer stands in: without an item of its own the inspector

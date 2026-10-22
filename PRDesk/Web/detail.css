@@ -134,8 +134,12 @@ a:hover { text-decoration: underline; }
   -webkit-user-select: none; user-select: none;
 }
 .l > .n::before { content: attr(data-n); }
-.l > .c { white-space: pre-wrap; overflow-wrap: anywhere; padding: 0 8px 0 14px; position: relative; min-height: 16px; }
-.l > .c::before { position: absolute; left: 3px; color: var(--secondary); }
+.l > .c {
+  white-space: pre-wrap; overflow-wrap: anywhere; position: relative; min-height: 16px;
+  /* A hanging indent of the line's own indentation (--i), so wrapped parts line up under it. */
+  padding: 0 8px 0 calc(14px + var(--i, 0ch)); text-indent: calc(-1 * var(--i, 0ch));
+}
+.l > .c::before { position: absolute; left: 3px; text-indent: 0; color: var(--secondary); }
 .l.a > .c::before { content: "+"; }
 .l.d > .c::before { content: "-"; }
 .l.a { background: rgba(46, 160, 67, .14); }
