@@ -29,9 +29,9 @@ enum ItemColumn: String, CaseIterable {
         case .number: 42
         case .title: 520
         case .author: 150
-        case .review: 64
-        case .turn: 40
-        case .ci: 54
+        case .review: 40
+        case .turn: 46
+        case .ci: 36
         case .size: 84
         case .age: 34
         case .updated: 34
@@ -118,6 +118,10 @@ enum ItemColumn: String, CaseIterable {
             return reviewRuns(row, viewer: viewer)
 
         case .turn:
+            // A pending review request is the most common reason it's the viewer's move; name it.
+            if item.isOpen, row.insight.isReviewRequestedFromMe {
+                return [.text("review", color: .systemOrange, font: CellFont.smallBold)]
+            }
             return switch row.insight.turn {
             case .me: [.text("me", color: .systemOrange, font: CellFont.smallBold)]
             case .them: [.text("them", color: .tertiaryLabelColor, font: CellFont.small)]
@@ -177,41 +181,39 @@ enum ItemColumn: String, CaseIterable {
         return .segments(parts, font: bold ? CellFont.regularBold : CellFont.regular, flexible: true)
     }
 
+    /// The viewer's verdict, then the number of approvals (the viewer's included), each in a
+    /// fixed slot so they line up down the column.
     private func reviewRuns(_ row: ItemRow, viewer: String?) -> [CellRun] {
         let item = row.item
         guard item.kind == .pullRequest else { return [] }
-        var runs: [CellRun] = []
-        switch viewer.flatMap(item.review(by:))?.state {
-        case "APPROVED": runs.append(.text("✓ you", color: .systemGreen, font: CellFont.small))
-        case "CHANGES_REQUESTED": runs.append(.text("× you", color: .systemRed, font: CellFont.small))
-        default:
-            if item.approvalCount > 0 {
-                runs.append(.text("✓\(item.approvalCount)", color: .systemGreen, font: CellFont.small))
-            }
+        let verdict: CellRun? = switch viewer.flatMap(item.review(by:))?.state {
+        case "APPROVED": .symbol("checkmark", color: .systemGreen)
+        case "CHANGES_REQUESTED": .symbol("xmark", color: .systemRed)
+        default: nil
         }
-        if item.isOpen, row.insight.isReviewRequestedFromMe {
-            runs.append(.chip("req", color: .systemOrange))
-        }
-        return runs
+        let approvals: CellRun? = item.approvalCount > 0
+            ? .text(String(item.approvalCount), color: .systemGreen, font: CellFont.digits)
+            : nil
+        return [.slot(verdict, width: 12), .slot(approvals, width: 14)]
     }
 
+    /// A dot for the CI state (green passed, red failed, yellow running, gray cancelled), filled
+    /// when the PR has the `ready` label and hollow otherwise, then the number of failed checks.
     private func ciRuns(_ item: Item) -> [CellRun] {
-        var runs: [CellRun] = []
-        if let ci = item.ci {
-            if ci.failed > 0 {
-                runs += [.dot(.systemRed), .text(String(ci.failed), color: .systemRed, font: CellFont.digits)]
-            } else if ci.pending > 0 || ci.state == "PENDING" || ci.state == "EXPECTED" {
-                runs.append(.dot(.systemYellow))
-            } else if ci.state == "SUCCESS" {
-                runs.append(.dot(.systemGreen))
-            } else {
-                runs.append(.dot(.systemRed))
-            }
+        guard let ci = item.ci else { return [] }
+        let color: NSColor = if ci.failed > 0 {
+            .systemRed
+        } else if ci.pending > 0 || ci.state == "PENDING" || ci.state == "EXPECTED" {
+            .systemYellow
+        } else if ci.state == "SUCCESS" {
+            .systemGreen
+        } else {
+            // A failed rollup with no failed checks: they were cancelled.
+            .systemGray
         }
-        if item.labels.contains(where: { $0.name == "ready" }) {
-            runs.append(.chip("rdy", color: .systemGreen))
-        }
-        return runs
+        let isReady = item.labels.contains { $0.name == "ready" }
+        let failed: CellRun? = ci.failed > 0 ? .text(String(ci.failed), color: .systemRed, font: CellFont.digits) : nil
+        return [isReady ? .dot(color) : .ring(color), .slot(failed, width: 18)]
     }
 }
 

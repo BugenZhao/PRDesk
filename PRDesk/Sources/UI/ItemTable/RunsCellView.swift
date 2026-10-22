@@ -1,13 +1,18 @@
 import AppKit
 
 /// One visual piece of a table cell. Runs are laid out left to right on a single line.
-enum CellRun {
+indirect enum CellRun {
     /// Text; a `flexible` run absorbs any shortage of width by truncating.
     /// `maxWidth` caps a non-flexible run, which then truncates.
     case text(String, color: NSColor = .labelColor, font: NSFont = CellFont.regular, flexible: Bool = false, maxWidth: CGFloat? = nil)
     /// Small rounded tag tinted with `color`.
     case chip(String, color: NSColor)
     case dot(NSColor)
+    /// A dot drawn as an outline.
+    case ring(NSColor)
+    /// Fixed width, so what follows lines up from row to row; the run (if any) sits at its start,
+    /// or its end when `trailing`.
+    case slot(CellRun?, width: CGFloat, trailing: Bool = false)
     case symbol(String, color: NSColor)
     /// An item state icon (asset template or SF Symbol), tinted.
     case icon(StateIcon, color: NSColor)
@@ -73,8 +78,10 @@ final class RunsCellView: NSTableCellView {
             min(ceil(string.size(withAttributes: [.font: font]).width), maxWidth ?? .infinity)
         case let .chip(string, _):
             ceil(string.size(withAttributes: [.font: CellFont.chip]).width) + 2 * Self.chipPadding
-        case .dot:
+        case .dot, .ring:
             Self.dotSize
+        case let .slot(_, width, _):
+            width
         case .symbol, .icon:
             Self.symbolSize
         case .image:
@@ -127,6 +134,18 @@ final class RunsCellView: NSTableCellView {
             let size = Self.dotSize
             (emphasized ? NSColor.alternateSelectedControlTextColor : color).setFill()
             NSBezierPath(ovalIn: NSRect(x: rect.minX, y: rect.midY - size / 2, width: size, height: size)).fill()
+
+        case let .ring(color):
+            let size = Self.dotSize
+            (emphasized ? NSColor.alternateSelectedControlTextColor : color).setStroke()
+            let ring = NSBezierPath(ovalIn: NSRect(x: rect.minX, y: rect.midY - size / 2, width: size, height: size).insetBy(dx: 0.75, dy: 0.75))
+            ring.lineWidth = 1.5
+            ring.stroke()
+
+        case let .slot(run, _, trailing):
+            guard let run else { return }
+            let width = min(naturalWidth(run), rect.width)
+            draw(run, in: NSRect(x: trailing ? rect.maxX - width : rect.minX, y: rect.minY, width: width, height: rect.height))
 
         case let .symbol(name, color):
             let config = NSImage.SymbolConfiguration(pointSize: 11, weight: .medium)
