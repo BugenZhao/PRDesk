@@ -192,7 +192,7 @@ private struct DetailHeader: View {
             Button("Refresh", systemImage: "arrow.clockwise") { model.loadDetail(force: true) }
                 .labelStyle(.iconOnly)
                 .disabled(model.detailState == .loading)
-            Button("Open", systemImage: "arrow.up.right.square") { model.perform(.openInBrowser, on: item.id) }
+            Button("Open", systemImage: "arrow.up.right") { model.perform(.openInBrowser, on: item.id) }
                 .labelStyle(.iconOnly)
                 .help("Open on GitHub (o)")
         }
