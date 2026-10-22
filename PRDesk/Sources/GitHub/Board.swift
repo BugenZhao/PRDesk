@@ -119,7 +119,6 @@ enum BoardQuery {
         var projectID: String
         var status: SelectField?
         var priority: SelectField?
-        var commentFieldID: String?
 
         init(_ project: Project) {
             projectID = project.id
@@ -133,7 +132,6 @@ enum BoardQuery {
             }
             status = select("Status")
             priority = select("Priority")
-            commentFieldID = fields["Comment"]?.id
         }
     }
 }
@@ -238,7 +236,6 @@ extension SyncEngine {
 
     struct FieldValue: Encodable, Sendable {
         var singleSelectOptionId: String?
-        var text: String?
     }
 
     private func addToBoard(projectID: String, contentID: String) async throws -> String {
@@ -311,16 +308,6 @@ extension SyncEngine {
             }
             let (id, option) = try Self.option(schema.priority, named: priority.optionName, in: "Priority")
             return (id, FieldValue(singleSelectOptionId: option))
-        }
-    }
-
-    func setComment(_ comment: String, number: Int, contentID: String) async throws {
-        let text = comment.trimmingCharacters(in: .whitespacesAndNewlines)
-        try await writeBoard(number: number, contentID: contentID) { entry in
-            entry.comment = text.isEmpty ? nil : text
-        } field: { schema, _ in
-            guard let id = schema.commentFieldID else { throw BoardError.missingField("Comment") }
-            return (id, text.isEmpty ? nil : FieldValue(text: text))
         }
     }
 

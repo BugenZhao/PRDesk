@@ -54,7 +54,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 - 从 Skipped / Muted 改成别的状态时，订阅恢复为 SUBSCRIBED（Muted 的通知线程也取消 ignored）
 - 改订阅需要 token 有 `notifications` scope（`gh auth refresh -h github.com -s notifications`）
 - **Priority**：board 上的单选字段，High / Medium / Low
-- **Comment**：board 上的文本字段，作为这条的备注（通常是下一步要做什么）
+- **Comment**：board 上的文本字段，作为这条的备注（通常是下一步要做什么）；app 只读，在列表标题后显示
 - **其他 Status**：`Python Parity Backlog` 属于另一个 tracker，app 完全忽略这些条目（不显示，也不改）。旧的 `Good`、`Pending` 当作 Working，`Stale` 当作 Backlog；open 的条目上出现 Done（比如重新打开了）当作未分诊
 - **被唤醒**：Skipped 的条目在设为 Skipped 之后若有人直接找我，会回到 Triage，带一个原因标签，Status 本身不变。"直接找我"指：
   - 被 @
@@ -177,7 +177,6 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 
 - **头部**：标题、作者和徽章、状态（draft / open / merged / closed）、CI 汇总、mergeable / conflicts、labels、创建和更新时间
 - **操作**：Status（Triage / Working / Backlog / Skipped / Muted）、Priority（H / M / L / –）、Pin、Open ↗
-- **Comment**：board 的 Comment 字段，可直接编辑，回车或失焦时保存
 - **Conversation**：
   - 时间线包括评论、review（含行内评论的摘要和 diff hunk）、push、label、状态变化
   - "Show automated" 默认关闭，关闭时隐藏自动化内容：

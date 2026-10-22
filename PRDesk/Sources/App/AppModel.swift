@@ -398,15 +398,6 @@ final class AppModel {
 
     private static let maxTabsAtOnce = 10
 
-    /// Saves the item's board Comment, if it changed.
-    func setComment(_ comment: String, for item: Item) {
-        let text = comment.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard text != (board(for: item)?.comment ?? "") else { return }
-        writeBoard("save the comment on #\(item.number)") { engine in
-            try await engine.setComment(text, number: item.number, contentID: item.id)
-        }
-    }
-
     /// Runs a board write, reporting failure in `writeError`.
     private func writeBoard(_ what: String, _ write: @escaping @Sendable (SyncEngine) async throws -> Void) {
         Task { [engine, logger] in

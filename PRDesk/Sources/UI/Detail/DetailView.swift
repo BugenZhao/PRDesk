@@ -10,29 +10,37 @@ struct DetailView: View {
     }
 
     var body: some View {
-        if let item = model.selectedItem {
-            VStack(spacing: 0) {
-                DetailHeader(item: item, state: model.state(for: item), tab: $tab)
-                    .padding(12)
-                if item.kind == .pullRequest {
-                    Picker("View", selection: $tab) {
-                        Text("Conversation").tag(DetailTab.conversation)
-                        Text(checksTitle(item)).tag(DetailTab.checks)
-                        Text("Files").tag(DetailTab.files)
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 8)
+        Group {
+            if let item = model.selectedItem {
+                VStack(spacing: 0) {
+                    DetailHeader(item: item, state: model.state(for: item), tab: $tab)
+                        .padding(12)
+                    Divider()
+                    content(item)
                 }
-                Divider()
-                content(item)
+                .onChange(of: item.number) {
+                    if item.kind == .issue { tab = .conversation }
+                }
+            } else {
+                ContentUnavailableView("No Selection", systemImage: "sidebar.right", description: Text("Select a PR or issue."))
             }
-            .onChange(of: item.number) {
-                if item.kind == .issue { tab = .conversation }
+        }
+        .toolbar {
+            // In the inspector's part of the window toolbar, over the pane it switches. Always
+            // there (disabled unless a PR is shown): without an item of its own the inspector has
+            // no toolbar section, and the list's buttons jump to the window's far edge.
+            ToolbarItem {
+                let pullRequest = model.selectedItem.flatMap { $0.kind == .pullRequest ? $0 : nil }
+                Picker("View", selection: $tab) {
+                    Text("Conversation").tag(DetailTab.conversation)
+                    Text(pullRequest.map(checksTitle) ?? "Checks").tag(DetailTab.checks)
+                    Text("Files").tag(DetailTab.files)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+                .disabled(pullRequest == nil)
             }
-        } else {
-            ContentUnavailableView("No Selection", systemImage: "sidebar.right", description: Text("Select a PR or issue."))
         }
     }
 
@@ -126,7 +134,6 @@ private struct DetailHeader: View {
             }
 
             controls
-            BoardCommentField(item: item, saved: model.board(for: item)?.comment ?? "")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -205,34 +212,6 @@ private struct DetailHeader: View {
             Image(systemName: symbol).frame(width: 14, height: 14)
         }
         .accessibilityLabel(title)
-    }
-}
-
-/// The board's Comment field: a note on the item, saved on Return or when focus leaves.
-private struct BoardCommentField: View {
-    @Environment(AppModel.self) private var model
-    let item: Item
-    let saved: String
-    @State private var text = ""
-    @FocusState private var isFocused: Bool
-
-    var body: some View {
-        TextField("Comment", text: $text, axis: .vertical)
-            .lineLimit(1 ... 4)
-            .textFieldStyle(.roundedBorder)
-            .controlSize(.small)
-            .focused($isFocused)
-            .onSubmit(save)
-            .onChange(of: isFocused) { if !isFocused { save() } }
-            // Reload when another item is shown or the board changes, but not under the cursor.
-            .task(id: "\(item.number)\n\(saved)") {
-                if !isFocused { text = saved }
-            }
-            .help("Comment on the board")
-    }
-
-    private func save() {
-        model.setComment(text, for: item)
     }
 }
 

@@ -50,19 +50,18 @@ struct MainView: View {
                 .labelsHidden()
                 .fixedSize()
             }
-            ToolbarItem(placement: .navigation) {
-                Button("Add", systemImage: "plus") { showsAdd = true }
-                    .help("Add a PR or issue to the board by number or URL")
-                    .popover(isPresented: $showsAdd, arrowEdge: .bottom) {
-                        AddItemView { showsAdd = false }
-                    }
-            }
-            ToolbarItem(placement: .primaryAction) {
+            // The list's own actions, at the right end of its part of the toolbar.
+            ToolbarItemGroup(placement: .primaryAction) {
                 Button("Sync Now", systemImage: "arrow.clockwise") {
                     Task { await model.sync() }
                 }
                 .help("Sync now (⌘R)")
                 .disabled(model.syncState == .syncing)
+                Button("Add", systemImage: "plus") { showsAdd = true }
+                    .help("Add a PR or issue to the board by number or URL")
+                    .popover(isPresented: $showsAdd, arrowEdge: .bottom) {
+                        AddItemView { showsAdd = false }
+                    }
             }
             ToolbarSpacer(.fixed, placement: .primaryAction)
             ToolbarItem(placement: .primaryAction) {
