@@ -136,6 +136,10 @@ struct ItemTableView: NSViewRepresentable {
                     // Keep a multiple selection the primary item belongs to; otherwise select it alone.
                     let others = selected.contains(selection) ? selected.compactMap(index(of:)) : []
                     select(row, alongWith: others, scroll: selection != shownSelection)
+                } else if isCollapsed(selection.section) {
+                    // Only hidden in a collapsed section: the item stays selected (and in the
+                    // detail pane), and is highlighted again where it was once the section opens.
+                    if table.selectedRow != -1 { table.deselectAll(nil) }
                 } else if let replacement = nearestItemRow(to: lastSelectedRow) {
                     // The selected item left its section (e.g. triaged out of Triage): select its neighbor.
                     select(replacement, scroll: true)
@@ -214,6 +218,10 @@ struct ItemTableView: NSViewRepresentable {
                 }
             }
             return true
+        }
+
+        private func isCollapsed(_ section: ListSection) -> Bool {
+            rows.contains { if case .header(section, _, true) = $0 { true } else { false } }
         }
 
         private func nearestItemRow(to index: Int) -> Int? {
