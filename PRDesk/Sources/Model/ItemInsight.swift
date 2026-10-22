@@ -62,7 +62,7 @@ struct ItemInsight: Hashable, Sendable {
             if event.kind == .reviewRequested { return isMe(event.target) }
             return !(item.state == .merged && event.kind == .closed)
         }
-        summary = latest.map { Self.describe($0, isMe: isMe($0.actor)) }
+        summary = latest.map { Self.describe($0, isMe: isMe($0.actor), isAuthor: sameLogin($0.actor, item.author)) }
         summaryAt = latest?.at
 
         turn = item.isOpen ? Self.turn(item: item, human: human, myLast: myLast, isMe: isMe,
@@ -128,8 +128,9 @@ struct ItemInsight: Hashable, Sendable {
         }
     }
 
-    private static func describe(_ event: Item.Event, isMe: Bool) -> String {
-        let who = isMe ? "you" : "@\(event.actor ?? "ghost")"
+    /// "you" for the viewer, "author" for the item's author, "@login" for anyone else.
+    private static func describe(_ event: Item.Event, isMe: Bool, isAuthor: Bool) -> String {
+        let who = isMe ? "you" : isAuthor ? "author" : "@\(event.actor ?? "ghost")"
         return switch event.kind {
         case .comment: "\(who) commented"
         case .approved: "\(who) approved"
