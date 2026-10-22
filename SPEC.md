@@ -7,6 +7,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 - 仓库：仅 `vllm-project/vllm`
 - 条目：PR 与 Issue
 - 用户：当前 `gh` 登录用户（BugenZhao），所有 "me / you" 语义都以它为准
+- 分诊结果的 source of truth：GitHub Project **Bugen's Board**（`vllm-project` 的 #56），见 §3.1
 - 不做：Claude / 终端面板、Task 类条目、Collection、Notes、IDE / worktree 集成
 
 ## 2. 技术栈
@@ -24,14 +25,41 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 
 ## 3. 数据同步
 
-- **跟踪集合**（自动）：`repo:vllm-project/vllm` 下满足任一条件
+- **跟踪集合**：`repo:vllm-project/vllm` 下满足任一条件
   - `involves:@me`（作者 / assignee / 被 @ / 评论过）
   - `review-requested:@me`、`reviewed-by:@me`
-  - 首次同步回溯 90 天；open 的全部保留，closed/merged 的保留 14 天后自动淡出
-- **手动**：`+ Add`（粘贴编号或 URL）加入；`u` untrack 后不再自动加回，除非之后有新的 @me 或 review request
+  - `label:rust`
+  - 在 board 上（包括在网页上手动加的）
+  - 首次同步回溯 90 天；closed/merged 的保留 14 天后淡出
+- **手动**：`+ Add`（粘贴编号或 URL）把条目加到 board 上（不设 Status），之后就一直跟踪
 - **增量**：每 60s 用 `updated:>=上次同步时间` 拉增量；选中条目时实时拉详情；窗口激活时立即同步一次
 - **限流**：顶栏显示 GraphQL 剩余额度；低于 500 时自动降低轮询频率
+- **Board**：每次同步都拉 board 的全部条目（Status、Priority、Comment）；board 上不在本地的条目按 id 补拉
 - **Inbox**：GitHub Notifications（仅本仓库、仅 participating，不含 watching），未读数显示在 tab、Dock 和菜单栏上；打开条目或按 `n` 即在 GitHub 上标记已读
+
+## 3.1 分诊（Bugen's Board）
+
+分诊是手动的决定，写在 board 上；条目的实时状态（Turn、approve、CI、冲突、merged/closed）由 API 算出，不手动维护。app 从不自动改 Status。
+
+| Status | 意思 | GitHub 订阅 |
+|---|---|---|
+| （不在 board 上，或没有 Status） | 未分诊 | 不变 |
+| **Working** | 现在要管 | 不变 |
+| **Backlog** | 想管，但以后再说（包括停滞了、暂时不想关心的） | 不变 |
+| **Skipped** | 质量不高或优先级不高，暂时忽略 | UNSUBSCRIBED（只在参与或被 @ 时通知） |
+| **Muted** | 彻底不管，相当于友好的 close | IGNORED（完全不通知） |
+| **Done** | 已合并或关闭；由 board 自带的 workflow 设置，app 不写 | 不变 |
+
+- 名字只描述"我做了什么"，不评价 PR 本身，因为 org 里的人可能看得到 board
+- 从 Skipped / Muted 改成别的状态时，订阅恢复为 SUBSCRIBED
+- **Priority**：board 上的单选字段，High / Medium / Low
+- **Comment**：board 上的文本字段，作为这条的备注（通常是下一步要做什么）
+- **其他 Status**：`Python Parity Backlog` 属于另一个 tracker，app 完全忽略这些条目（不显示，也不改）。旧的 `Good`、`Pending` 当作 Working，`Stale` 当作 Backlog；open 的条目上出现 Done（比如重新打开了）当作未分诊
+- **被唤醒**：Skipped 的条目在设为 Skipped 之后若有人直接找我，会回到 Triage，带一个原因标签，Status 本身不变。"直接找我"指：
+  - 被 @
+  - 被人手动请求 review（不是作者在打开、转 ready 或 push 时发出的自动请求）
+  - 我参与过的条目上，他人在我最后一次活动之后评论或 review
+- 写操作立即在本地生效，再写到 GitHub；同步时以 board 为准
 
 ## 4. 主界面
 
@@ -40,30 +68,38 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 ├ 列表 ─────────────────────────────────────────────┬ 详情 ──────────────────────────────────────────────┤
 │ Filter (/)          643 items   快捷键提示        │ #56492 [Core] Extensible KV cache                  │
 │ ▾ Recently viewed 8                               │ by njhill ◆◆  draft  CI ● 16 failed  conflicts     │
-│ ▾ Pinned 24                                       │ [H M L] [Pin] [Untrack] [Open ↗]                   │
-│ ▾ Focus 20                                        │ Conversation | Checks | Files                      │
-│ ▸ All tracked 591                                 │ ...时间线...                                       │
+│ ▾ Pinned 2                                        │ [Triage Working Backlog Skipped Muted] [H M L –]   │
+│ ▾ Working 9                                       │ [Pin] [Open ↗]   Comment: ...                      │
+│ ▾ Good 1                                          │ Conversation | Checks | Files                      │
+│ ▾ Triage 180                                      │ ...时间线...                                       │
+│ ▸ Backlog 31                                      │                                                    │
 │                                                   │ ┌ 评论框 ──────────────── Comment / Approve … ┐   │
 └───────────────────────────────────────────────────┴────────────────────────────────────────────────────┘
 ```
 
 ### 4.1 分组
 
-- **Recently viewed**：最近查看的 8 条
-- **Pinned**：`p` 置顶的条目
-- **Focus**：open，且未被 `d` 移出（或移出后又有新动态），且满足任一条件：优先级 H；或 Turn = me。例外：自己的 PR 若 30 天没有任何人（不含 bot）的动静，且没标 H，则不进 Focus
-- **Review requests**：自动的 review 请求（作者在 PR 打开、转 ready 或 push 前后发出的，基本是 CODEOWNERS），PR 已 ready、我从没参与过；14 天没动静的降到 All tracked。别人发起的、或在其他时间发起的请求视为手动请求，算 Turn = me
-- **All tracked**：其余，默认折叠
-- 同一条目可同时出现在多个组里；组的折叠状态持久化
+从上到下：
+
+- **Recently viewed**：最近查看的 8 条（本地）
+- **Pinned**：`p` 置顶的条目（本地）
+- **Working**：Status = Working 的 open 条目，approve 了的 PR 除外；Turn = me 的排在前面
+- **Good**：Status = Working、已 approve 的 open PR
+- **Triage**：未分诊的 open 条目，加上被唤醒的 Skipped 条目；downvote 过的作者的条目沉到底部
+- **Backlog**：Status = Backlog 的 open 条目，默认折叠
+- **Recently closed**：最近 14 天 merged / closed 的条目，默认折叠
+- **Skipped**、**Muted**：对应 Status 的 open 条目，默认折叠
+
+除 Recently viewed 和 Pinned 外，每个条目只出现在一个组里。组的折叠状态持久化。过滤时显示所有匹配项，忽略折叠。
 
 ### 4.2 列
 
 | 列 | 内容 |
 |---|---|
 | (标记) | `•` 有未读的他人动态（相对我上次查看） |
-| P | 优先级 `H` / `M` / `L` 徽章 |
+| P | 优先级 `H` / `M` / `L` 徽章（来自 board） |
 | # | 编号；PR / Issue 用不同的小图标区分 |
-| Title | 标题，后接状态标签（draft、merged、closed、new、on me、req），再接灰色的最新事件摘要，例如 `@xx commented 2h`、`CI passed 3h`、`you reviewed 2d` |
+| Title | 状态图标 + 标题（开头的 `[..]` / `xx:` 标签变淡），再接灰色的最新事件摘要（如 `@xx commented 2h`、`you reviewed 2d`）；被唤醒的条目带原因标签；有 board Comment 时在最后显示备注 |
 | Author | 用户名 + 组织徽章（见 §5） |
 | Review | `✓n` approve 数；`✓ you` / `× you` 我的结论；`req` 请求我 review 且未完成 |
 | Turn | `me` / `them` / 空（已关闭） |
@@ -83,7 +119,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 ### 4.4 过滤
 
 - 自由文本匹配标题、编号、作者
-- 支持 token：`is:pr` `is:issue` `is:draft` `is:open` `turn:me` `author:x` `label:x` `ci:fail` `p:h` `org:redhat`
+- 支持 token：`is:pr` `is:issue` `is:draft` `is:open` `is:unread` `is:pinned` `status:triage|working|backlog|skipped|muted` `turn:me` `author:x` `label:x` `ci:fail` `p:h` `org:redhat` `vote:down`；前面加 `-` 取反
 
 ### 4.5 快捷键
 
@@ -91,12 +127,12 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 |---|---|
 | `j` / `k`，`↑` / `↓` | 移动 |
 | `/` | 聚焦过滤框 |
-| `1` / `2` / `3` / `0` | 设为 H / M / L / 清除优先级 |
+| `w` / `b` / `s` / `m` | Status 设为 Working / Backlog / Skipped / Muted；再按一次同一个键清除 Status（回到未分诊） |
+| `1` / `2` / `3` / `0` | Priority 设为 H / M / L / 清除 |
 | `p` | 置顶 / 取消置顶 |
-| `d` | 移出 Focus |
 | `n` | 标为已读 |
 | `o` | 在浏览器打开 |
-| `u` | untrack |
+| `+` / `-` | upvote / downvote 作者 |
 | `c` | 聚焦评论框 |
 | `⌘R` | 立即同步 |
 | `⌘1` / `⌘2` | 切换 Dashboard / Inbox |
@@ -120,7 +156,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 
 - 每个人可以是 upvote / 默认 / downvote，只存在本地
 - 作者名后显示 👍 / 👎 小图标（列表、详情头部、时间线）
-- downvote 的作者：他的所有条目都不进 Focus（单条标了 H 的除外），其余分组不受影响
+- downvote 的作者：他的条目在 Triage 里沉到底部，其余分组不受影响；不会自动改 Status
 - upvote 目前只显示图标，没有其他效果
 - 操作：选中行按 `+` / `-`（再按一次取消），右键行或右键人名，设置 → Votes 管理
 - 过滤：`vote:up` / `vote:down` / `vote:none`
@@ -128,7 +164,8 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 ## 6. 详情面板
 
 - **头部**：标题、作者和徽章、状态（draft / open / merged / closed）、CI 汇总、mergeable / conflicts、labels、创建和更新时间
-- **操作**：H / M / L、Pin、Untrack、Open ↗
+- **操作**：Status（Triage / Working / Backlog / Skipped / Muted）、Priority（H / M / L / –）、Pin、Open ↗
+- **Comment**：board 的 Comment 字段，可直接编辑，回车或失焦时保存
 - **Conversation**：
   - 时间线包括评论、review（含行内评论的摘要和 diff hunk）、push、label、状态变化
   - 可"显示 bot"，可全部展开 / 折叠
@@ -143,7 +180,8 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 ## 7. 本地状态（SQLite）
 
 - `items`：PR / Issue 的快照字段 + 原始 JSON
-- `item_state`：priority、pinned、focus_dismissed_at、last_viewed_at、tracked、manual
+- `item_state`：pinned、viewed_at、seen_at（只存本地）
+- `board_item`：board 条目的缓存（item id、Status 及其设置时间、Priority、Comment）
 - `users`：login、头像、company、orgs、邮箱域名、committer 领域、来源、fetched_at
 - `org_overrides`：手动设置的映射
 - `timeline_cache`：详情缓存
@@ -160,7 +198,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 
 **我是 reviewer**：
 
-- 有待我完成的 review request → `me`
+- 有待我完成的 review request（PR 不是 draft）→ `me`
 - 我 review 过，且作者在我上次 review 之后 push 或评论了 → `me`
 - 其他情况 → `them`
 

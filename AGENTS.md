@@ -14,14 +14,15 @@ open .build/DerivedData/Build/Products/Debug/PRDesk.app
 running copy first) — that is the copy for daily use. Keep the build free of warnings.
 
 Debug builds accept `-PRDeskAppearance dark|light` to force an appearance, and
-`-PRDeskDryRunWrites YES` to log writes to GitHub (comments, reviews, marking notifications read)
-instead of sending them — use it whenever a test could trigger a write.
+`-PRDeskDryRunWrites YES` to log writes to GitHub (comments, reviews, marking notifications read,
+board fields, subscriptions) instead of sending them — use it whenever a test could trigger a write.
 Local data lives in `~/Library/Application Support/PR Desk/` (SQLite via GRDB, avatar cache).
 
 ## Layout
 
 - `PRDesk/Sources/GitHub` — `GitHubClient` (GraphQL + REST, retries), queries and mutations
-- `PRDesk/Sources/Sync` — `SyncEngine` (tracked items, details, inbox), `AffiliationEngine` (badges)
+- `PRDesk/Sources/Sync` — `SyncEngine` (tracked items, details, inbox, the triage board),
+  `AffiliationEngine` (badges)
 - `PRDesk/Sources/Store` — GRDB records and migrations (`AppDatabase`); migrations are append-only
 - `PRDesk/Sources/Model` — pure logic: `ItemInsight` (Turn, unread, review-request classification),
   filter parsing, sections and sorting
@@ -70,8 +71,12 @@ are used off the main actor); no glass on content (cards, chips, rows).
   with `errors`, not an HTTP error.
 - Heavy fields in the list search (e.g. comment bodies) push pages past GitHub's time limit
   (502s and truncated JSON); keep the list query lean and fetch detail on selection.
-- Never post to GitHub (comments, reviews, marking notifications read) while testing; use the
-  dry-run flag above.
+- Never post to GitHub (comments, reviews, marking notifications read, board fields,
+  subscriptions) while testing; use the dry-run flag above.
+- The triage board (GitHub Project `vllm-project` #56) is the source of truth for Status, Priority
+  and Comment (SPEC §3.1). The app writes them only on an explicit user action, never from a rule;
+  it also shares the board with another tracker (`Python Parity Backlog`), whose items it must
+  leave alone.
 - Only user-initiated selection counts as opening an item (viewed, unread cleared, notification
   marked read). Selections the table makes itself go through `AppModel.autoSelect`; otherwise a
   row leaving the list selects its neighbor, which gets read and leaves too, in a chain.
