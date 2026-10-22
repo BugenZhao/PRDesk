@@ -117,7 +117,7 @@ enum ItemColumn: String, CaseIterable {
                 if contribution.isRegular, orgBadges.isEmpty {
                     mark = [.symbol("checkmark.seal", color: .systemGreen)]
                 } else if contribution.isFirstTime {
-                    mark = [.chip("1st", color: .secondaryLabelColor)]
+                    mark = [.tile("1st", color: .firstTimer)]
                 }
             }
             let avatar: CellRun = .avatar(item.author.flatMap(AvatarCache.shared.image(for:)))
@@ -270,6 +270,13 @@ extension NSColor {
             ? NSColor(srgbRed: 0.85, green: 0.21, blue: 0.20, alpha: 1)
             : NSColor(srgbRed: 0.81, green: 0.13, blue: 0.18, alpha: 1)
     }
+
+    /// The first-timer tile: a teal deep enough to carry white text.
+    static let firstTimer = NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            ? NSColor(srgbRed: 0.16, green: 0.58, blue: 0.66, alpha: 1)
+            : NSColor(srgbRed: 0.04, green: 0.52, blue: 0.60, alpha: 1)
+    }
 }
 
 extension Vote {
@@ -291,7 +298,7 @@ extension Vote {
 extension Badge {
     @MainActor
     var cellRun: CellRun {
-        if let image = AvatarCache.shared.image(for: org.avatarLogin) { .image(image) } else { .chip(org.shortLabel, color: .secondaryLabelColor) }
+        if let image = AvatarCache.shared.image(for: org.avatarLogin) { .image(image) } else { .tile(org.shortLabel, color: .tertiaryLabelColor) }
     }
 }
 

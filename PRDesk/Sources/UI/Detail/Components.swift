@@ -81,7 +81,7 @@ struct BadgeIcons: View {
                         .foregroundStyle(.green)
                         .help(contribution.summary)
                 } else if contribution.isFirstTime {
-                    Chip(text: "1st")
+                    BadgeTile(text: "1st", color: Color(nsColor: .firstTimer), size: size)
                         .help(contribution.summary)
                 }
             }
@@ -90,7 +90,7 @@ struct BadgeIcons: View {
                     if let image = cache.image(for: badge.org.avatarLogin) {
                         Image(nsImage: image).resizable()
                     } else {
-                        Text(badge.org.shortLabel).font(.system(size: 8, weight: .bold))
+                        BadgeTile(text: badge.org.shortLabel, color: Color(nsColor: .tertiaryLabelColor), size: size)
                     }
                 }
                 .frame(width: size, height: size)
@@ -98,6 +98,22 @@ struct BadgeIcons: View {
                 .help("\(badge.org.displayName) — \(badge.source)")
             }
         }
+    }
+}
+
+/// A short label on a solid rounded square, sized and shaped like an org badge.
+struct BadgeTile: View {
+    let text: String
+    let color: Color
+    var size: CGFloat = 13
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: size * 8 / 13, weight: .bold))
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .frame(width: size, height: size)
+            .background(color, in: RoundedRectangle(cornerRadius: 3))
     }
 }
 

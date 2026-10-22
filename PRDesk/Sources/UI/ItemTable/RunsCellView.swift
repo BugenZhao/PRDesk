@@ -18,6 +18,8 @@ indirect enum CellRun {
     case segments([(text: String, color: NSColor)], font: NSFont = CellFont.regular, flexible: Bool = false)
     /// Small rounded image, e.g. an org avatar.
     case image(NSImage)
+    /// A short label on a solid rounded square the size of `image`, so it sits among org avatars.
+    case tile(String, color: NSColor)
     /// A person's avatar in a circle; a placeholder circle while it loads.
     case avatar(NSImage?)
     /// Takes whatever width is left over, pushing the runs after it to the far edge.
@@ -32,6 +34,7 @@ enum CellFont {
     nonisolated(unsafe) static let small = NSFont.systemFont(ofSize: 11)
     nonisolated(unsafe) static let smallBold = NSFont.systemFont(ofSize: 11, weight: .semibold)
     nonisolated(unsafe) static let chip = NSFont.systemFont(ofSize: 10, weight: .medium)
+    nonisolated(unsafe) static let tile = NSFont.systemFont(ofSize: 8, weight: .bold)
 }
 
 /// A cell that draws its runs directly, which keeps dense tables cheap to scroll.
@@ -117,7 +120,7 @@ final class RunsCellView: NSTableCellView {
             width
         case .symbol, .icon:
             Self.symbolSize
-        case .image, .avatar:
+        case .image, .tile, .avatar:
             Self.imageSize
         case .spring:
             0
@@ -191,6 +194,24 @@ final class RunsCellView: NSTableCellView {
 
         case let .image(image):
             drawImage(image, in: rect)
+
+        case let .tile(string, color):
+            let size = Self.imageSize
+            let target = NSRect(x: rect.minX, y: rect.midY - size / 2, width: size, height: size)
+            color.setFill()
+            NSBezierPath(roundedRect: target, xRadius: 3, yRadius: 3).fill()
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.alignment = .center
+            let text = NSAttributedString(string: string, attributes: [
+                .font: CellFont.tile,
+                .foregroundColor: NSColor.white,
+                .paragraphStyle: paragraph,
+            ])
+            let lineHeight = ceil(CellFont.tile.ascender - CellFont.tile.descender)
+            text.draw(
+                with: NSRect(x: target.minX, y: target.midY - lineHeight / 2, width: size, height: lineHeight),
+                options: [.usesLineFragmentOrigin]
+            )
 
         case .spring:
             break
