@@ -135,9 +135,12 @@ enum ItemColumn: String, CaseIterable {
 
         case .size:
             guard let additions = item.additions, let deletions = item.deletions else { return [] }
+            // Additions to the left, deletions to the right; only the signs are colored, so the
+            // numbers stay quieter than the green and red of Review and CI.
             return [
-                .text("+\(additions)", color: .systemGreen, font: CellFont.digits),
-                .text("−\(deletions)", color: .systemRed, font: CellFont.digits),
+                .segments([("+", .systemGreen), (String(additions), .secondaryLabelColor)], font: CellFont.digits),
+                .spring,
+                .segments([("−", .systemRed), (String(deletions), .secondaryLabelColor)], font: CellFont.digits),
             ]
 
         case .age:
