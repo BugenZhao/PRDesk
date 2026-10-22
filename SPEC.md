@@ -100,7 +100,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 | (标记) | `•` 有未读的他人动态（相对我上次查看） |
 | P | 优先级 `H` / `M` / `L` 徽章（来自 board） |
 | # | 编号；PR / Issue 用不同的小图标区分 |
-| Title | 状态图标 + 标题（开头的 `[..]` / `xx:` 标签变淡），再接灰色的最新事件摘要（如 `@xx commented 2h`、`you reviewed 2d`）；被唤醒的条目带原因标签；有 board Comment 时在最后显示备注 |
+| Title | 状态图标 + 标题（开头的 `[..]` / `xx:` 标签变淡），被唤醒的条目带原因标签；有 board Comment 时接着显示备注；灰色的最新事件摘要（如 `@xx commented 2h`、`you reviewed 2d`）始终靠右对齐 |
 | Author | 用户名 + 组织徽章（见 §5） |
 | Review | 绿色 ✓ + approve 总数（含我）；我 approve 过时 ✓ 变成实心圆；我 request changes 时后面多一个红 ✗。和 CI 列同样的结构：小标记 + 数字，固定位置 |
 | Turn | `review`（请求我 review 且未完成）/ `me` / `them` / 空（已关闭） |

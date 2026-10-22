@@ -163,12 +163,14 @@ enum ItemColumn: String, CaseIterable {
         if let reason = row.wakeReason {
             runs.append(.chip(reason, color: .systemPurple))
         }
-        if let summary = row.insight.summary, let at = row.insight.summaryAt {
-            runs.append(.text("\(summary) \(at.compactAge(relativeTo: now))", color: .tertiaryLabelColor, font: CellFont.small, maxWidth: 180))
-        }
         if let comment = row.comment {
             runs.append(.symbol("text.bubble", color: .tertiaryLabelColor))
-            runs.append(.text(comment, color: .secondaryLabelColor, font: CellFont.small, maxWidth: 320))
+            runs.append(.text(comment, color: .secondaryLabelColor, font: CellFont.small, flexible: true, maxWidth: 320))
+        }
+        // The latest event sits at the right edge, so it lines up down the column.
+        if let summary = row.insight.summary, let at = row.insight.summaryAt {
+            runs.append(.spring)
+            runs.append(.text("\(summary) \(at.compactAge(relativeTo: now))", color: .tertiaryLabelColor, font: CellFont.small, maxWidth: 180))
         }
         return runs
     }

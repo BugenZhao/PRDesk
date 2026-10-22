@@ -22,6 +22,8 @@ indirect enum CellRun {
     case image(NSImage)
     /// A person's avatar in a circle; a placeholder circle while it loads.
     case avatar(NSImage?)
+    /// Takes whatever width is left over, pushing the runs after it to the far edge.
+    case spring
 }
 
 /// NSFont is immutable, so sharing these across isolation domains is safe.
@@ -63,8 +65,17 @@ final class RunsCellView: NSTableCellView {
         let gaps = spacing * CGFloat(runs.count - 1)
         let available = bounds.width - 2 * inset - gaps
         let fixed = zip(runs, natural).reduce(0) { $0 + ($1.0.isFlexible ? 0 : $1.1) }
-        let widths = zip(runs, natural).map { run, width in
-            run.isFlexible ? max(0, min(width, available - fixed)) : width
+        // Flexible runs share what the fixed ones leave, earlier runs first; springs get the rest.
+        var remaining = max(0, available - fixed)
+        var widths = zip(runs, natural).map { run, width -> CGFloat in
+            guard run.isFlexible else { return width }
+            let given = min(width, remaining)
+            remaining -= given
+            return given
+        }
+        let springs = runs.indices.filter { if case .spring = runs[$0] { true } else { false } }
+        for index in springs {
+            widths[index] = remaining / CGFloat(springs.count)
         }
         let total = widths.reduce(0, +) + gaps
         var x = alignment == .trailing ? bounds.maxX - inset - total : inset
@@ -88,6 +99,8 @@ final class RunsCellView: NSTableCellView {
             Self.symbolSize
         case .image, .avatar:
             Self.imageSize
+        case .spring:
+            0
         case let .segments(parts, font, _):
             ceil(Self.attributed(parts, font: font, override: nil).size().width)
         }
@@ -165,6 +178,9 @@ final class RunsCellView: NSTableCellView {
 
         case let .image(image):
             drawImage(image, in: rect)
+
+        case .spring:
+            break
 
         case let .avatar(image):
             let size = Self.imageSize
