@@ -7,7 +7,7 @@ struct PRDeskApp: App {
     init() {
         // Tooltips carry details the dense list leaves out, so show them almost at once (AppKit's
         // default waits about a second). A registered default, so `defaults write` still wins.
-        UserDefaults.standard.register(defaults: ["NSInitialToolTipDelay": 100])
+        UserDefaults.standard.register(defaults: ["NSInitialToolTipDelay": 300])
         do {
             _model = State(initialValue: try AppModel(db: .openDefault()))
         } catch {
