@@ -186,10 +186,10 @@ enum ItemColumn: String, CaseIterable {
     }
 
     /// Review and CI share one shape: a small mark, then a count, in the same fixed slots.
-    private static let markSlot: CGFloat = 10
+    private static let markSlot: CGFloat = 13
     private static let countSlot: CGFloat = 16
-    /// Sized to sit level with the CI dot.
-    private static let markPointSize: CGFloat = 8
+    /// One size for the review check and the CI dot, both SF Symbol circles, so they match.
+    private static let markPointSize: CGFloat = 10
 
     /// Approvals as a circled check and a count, the circle filled when one of them is the viewer's; a red
     /// cross after them when the viewer requested changes.
@@ -225,7 +225,8 @@ enum ItemColumn: String, CaseIterable {
         }
         let isReady = item.labels.contains { $0.name == "ready" }
         let failed: CellRun? = ci.failed > 0 ? .text(String(ci.failed), color: .systemRed, font: CellFont.digits) : nil
-        return [.slot(isReady ? .dot(color) : .ring(color), width: Self.markSlot), .slot(failed, width: Self.countSlot)]
+        let dot: CellRun = .symbol(isReady ? "circle.fill" : "circle", color: color, pointSize: Self.markPointSize)
+        return [.slot(dot, width: Self.markSlot), .slot(failed, width: Self.countSlot)]
     }
 }
 
