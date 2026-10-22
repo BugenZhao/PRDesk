@@ -15,7 +15,9 @@ running copy first) — that is the copy for daily use. Keep the build free of w
 
 Debug builds accept `-PRDeskAppearance dark|light` to force an appearance, and
 `-PRDeskDryRunWrites YES` to log writes to GitHub (comments, reviews, marking notifications read,
-board fields, subscriptions) instead of sending them — use it whenever a test could trigger a write.
+board fields, subscriptions) instead of sending them — use it whenever a test could trigger a write. Both flags are
+compiled out of Release builds: a Release test copy writes to GitHub for real, so only measure with
+one (benchmarks, profiling) and never press keys, click rows or select items in it.
 Local data lives in `~/Library/Application Support/PR Desk/` (SQLite via GRDB, avatar cache).
 
 ## Testing in the running app
