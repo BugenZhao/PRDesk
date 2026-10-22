@@ -33,6 +33,8 @@ struct DetailView: View {
             // has no toolbar section, and the list's buttons jump to the window's far edge.
             if isShown {
                 if let item = model.selectedItem, item.kind == .pullRequest {
+                    // Spacers on both sides center the tabs over the pane.
+                    ToolbarSpacer(.flexible)
                     ToolbarItem {
                         Picker("View", selection: $tab) {
                             Text("Conversation").tag(DetailTab.conversation)
@@ -43,6 +45,7 @@ struct DetailView: View {
                         .labelsHidden()
                         .fixedSize()
                     }
+                    ToolbarSpacer(.flexible)
                 } else {
                     ToolbarSpacer(.flexible)
                 }
