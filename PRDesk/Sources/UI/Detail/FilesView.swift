@@ -9,9 +9,6 @@ struct FilesView: View {
     @State private var error: String?
     @State private var expanded: [String: Bool] = [:]
 
-    /// Files with more diff lines than this start collapsed.
-    private static let autoExpandLimit = 300
-
     var body: some View {
         Group {
             if let files {
@@ -50,8 +47,9 @@ struct FilesView: View {
                 .buttonStyle(.link)
 
                 ForEach(files) { parsed in
+                    // Files start collapsed.
                     FileDiffView(file: parsed.file, lines: parsed.lines, expanded: Binding(
-                        get: { expanded[parsed.id] ?? ((parsed.lines?.count ?? 0) < Self.autoExpandLimit) },
+                        get: { expanded[parsed.id] ?? false },
                         set: { expanded[parsed.id] = $0 }
                     ))
                 }
@@ -112,7 +110,7 @@ private struct FileDiffView: View {
             }
             .font(.caption.monospaced())
             .lineLimit(1)
-            .truncationMode(.head)
+            .truncationMode(.middle)
             .textSelection(.enabled)
             Spacer()
             Text("+\(file.additions)").foregroundStyle(.green)

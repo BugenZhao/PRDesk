@@ -190,7 +190,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
   - 可全部展开 / 折叠
   - 自上次查看以来的新内容高亮，并自动滚到第一条新内容
 - **Checks**：按状态分组列出 check runs 和 statuses，失败的置顶，点击打开日志 URL
-- **Files**（v1 只读）：变更文件列表和 diff
+- **Files**（v1 只读）：变更文件列表和 diff；每个文件默认折叠，文件名过长时省略中间
 - **写操作**：底部是 Markdown 评论框（支持预览，`⌘↩` 发送）
   - PR：Comment / Approve / Request changes，以带正文的整体 review 提交
   - Issue：仅 Comment
