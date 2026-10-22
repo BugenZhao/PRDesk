@@ -77,8 +77,24 @@ struct DetailView: View {
                 Button("Retry") { model.loadDetail(force: true) }
             }
         } else {
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            DelayedProgressView()
         }
+    }
+}
+
+/// A spinner that appears only if loading takes a moment, so quick switches between items don't
+/// flash it.
+struct DelayedProgressView: View {
+    @State private var isShown = false
+
+    var body: some View {
+        ProgressView()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .opacity(isShown ? 1 : 0)
+            .task {
+                try? await Task.sleep(for: .milliseconds(250))
+                withAnimation(.easeIn(duration: 0.15)) { isShown = true }
+            }
     }
 }
 

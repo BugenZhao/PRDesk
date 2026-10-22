@@ -104,7 +104,25 @@ final class AppModel {
     }
 
     /// Detail of the selected item; may briefly be a cached copy while a fresh one loads.
-    private(set) var detail: ItemDetail?
+    private(set) var detail: ItemDetail? {
+        didSet { if let detail { rememberDetail(detail) } }
+    }
+
+    /// Recently shown details, so returning to an item shows it at once rather than after a
+    /// database read.
+    @ObservationIgnored private var recentDetails: [Int: ItemDetail] = [:]
+    @ObservationIgnored private var recentDetailOrder: [Int] = []
+    private static let recentDetailLimit = 20
+
+    private func rememberDetail(_ detail: ItemDetail) {
+        recentDetails[detail.number] = detail
+        recentDetailOrder.removeAll { $0 == detail.number }
+        recentDetailOrder.append(detail.number)
+        if recentDetailOrder.count > Self.recentDetailLimit {
+            recentDetails[recentDetailOrder.removeFirst()] = nil
+        }
+    }
+
     private(set) var detailState: DetailState = .idle
 
     /// `seenAt` of the selected item when it was opened, before opening moved it forward.
@@ -529,7 +547,7 @@ final class AppModel {
             return
         }
         if detail?.number != item.number {
-            detail = nil
+            detail = recentDetails[item.number]
         }
         detailState = .idle
         detailTask = Task { [weak self, db, engine] in
