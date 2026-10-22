@@ -18,6 +18,31 @@ Debug builds accept `-PRDeskAppearance dark|light` to force an appearance, and
 board fields, subscriptions) instead of sending them — use it whenever a test could trigger a write.
 Local data lives in `~/Library/Application Support/PR Desk/` (SQLite via GRDB, avatar cache).
 
+## Testing in the running app
+
+Check UI changes in a separate test copy, never the installed app or another session's debug build:
+
+```sh
+DD=<your scratch dir>/DerivedData   # not .build/DerivedData, which other sessions build into
+xcodebuild -workspace PRDesk.xcworkspace -scheme PRDesk -derivedDataPath "$DD" \
+  PRODUCT_BUNDLE_IDENTIFIER=com.bugenzhao.PRDesk.perftest build
+"$DD/Build/Products/Debug/PRDesk.app/Contents/MacOS/PRDesk" -PRDeskDryRunWrites YES &
+```
+
+- The own bundle id keeps it apart from `com.bugenzhao.PRDesk` (the installed copy and
+  `scripts/install.sh`, which quits that id) and gives it its own preferences (collapsed sections,
+  column widths). Launch the binary directly; `open` may just activate another copy.
+- Drive it with computer use in the background (`app_screenshot`, `app_click`, `app_menu`,
+  `app_zoom` on `com.bugenzhao.PRDesk.perftest`), so the user keeps working. Menu commands go
+  through `app_menu`; context menus can't be opened in the background.
+- It shares the real database: selecting an item marks it viewed and read, and adding or pinning
+  stores it. Pick items already in Recently viewed, and don't add, pin or set fields unless that is
+  what's being tested. Quit the copy when done.
+- Web pages (`PRDesk/Web/`) can also be checked headless: load `WebResources.page(_:)` into an
+  offscreen `WKWebView` with the scripts, render a payload built from `detailCache` rows, and
+  `takeSnapshot`. Offscreen views don't animate or tick timers at full rate, so judge timing and
+  transitions in the app instead.
+
 ## Layout
 
 - `PRDesk/Sources/GitHub` — `GitHubClient` (GraphQL + REST, retries), queries and mutations
