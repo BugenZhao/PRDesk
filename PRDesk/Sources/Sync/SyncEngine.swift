@@ -30,6 +30,9 @@ actor SyncEngine {
     static let initialLookback: TimeInterval = 90 * 24 * 3600
     private static let indexSlack: TimeInterval = 5 * 60
     private static let boardRefreshInterval: TimeInterval = 5 * 60
+    /// The board is read every few minutes rather than every round; the app's own writes show
+    /// at once anyway, so this only delays edits made on the web.
+    private static let boardSyncInterval: TimeInterval = 3 * 60
     private static let lastSyncKey = "lastSyncStartedAt"
     private static let viewerKey = "viewer"
     private static let windowLength: TimeInterval = 10 * 24 * 3600
@@ -40,6 +43,7 @@ actor SyncEngine {
     private let logger = Logger(subsystem: "com.bugenzhao.PRDesk", category: "Sync")
     private var isSyncing = false
     private var boardRefreshedAt: Date?
+    private var boardSyncedAt: Date?
     /// Ids needed to write to the board, from the latest board sync.
     var boardSchema: BoardQuery.Schema?
     /// When the app last wrote each board item, so a sync that read the board just before
@@ -51,8 +55,9 @@ actor SyncEngine {
         self.db = db
     }
 
-    /// Returns nil if a sync is already running.
-    func sync() async throws -> SyncResult? {
+    /// Returns nil if a sync is already running. `includeBoard` reads the board even if it was read
+    /// recently (for a sync the user asked for).
+    func sync(includeBoard: Bool = false) async throws -> SyncResult? {
         guard !isSyncing else { return nil }
         isSyncing = true
         defer { isSyncing = false }
@@ -65,28 +70,33 @@ actor SyncEngine {
             startedAt.addingTimeInterval(-Self.initialLookback)
         }
 
-        // `involves:` covers author, assignee, mentions and commenters, but not review requests or reviews.
-        let qualifiers = ["involves:\(viewer)", "review-requested:\(viewer)", "reviewed-by:\(viewer)", "label:rust"]
+        // One advanced search for everything tracked; `involves:` covers author, assignee, mentions
+        // and commenters, but not review requests or reviews.
+        let qualifier = "(involves:\(viewer) OR review-requested:\(viewer) OR reviewed-by:\(viewer) OR label:rust)"
         // Search pages are slow (GitHub computes mergeability and CI counts per PR), so long ranges
-        // are cut into windows fetched in parallel.
+        // are cut into windows fetched in parallel, with full pages; a short incremental range
+        // uses small ones.
         let windows = Self.windows(from: since, to: startedAt)
-        let jobs = qualifiers.flatMap { qualifier in windows.map { (qualifier, $0.from, $0.to) } }
+        let pageSize = windows.count > 1 ? ItemQuery.pageSize : ItemQuery.incrementalPageSize
         var fetched = try await withThrowingTaskGroup(of: Int.self) { group in
-            var pending = jobs.makeIterator()
+            var pending = windows.makeIterator()
             var total = 0
             for _ in 0 ..< Self.maxConcurrentFetches {
-                guard let (qualifier, from, to) = pending.next() else { break }
-                group.addTask { try await self.fetch(qualifier: qualifier, from: from, to: to) }
+                guard let window = pending.next() else { break }
+                group.addTask { try await self.fetch(qualifier: qualifier, from: window.from, to: window.to, pageSize: pageSize) }
             }
             while let count = try await group.next() {
                 total += count
-                if let (qualifier, from, to) = pending.next() {
-                    group.addTask { try await self.fetch(qualifier: qualifier, from: from, to: to) }
+                if let window = pending.next() {
+                    group.addTask { try await self.fetch(qualifier: qualifier, from: window.from, to: window.to, pageSize: pageSize) }
                 }
             }
             return total
         }
-        fetched += try await refreshBoardItems(syncBoard())
+        if includeBoard || boardSyncedAt.map({ startedAt.timeIntervalSince($0) >= Self.boardSyncInterval }) ?? true {
+            fetched += try await refreshBoardItems(syncBoard())
+            boardSyncedAt = startedAt
+        }
 
         try await db.setMeta(Self.lastSyncKey, Self.format(startedAt))
         if try await db.meta(AppDatabase.baselineKey) == nil {
@@ -144,7 +154,7 @@ actor SyncEngine {
 
     /// Fetches every item matching `qualifier` updated in `[from, to]`, writing each page as it arrives.
     /// Search caps results at 1000, so larger windows are split in half.
-    private func fetch(qualifier: String, from: Date, to: Date?) async throws -> Int {
+    private func fetch(qualifier: String, from: Date, to: Date?, pageSize: Int) async throws -> Int {
         let range = if let to { "\(Self.format(from))..\(Self.format(to))" } else { ">=\(Self.format(from))" }
         let q = "repo:\(Self.repo) \(qualifier) updated:\(range)"
         var after: String?
@@ -152,7 +162,7 @@ actor SyncEngine {
         repeat {
             let page = try await client.query(
                 ItemQuery.search,
-                variables: ItemQuery.SearchVariables(q: q, after: after),
+                variables: ItemQuery.SearchVariables(q: q, first: pageSize, after: after),
                 as: ItemQuery.SearchResponse.self
             ).search
             if after == nil, page.issueCount > ItemQuery.resultCap {
@@ -160,8 +170,8 @@ actor SyncEngine {
                 if end.timeIntervalSince(from) > 3600 {
                     let mid = from.addingTimeInterval(end.timeIntervalSince(from) / 2)
                     logger.info("\(page.issueCount) results for \(q, privacy: .public); splitting")
-                    return try await fetch(qualifier: qualifier, from: from, to: mid)
-                        + fetch(qualifier: qualifier, from: mid, to: to)
+                    return try await fetch(qualifier: qualifier, from: from, to: mid, pageSize: pageSize)
+                        + fetch(qualifier: qualifier, from: mid, to: to, pageSize: pageSize)
                 }
             }
             let now = Date()

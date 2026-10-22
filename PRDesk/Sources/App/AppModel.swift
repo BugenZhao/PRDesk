@@ -27,9 +27,16 @@ final class AppModel {
     /// Closed or merged items stay visible this long after closing.
     static let closedRetention: TimeInterval = 14 * 24 * 3600
     static let recentLimit = 8
-    private static let pollInterval: Duration = .seconds(60)
-    /// Minimum gap before re-syncing when the app is activated.
-    private static let activationThreshold: TimeInterval = 15
+    /// Seconds between automatic syncs, set in Settings. Each round costs a few GraphQL points.
+    var syncInterval: Int = Defaults.get(.syncInterval) ?? 300 {
+        didSet { Defaults.set(syncInterval, for: .syncInterval) }
+    }
+
+    static let syncIntervals = [60, 120, 300, 600, 900]
+    /// Rounds are timed from the last attempt, so a failing sync isn't retried every tick.
+    @ObservationIgnored private var lastSyncAttemptAt: Date?
+    /// How often the poll loop checks whether a sync is due, so a new interval applies promptly.
+    private static let pollTick: Duration = .seconds(15)
     /// How long an item must stay selected before it counts as viewed.
     private static let dwellBeforeViewed: Duration = .milliseconds(1200)
 
@@ -211,24 +218,22 @@ final class AppModel {
                 self?.rebuild()
             }
             while !Task.isCancelled {
-                await self?.sync()
-                try? await Task.sleep(for: Self.pollInterval)
-            }
-        })
-        tasks.append(Task { [weak self] in
-            for await _ in NotificationCenter.default.notifications(named: NSApplication.didBecomeActiveNotification) {
                 guard let self else { return }
-                if let last = lastSyncedAt, Date().timeIntervalSince(last) < Self.activationThreshold { continue }
-                await sync()
+                if lastSyncAttemptAt.map({ Date().timeIntervalSince($0) >= TimeInterval(syncInterval) }) ?? true {
+                    await sync(includeBoard: false)
+                }
+                try? await Task.sleep(for: Self.pollTick)
             }
         })
     }
 
-    func sync() async {
+    /// Syncs now. Unless it is the timer's round, this also reads the board.
+    func sync(includeBoard: Bool = true) async {
         guard syncState != .syncing else { return }
         syncState = .syncing
+        lastSyncAttemptAt = Date()
         do {
-            if let result = try await engine.sync() {
+            if let result = try await engine.sync(includeBoard: includeBoard) {
                 if viewer != result.viewer {
                     viewer = result.viewer
                     rebuild()
@@ -625,7 +630,7 @@ final class AppModel {
 /// Small typed wrapper over UserDefaults for UI preferences.
 enum Defaults {
     enum Key: String {
-        case sort, collapsed, drafts, mergedThreshold
+        case sort, collapsed, drafts, mergedThreshold, syncInterval
     }
 
     static func get<T: Decodable>(_ key: Key) -> T? {

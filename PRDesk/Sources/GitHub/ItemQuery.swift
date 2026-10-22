@@ -3,6 +3,9 @@ import Foundation
 /// GraphQL queries that fetch list-level item data, and the response shapes they decode into.
 enum ItemQuery {
     static let pageSize = 50
+    /// Page size for incremental syncs, which usually find a handful of changes. GitHub charges
+    /// for the nodes a page could return (50 per page costs 6 points, 20 costs 2).
+    static let incrementalPageSize = 20
     /// GitHub search never returns more than this many results for one query.
     static let resultCap = 1000
 
@@ -83,8 +86,8 @@ enum ItemQuery {
     """
 
     static let search = """
-    query($q: String!, $after: String) {
-      search(query: $q, type: ISSUE, first: \(pageSize), after: $after) {
+    query($q: String!, $first: Int!, $after: String) {
+      search(query: $q, type: ISSUE_ADVANCED, first: $first, after: $after) {
         issueCount
         pageInfo { hasNextPage endCursor }
         nodes { __typename ...PRFields ...IssueFields }
@@ -115,6 +118,7 @@ enum ItemQuery {
 
     struct SearchVariables: Encodable, Sendable {
         var q: String
+        var first: Int
         var after: String?
     }
 

@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// The viewer's opinion of a person. Downvoted authors never put items in Focus.
+/// The viewer's opinion of a person. Downvoted authors' items sink to the bottom of Triage.
 enum Vote: Int, Codable, Sendable {
     case up = 1
     case down = -1

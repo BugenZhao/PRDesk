@@ -18,6 +18,7 @@ struct SettingsView: View {
 }
 
 private struct TokenSettingsView: View {
+    @Environment(AppModel.self) private var model
     @State private var token = ""
     /// Loaded in `.task`: a keychain read is too slow to repeat on every view rebuild.
     @State private var hasSavedToken = false
@@ -44,6 +45,20 @@ private struct TokenSettingsView: View {
                 Text(hasSavedToken
                     ? "Using the saved token. Changes take effect after relaunching."
                     : "No saved token; using `gh auth token`.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                @Bindable var model = model
+                Picker("Sync every", selection: $model.syncInterval) {
+                    ForEach(AppModel.syncIntervals, id: \.self) { seconds in
+                        Text(seconds < 60 ? "\(seconds) seconds" : seconds == 60 ? "1 minute" : "\(seconds / 60) minutes").tag(seconds)
+                    }
+                }
+            } header: {
+                Text("Sync")
+            } footer: {
+                Text("Each round costs a few of GitHub's 5,000 hourly API points; the triage board is read at most every 3 minutes. ⌘R syncs everything at once.")
                     .foregroundStyle(.secondary)
             }
         }
@@ -180,7 +195,7 @@ private struct VoteSettingsView: View {
             } header: {
                 Text("People")
             } footer: {
-                Text("Vote with + / - on a selected row, or right-click a name. Downvoted authors never put items in Focus unless the item is marked H.")
+                Text("Vote with + / - on selected rows, or right-click a name. Downvoted authors' items sink to the bottom of Triage.")
                     .foregroundStyle(.secondary)
             }
         }
