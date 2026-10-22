@@ -47,6 +47,7 @@ struct ItemTableView: NSViewRepresentable {
         table.target = coordinator
         table.doubleAction = #selector(Coordinator.openClickedItem)
         table.keyHandler = { [weak coordinator] event in coordinator?.handleKey(event) ?? false }
+        table.headerClickHandler = { [weak coordinator] row in coordinator?.toggleHeader(at: row) ?? false }
         table.menu = coordinator.makeContextMenu()
         coordinator.table = table
         coordinator.startClock()
@@ -372,9 +373,17 @@ struct ItemTableView: NSViewRepresentable {
             return view
         }
 
+        /// Toggles the section if `row` is a header; see `ItemNSTableView.mouseDown`.
+        func toggleHeader(at row: Int) -> Bool {
+            guard rows.indices.contains(row), case let .header(section, _, _) = rows[row] else { return false }
+            parent.onToggleSection(section)
+            return true
+        }
+
         func tableView(_: NSTableView, shouldSelectRow row: Int) -> Bool {
             guard case let .header(section, _, _) = rows[row] else { return true }
-            // Clicking a header toggles it; keyboard navigation just skips over it.
+            // A click on the header floating at the top lands here (one in place is taken by
+            // `ItemNSTableView.mouseDown`); keyboard navigation just skips over headers.
             if let type = NSApp.currentEvent?.type, type == .leftMouseDown || type == .leftMouseUp {
                 DispatchQueue.main.async { self.parent.onToggleSection(section) }
             }
@@ -400,10 +409,20 @@ struct ItemTableView: NSViewRepresentable {
 /// Routes single-key shortcuts to the coordinator before normal table handling.
 final class ItemNSTableView: NSTableView {
     var keyHandler: ((NSEvent) -> Bool)?
+    /// Returns whether the row was a section header and was toggled.
+    var headerClickHandler: ((Int) -> Bool)?
 
     override func keyDown(with event: NSEvent) {
         if keyHandler?(event) == true { return }
         super.keyDown(with: event)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        // The table never asks whether to select a header sitting in place, so `shouldSelectRow`
+        // only sees clicks on the floating one; take the others here.
+        let row = row(at: convert(event.locationInWindow, from: nil))
+        if row >= 0, headerClickHandler?(row) == true { return }
+        super.mouseDown(with: event)
     }
 }
 
