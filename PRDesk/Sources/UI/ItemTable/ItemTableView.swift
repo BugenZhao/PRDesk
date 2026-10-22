@@ -54,6 +54,7 @@ struct ItemTableView: NSViewRepresentable {
         table.keyHandler = { [weak coordinator] event in coordinator?.handleKey(event) ?? false }
         table.headerClickHandler = { [weak coordinator] row in coordinator?.toggleHeader(at: row) ?? false }
         table.copyLinksHandler = { [weak coordinator] in coordinator?.copySelectedLinks() ?? false }
+        table.toolTipProvider = { [weak coordinator] row, column in coordinator?.toolTip(row: row, column: column) }
         table.listUndoManager = listUndoManager
         table.menu = coordinator.makeContextMenu()
         coordinator.table = table
@@ -123,6 +124,7 @@ struct ItemTableView: NSViewRepresentable {
                 rows = parent.rows
                 viewer = parent.viewer
                 badgeVersion = parent.badgeVersion
+                table.resetToolTip()
                 if viewerChanged || !animateChanges(from: old, in: table) {
                     table.reloadData()
                 }
@@ -445,8 +447,7 @@ struct ItemTableView: NSViewRepresentable {
                     .text(section.title, font: CellFont.smallBold),
                     .text(String(count), color: .secondaryLabelColor, font: CellFont.digits),
                 ]
-                cell.alphaValue = 1
-                cell.showsTruncatedText = false
+                cell.opacity = 1
                 return cell
 
             case let .item(_, itemRow):
@@ -454,14 +455,28 @@ struct ItemTableView: NSViewRepresentable {
                 let cell = reusableCell(tableView, id: column.rawValue)
                 cell.alignment = column.alignment
                 cell.runs = column.runs(for: itemRow, viewer: viewer, badges: parent.badges, contribution: parent.contribution, now: Date())
-                cell.alphaValue = itemRow.item.isOpen ? 1 : 0.55
-                cell.showsTruncatedText = column == .title
-                cell.toolTip = switch column {
-                case .author: authorTooltip(itemRow.item.author)
-                case .ci: ItemColumn.ciTooltip(itemRow.item)
-                default: nil
-                }
+                cell.opacity = itemRow.item.isOpen ? 1 : 0.55
                 return cell
+            }
+        }
+
+        /// The tooltip for a cell, worked out only when it is about to show; see
+        /// `ItemNSTableView.toolTipProvider`.
+        func toolTip(row: Int, column: Int) -> String? {
+            guard let table, rows.indices.contains(row) else { return nil }
+            switch rows[row] {
+            case let .header(section, _, _):
+                return section.help
+            case let .item(_, itemRow):
+                guard table.tableColumns.indices.contains(column),
+                      let itemColumn = ItemColumn(rawValue: table.tableColumns[column].identifier.rawValue)
+                else { return nil }
+                switch itemColumn {
+                case .title: return (table.view(atColumn: column, row: row, makeIfNecessary: false) as? RunsCellView)?.truncatedText
+                case .author: return authorTooltip(itemRow.item.author)
+                case .ci: return ItemColumn.ciTooltip(itemRow.item)
+                default: return nil
+                }
             }
         }
 
@@ -485,6 +500,9 @@ struct ItemTableView: NSViewRepresentable {
             let view = tableView.makeView(withIdentifier: ItemRowView.identifier, owner: nil) as? ItemRowView ?? {
                 let view = ItemRowView()
                 view.identifier = ItemRowView.identifier
+                // Cells draw into the row's layer rather than one backing store each, so a row
+                // scrolling in is one layer to fill, not a dozen.
+                view.canDrawSubviewsIntoLayer = true
                 return view
             }()
             configure(view, for: row)
@@ -495,14 +513,11 @@ struct ItemTableView: NSViewRepresentable {
             switch rows[row] {
             case let .item(_, itemRow):
                 view.tint = itemRow.priority?.rowTint
-                view.toolTip = nil
                 view.drawsSeparator = false
-            case let .header(section, _, _):
+            case .header:
                 view.tint = nil
                 // Divides each section from the one above.
                 view.drawsSeparator = row > 0
-                // On the row: a group row doesn't show its cell's tooltip.
-                view.toolTip = section.help
             }
         }
 
@@ -566,6 +581,8 @@ final class ItemNSTableView: NSTableView {
     weak var listUndoManager: UndoManager?
     /// Copies the selected items' links; returns whether anything was selected.
     var copyLinksHandler: (() -> Bool)?
+    /// The tooltip for the cell at a row and column.
+    var toolTipProvider: ((Int, Int) -> String?)?
 
     @objc func undo(_: Any?) { listUndoManager?.undo() }
     @objc func redo(_: Any?) { listUndoManager?.redo() }
@@ -594,12 +611,65 @@ final class ItemNSTableView: NSTableView {
         super.keyDown(with: event)
     }
 
+    // MARK: Tooltips
+
+    // One tooltip area, over the cell under the mouse, instead of one per cell: cells don't
+    // work out tooltips while being set up, and scrolling has no tooltip areas to move.
+    private var toolTipCell: (row: Int, column: Int)?
+    private var hoverArea: NSTrackingArea?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        guard hoverArea == nil else { return }
+        let area = NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self)
+        addTrackingArea(area)
+        hoverArea = area
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        updateToolTipCell(at: convert(event.locationInWindow, from: nil))
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        resetToolTip()
+    }
+
+    /// Forgets the hovered cell, e.g. after rows changed under it.
+    func resetToolTip() {
+        guard toolTipCell != nil else { return }
+        toolTipCell = nil
+        removeAllToolTips()
+    }
+
+    private func updateToolTipCell(at point: NSPoint) {
+        let row = row(at: point)
+        let column = column(at: point)
+        guard row >= 0, column >= 0 else { return resetToolTip() }
+        if let toolTipCell, toolTipCell == (row, column) { return }
+        removeAllToolTips()
+        toolTipCell = (row, column)
+        // A header spans the whole row.
+        let rect = delegate?.tableView?(self, isGroupRow: row) == true ? rect(ofRow: row) : frameOfCell(atColumn: column, row: row)
+        addToolTip(rect, owner: self, userData: nil)
+    }
+
     override func mouseDown(with event: NSEvent) {
         // The table never asks whether to select a header sitting in place, so `shouldSelectRow`
         // only sees clicks on the floating one; take the others here.
         let row = row(at: convert(event.locationInWindow, from: nil))
         if row >= 0, headerClickHandler?(row) == true { return }
         super.mouseDown(with: event)
+    }
+}
+
+extension ItemNSTableView: NSViewToolTipOwner {
+    nonisolated func view(_: NSView, stringForToolTip _: NSView.ToolTipTag, point _: NSPoint, userData _: UnsafeMutableRawPointer?) -> String {
+        MainActor.assumeIsolated {
+            guard let toolTipCell else { return "" }
+            return toolTipProvider?(toolTipCell.row, toolTipCell.column) ?? ""
+        }
     }
 }
 

@@ -159,7 +159,7 @@ enum ItemColumn: String, CaseIterable {
         }
     }
 
-    private func titleRuns(_ row: ItemRow, now: Date) -> [CellRun] {
+    @MainActor private func titleRuns(_ row: ItemRow, now: Date) -> [CellRun] {
         let item = row.item
         var runs: [CellRun] = [
             .icon(item.stateIcon, color: item.stateColor),
@@ -188,12 +188,25 @@ enum ItemColumn: String, CaseIterable {
     }
 
     /// The title with its leading tags ("[Core] ", "fix(x): ") dimmed.
-    private func titleRun(_ title: String, bold: Bool) -> CellRun {
-        let (prefix, rest) = TitlePrefix.split(title)
+    @MainActor private func titleRun(_ title: String, bold: Bool) -> CellRun {
+        let (prefix, rest) = Self.splitTitle(title)
         var parts: [(text: String, color: NSColor)] = []
-        if !prefix.isEmpty { parts.append((String(prefix), .secondaryLabelColor)) }
-        parts.append((String(rest), .labelColor))
+        if !prefix.isEmpty { parts.append((prefix, .secondaryLabelColor)) }
+        parts.append((rest, .labelColor))
         return .segments(parts, font: bold ? CellFont.regularBold : CellFont.regular, flexible: true)
+    }
+
+    /// `TitlePrefix.split`, remembered: its regexes are slow next to everything else a row
+    /// scrolling in costs.
+    @MainActor private static var titleSplits: [String: (prefix: String, rest: String)] = [:]
+
+    @MainActor private static func splitTitle(_ title: String) -> (prefix: String, rest: String) {
+        if let split = titleSplits[title] { return split }
+        let (prefix, rest) = TitlePrefix.split(title)
+        let split = (String(prefix), String(rest))
+        if titleSplits.count > 5000 { titleSplits.removeAll() }
+        titleSplits[title] = split
+        return split
     }
 
     /// Review and CI share one shape: a small mark, then a count, in the same fixed slots.

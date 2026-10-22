@@ -45,12 +45,15 @@ final class RunsCellView: NSTableCellView {
         didSet {
             cachedNaturalWidths = nil
             needsDisplay = true
-            updateTruncationToolTip()
         }
     }
     var alignment: Alignment = .leading { didSet { needsDisplay = true } }
-    /// Shows the full text of runs cut short (e.g. a long title) as the tooltip.
-    var showsTruncatedText = false { didSet { updateTruncationToolTip() } }
+    /// Fades the whole cell, e.g. for closed items. Applied while drawing rather than through
+    /// `alphaValue`, which makes AppKit render the cell offscreen first when it draws into its
+    /// row's layer.
+    var opacity: CGFloat = 1 {
+        didSet { if opacity != oldValue { needsDisplay = true } }
+    }
 
     nonisolated static let spacing: CGFloat = 4
     nonisolated static let inset: CGFloat = 2
@@ -79,6 +82,18 @@ final class RunsCellView: NSTableCellView {
 
     override func draw(_: NSRect) {
         guard !runs.isEmpty else { return }
+        if opacity < 1, let context = NSGraphicsContext.current?.cgContext {
+            // One layer for the whole cell, so overlapping pieces (a chip and its text) fade as one.
+            context.setAlpha(opacity)
+            context.beginTransparencyLayer(auxiliaryInfo: nil)
+            defer { context.endTransparencyLayer() }
+            drawRuns()
+        } else {
+            drawRuns()
+        }
+    }
+
+    private func drawRuns() {
         let widths = layoutWidths(natural: naturalWidths)
         let total = widths.reduce(0, +) + Self.spacing * CGFloat(runs.count - 1)
         var x = alignment == .trailing ? bounds.maxX - Self.inset - total : Self.inset
@@ -86,11 +101,6 @@ final class RunsCellView: NSTableCellView {
             draw(run, in: NSRect(x: x, y: 0, width: width, height: bounds.height))
             x += width + Self.spacing
         }
-    }
-
-    override func setFrameSize(_ newSize: NSSize) {
-        super.setFrameSize(newSize)
-        updateTruncationToolTip()
     }
 
     /// The width each run gets: flexible runs share what the fixed ones leave, earlier runs first;
@@ -113,20 +123,20 @@ final class RunsCellView: NSTableCellView {
         return widths
     }
 
-    private func updateTruncationToolTip() {
-        guard showsTruncatedText else { return }
+    /// The full text of runs cut short at the current width (e.g. a long title), one per line;
+    /// asked for only when a tooltip is about to show.
+    var truncatedText: String? {
         let widths = layoutWidths(natural: naturalWidths)
         let cut = zip(runs, widths).compactMap { run, width in
             run.fullWidth.map { $0 > width + 0.5 } == true ? run.fullText : nil
         }
-        let tip = cut.isEmpty ? nil : cut.joined(separator: "\n")
-        if toolTip != tip { toolTip = tip }
+        return cut.isEmpty ? nil : cut.joined(separator: "\n")
     }
 
     private func naturalWidth(_ run: CellRun) -> CGFloat {
         switch run {
         case let .text(string, _, font, _, maxWidth):
-            min(ceil(string.size(withAttributes: [.font: font]).width), maxWidth ?? .infinity)
+            min(Self.textWidth(string, font: font), maxWidth ?? .infinity)
         case let .chip(string, _):
             ceil(string.size(withAttributes: [.font: CellFont.chip]).width) + 2 * Self.chipPadding
         case .dot:
@@ -140,8 +150,25 @@ final class RunsCellView: NSTableCellView {
         case .spring:
             0
         case let .segments(parts, font, _):
-            ceil(Self.attributed(parts, font: font, override: nil).size().width)
+            Self.textWidth(parts.map(\.text).joined(), font: font)
         }
+    }
+
+    private struct WidthKey: Hashable {
+        var text: String
+        var font: NSFont
+    }
+
+    /// Measured text widths: the same titles, ages and counts come back as rows scroll in and out.
+    private static var textWidths: [WidthKey: CGFloat] = [:]
+
+    fileprivate static func textWidth(_ text: String, font: NSFont) -> CGFloat {
+        let key = WidthKey(text: text, font: font)
+        if let width = textWidths[key] { return width }
+        let width = ceil(text.size(withAttributes: [.font: font]).width)
+        if textWidths.count > 20000 { textWidths.removeAll() }
+        textWidths[key] = width
+        return width
     }
 
     private static func attributed(_ parts: [(text: String, color: NSColor)], font: NSFont, override: NSColor?) -> NSAttributedString {
@@ -325,10 +352,10 @@ private extension CellRun {
     }
 
     /// The width the whole text needs, uncapped; nil for runs that can't be cut short.
-    var fullWidth: CGFloat? {
+    @MainActor var fullWidth: CGFloat? {
         switch self {
-        case let .text(string, _, font, _, _): ceil(string.size(withAttributes: [.font: font]).width)
-        case let .segments(parts, font, _): ceil(parts.map(\.text).joined().size(withAttributes: [.font: font]).width)
+        case let .text(string, _, font, _, _): RunsCellView.textWidth(string, font: font)
+        case let .segments(parts, font, _): RunsCellView.textWidth(parts.map(\.text).joined(), font: font)
         default: nil
         }
     }
