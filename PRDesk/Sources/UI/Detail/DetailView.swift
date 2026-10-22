@@ -6,7 +6,7 @@ struct DetailView: View {
     @State private var tab: DetailTab = .conversation
 
     enum DetailTab: Hashable {
-        case conversation, checks
+        case conversation, checks, files
     }
 
     var body: some View {
@@ -18,6 +18,7 @@ struct DetailView: View {
                     Picker("View", selection: $tab) {
                         Text("Conversation").tag(DetailTab.conversation)
                         Text(checksTitle(item)).tag(DetailTab.checks)
+                        Text("Files").tag(DetailTab.files)
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
@@ -52,6 +53,8 @@ struct DetailView: View {
                 }
             case .checks:
                 ChecksView(checks: detail.checks)
+            case .files:
+                FilesView(item: item)
             }
         } else if case let .failed(message) = model.detailState {
             ContentUnavailableView {

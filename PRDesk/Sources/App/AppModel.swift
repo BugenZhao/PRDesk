@@ -51,7 +51,11 @@ final class AppModel {
 
     var mode: ListMode = .dashboard { didSet { rebuild() } }
     /// Unread notifications for issues and PRs in the repository, newest first.
-    private(set) var inbox: [InboxNote] = []
+    private(set) var inbox: [InboxNote] = [] {
+        didSet { NSApp.dockTile.badgeLabel = inbox.isEmpty ? nil : String(inbox.count) }
+    }
+    /// All Focus items regardless of the filter, most recently updated first (for the menu bar).
+    private(set) var focusItems: [ItemRow] = []
 
     /// Bumped to move keyboard focus to the filter field or back to the table.
     private(set) var filterFocusRequest = 0
@@ -232,6 +236,26 @@ final class AppModel {
 
     func requestComposerFocus() { composerFocusRequest += 1 }
 
+    @ObservationIgnored private var filesCache: [Int: (updatedAt: Date?, files: [PullFile])] = [:]
+
+    /// Changed files of a PR, cached until the PR is updated.
+    func files(for number: Int) async throws -> [PullFile] {
+        let updatedAt = snapshot.items.first { $0.number == number }?.updatedAt
+        if let cached = filesCache[number], cached.updatedAt == updatedAt { return cached.files }
+        let files = try await engine.fetchFiles(number: number)
+        filesCache[number] = (updatedAt, files)
+        return files
+    }
+
+    /// Shows an item in the dashboard's Focus section, clearing anything that would hide it.
+    func reveal(_ itemID: Item.ID, in section: ListSection = .focus) {
+        mode = .dashboard
+        filterText = ""
+        collapsed.remove(section)
+        selection = TableSelection(section: section, itemID: itemID)
+        requestTableFocus()
+    }
+
     // MARK: Actions
 
     func perform(_ action: ItemAction, on itemID: Item.ID) {
@@ -374,14 +398,16 @@ final class AppModel {
         let affiliations = affiliations
         let orgs = { (login: String) in affiliations.badges(for: login).map(\.org) }
 
-        let visible: [ItemRow] = snapshot.items.compactMap { item in
+        let candidates: [ItemRow] = snapshot.items.compactMap { item in
             let state = state(for: item)
             let insight = ItemInsight(item: item, state: state, viewer: viewer, baseline: snapshot.baseline)
-            let row = ItemRow(item: item, state: state, insight: insight)
             if !insight.isTracked, !filter.showsUntracked { return nil }
             if !item.isOpen, (item.closedAt ?? item.updatedAt) < cutoff, !state.isPinned { return nil }
-            return filter.matches(row, orgs: orgs) ? row : nil
+            return ItemRow(item: item, state: state, insight: insight)
         }
+        focusItems = candidates.filter(Self.isFocus)
+        let visible = filter.isEmpty ? candidates : candidates.filter { filter.matches($0, orgs: orgs) }
+
         visibleCount = visible.count
 
         if mode == .inbox {

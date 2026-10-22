@@ -36,5 +36,17 @@ struct PRDeskApp: App {
             SettingsView()
                 .environment(model)
         }
+
+        MenuBarExtra {
+            MenuBarContent()
+                .environment(model)
+        } label: {
+            if model.inbox.isEmpty {
+                Image(systemName: "tray")
+            } else {
+                Image(systemName: "tray.full")
+                Text(String(model.inbox.count))
+            }
+        }
     }
 }
