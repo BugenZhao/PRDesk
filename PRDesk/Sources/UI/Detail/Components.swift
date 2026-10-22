@@ -71,19 +71,21 @@ struct BadgeIcons: View {
     var body: some View {
         let cache = AvatarCache.shared
         _ = cache.version
+        let badges = login.map(model.affiliations.badges(for:)) ?? []
         return HStack(spacing: 3) {
             if let contribution = model.contribution(for: login) {
-                if contribution.isRegular {
+                // An org badge already says the author is established.
+                if contribution.isRegular, badges.isEmpty {
                     Image(systemName: "checkmark.seal")
                         .font(.system(size: size - 2))
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(.green)
                         .help(contribution.summary)
                 } else if contribution.isFirstTime {
                     Chip(text: "1st")
                         .help(contribution.summary)
                 }
             }
-            ForEach(login.map(model.affiliations.badges(for:)) ?? [], id: \.org) { badge in
+            ForEach(badges, id: \.org) { badge in
                 Group {
                     if let image = cache.image(for: badge.org.avatarLogin) {
                         Image(nsImage: image).resizable()

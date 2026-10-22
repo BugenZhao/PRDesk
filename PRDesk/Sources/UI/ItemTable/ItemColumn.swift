@@ -102,15 +102,17 @@ enum ItemColumn: String, CaseIterable {
         case .author:
             let name: CellRun = .text(item.author ?? "ghost", flexible: true)
             let vote: [CellRun] = row.authorVote.map { [.symbol($0.symbol, color: $0.nsColor)] } ?? []
+            let orgBadges = item.author.map(badges) ?? []
             var mark: [CellRun] = []
             if let contribution = item.author.flatMap(contribution) {
-                if contribution.isRegular {
-                    mark = [.symbol("checkmark.seal", color: .systemBlue)]
+                // An org badge already says the author is established.
+                if contribution.isRegular, orgBadges.isEmpty {
+                    mark = [.symbol("checkmark.seal", color: .systemGreen)]
                 } else if contribution.isFirstTime {
                     mark = [.chip("1st", color: .secondaryLabelColor)]
                 }
             }
-            return [name] + vote + mark + (item.author.map(badges) ?? []).map(\.cellRun)
+            return [name] + vote + mark + orgBadges.map(\.cellRun)
 
         case .review:
             return reviewRuns(row, viewer: viewer)
