@@ -95,8 +95,10 @@ private struct DetailHeader: View {
                 LoginText(login: item.author)
                 BadgeIcons(login: item.author)
                 stateChip
-                if item.isOpen, item.mergeable == "CONFLICTING" {
-                    Chip(text: "conflicts", color: .red)
+                if item.hasConflicts {
+                    Image(systemName: item.kindSymbol)
+                        .foregroundStyle(Color(nsColor: item.stateColor))
+                        .help("Has merge conflicts")
                 }
                 if let ci = item.ci {
                     Button { tab = .checks } label: { CISummary(ci: ci) }

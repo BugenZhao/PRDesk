@@ -99,14 +99,7 @@ enum ItemColumn: String, CaseIterable {
             return titleRuns(row, now: now)
 
         case .author:
-            // The signed-in user's own items stand out in the accent color.
-            let isMine = sameLogin(item.author, viewer)
-            let name: CellRun = .text(
-                item.author ?? "ghost",
-                color: isMine ? .controlAccentColor : .labelColor,
-                font: isMine ? CellFont.regularBold : CellFont.regular,
-                flexible: true
-            )
+            let name: CellRun = .text(item.author ?? "ghost", flexible: true)
             let vote: [CellRun] = row.authorVote.map { [.symbol($0.symbol, color: $0.nsColor)] } ?? []
             return [name] + vote + (item.author.map(badges) ?? []).map(\.cellRun)
 
@@ -148,7 +141,7 @@ enum ItemColumn: String, CaseIterable {
         switch item.state {
         case .merged: runs.append(.chip("merged", color: .systemPurple))
         case .closed: runs.append(.chip("closed", color: .systemRed))
-        case .open: if item.mergeable == "CONFLICTING" { runs.append(.chip("conflicts", color: .systemRed)) }
+        case .open: break
         }
         if let note = row.note {
             runs.append(.chip(note.reasonLabel, color: .controlAccentColor))
@@ -247,9 +240,13 @@ extension Item {
         }
     }
 
-    /// GitHub's state colors: open green, draft gray, merged/completed purple, closed PR red.
+    var hasConflicts: Bool { isOpen && mergeable == "CONFLICTING" }
+
+    /// GitHub's state colors: open green, draft gray, merged/completed purple, closed PR red;
+    /// an open PR with merge conflicts is yellow instead of carrying a separate tag.
     var stateColor: NSColor {
         switch (kind, state) {
+        case (.pullRequest, .open) where hasConflicts: .systemYellow
         case (.pullRequest, .open): isDraft ? .secondaryLabelColor : .systemGreen
         case (.pullRequest, .merged): .systemPurple
         case (.pullRequest, .closed): .systemRed

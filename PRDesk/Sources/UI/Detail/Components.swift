@@ -20,8 +20,7 @@ struct AvatarView: View {
     }
 }
 
-/// A login, shown in the accent color when it is the signed-in user, followed by the viewer's
-/// vote on that person. Right-click to vote.
+/// A login followed by the viewer's vote on that person. Right-click to vote.
 struct LoginText: View {
     @Environment(AppModel.self) private var model
     let login: String?
@@ -31,8 +30,7 @@ struct LoginText: View {
         let isMe = sameLogin(login, model.viewer)
         HStack(spacing: 3) {
             Text(login ?? "ghost")
-                .fontWeight(isMe ? .semibold : weight)
-                .foregroundStyle(isMe ? Color.accentColor : Color.primary)
+                .fontWeight(weight)
             if let vote = model.vote(for: login) {
                 Image(systemName: vote.symbol)
                     .font(.caption2)
