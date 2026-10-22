@@ -100,7 +100,16 @@ const PRDesk = (() => {
     all: null,
     /** Set when the page opened without new entries, so new ones arriving later can be shown. */
     awaitingNew: false,
+    /** Scroll and expansion of items shown before, restored on coming back to them. */
+    saved: new Map(),
   };
+
+  /** Remembers `state` under `key`, keeping the most recent few dozen. */
+  function remember(saved, key, state) {
+    saved.delete(key);
+    saved.set(key, state);
+    if (saved.size > 50) saved.delete(saved.keys().next().value);
+  }
 
   function isExpanded(element) {
     return timeline.expanded.get(element.dataset.id) ?? timeline.all ?? element._block.expanded;
@@ -146,11 +155,15 @@ const PRDesk = (() => {
 
   function renderTimeline(data) {
     const reset = data.key !== timeline.key;
+    const prior = reset ? timeline.saved.get(data.key) : null;
     if (reset) {
+      if (timeline.key !== null) {
+        remember(timeline.saved, timeline.key, { scroll: scrollY, expanded: new Map(timeline.expanded), all: timeline.all });
+      }
       timeline.key = data.key;
       timeline.blocks.clear();
-      timeline.expanded.clear();
-      timeline.all = null;
+      timeline.expanded = prior ? new Map(prior.expanded) : new Map();
+      timeline.all = prior ? prior.all : null;
       root.replaceChildren();
       userScrolled = false;
     }
@@ -173,8 +186,9 @@ const PRDesk = (() => {
 
     const firstNew = data.firstNew && timeline.blocks.get(data.firstNew);
     if (reset) {
-      timeline.awaitingNew = !firstNew;
-      if (firstNew) scrollToElement(firstNew); else scrollTo(0, 0);
+      timeline.awaitingNew = !firstNew && !prior;
+      // New entries first; otherwise back where the item was left.
+      if (firstNew) scrollToElement(firstNew); else scrollTo(0, prior ? prior.scroll : 0);
     } else if (firstNew && timeline.awaitingNew && !userScrolled) {
       timeline.awaitingNew = false;
       scrollToElement(firstNew);
@@ -203,6 +217,7 @@ const PRDesk = (() => {
     elements: new Map(),
     expanded: new Map(),
     all: null,
+    saved: new Map(),
   };
 
   const languages = {
@@ -397,13 +412,16 @@ const PRDesk = (() => {
 
   function renderFiles(data) {
     const reset = data.key !== files.key;
+    const prior = reset ? files.saved.get(data.key) : null;
     if (reset) {
+      if (files.key !== null) {
+        remember(files.saved, files.key, { scroll: scrollY, expanded: new Map(files.expanded), all: files.all });
+      }
       files.key = data.key;
       files.elements.clear();
-      files.expanded.clear();
-      files.all = null;
+      files.expanded = prior ? new Map(prior.expanded) : new Map();
+      files.all = prior ? prior.all : null;
       root.replaceChildren();
-      scrollTo(0, 0);
     }
     const elements = data.files.map((file) => {
       let element = files.elements.get(file.name);
@@ -428,6 +446,7 @@ const PRDesk = (() => {
     const names = new Set(data.files.map((file) => file.name));
     for (const name of [...files.elements.keys()]) if (!names.has(name)) files.elements.delete(name);
     arrange(root, elements);
+    if (reset) scrollTo(0, prior ? prior.scroll : 0);
   }
 
   function toggleFile(element) {
@@ -460,8 +479,49 @@ const PRDesk = (() => {
 
   // MARK: Clicks
 
+  /** The issue or PR of this repository a link points to, if it does. */
+  function itemLink(href) {
+    const repo = document.documentElement.dataset.repo.replace(/[.]/g, "\\.");
+    const match = new RegExp(`^https://github\\.com/${repo}/(?:pull|issues)/(\\d+)(/[^?#]*)?(?:\\?[^#]*)?(#.+)?$`, "i").exec(href);
+    return match && { number: match[1], subpage: match[2] && match[2] !== "/", hash: match[3] };
+  }
+
+  /** Expands and scrolls to the comment a link's anchor names, if this page shows it. */
+  function revealAnchor(hash) {
+    const anchor = document.querySelector(`a.icon-link[href$="${CSS.escape(hash)}"]`);
+    const card = anchor && anchor.closest(".card");
+    if (!card) return false;
+    timeline.expanded.set(card.dataset.id, true);
+    applyExpansion(card);
+    scrollToElement(anchor.closest(".rc") || card);
+    return true;
+  }
+
+  /**
+   * Links to this repository's issues and PRs open in the app; a link into the item already shown
+   * scrolls to its comment. ⌘-click, the ↗ buttons and other links go to the browser.
+   */
+  function handleLink(event, link) {
+    if (event.metaKey || event.shiftKey || event.altKey || link.closest(".icon-link")) return;
+    const target = itemLink(link.href);
+    if (!target) return;
+    const current = document.documentElement.dataset.page === "files" ? files.key : timeline.key;
+    if (target.number === current) {
+      if (target.hash ? revealAnchor(target.hash) : !target.subpage) event.preventDefault();
+      return;
+    }
+    event.preventDefault();
+    post({ type: "openItem", number: Number(target.number) });
+  }
+
   addEventListener("click", (event) => {
-    if (event.button !== 0 || event.target.closest("a, .login")) return;
+    if (event.button !== 0) return;
+    const link = event.target.closest("a[href]");
+    if (link) {
+      handleLink(event, link);
+      return;
+    }
+    if (event.target.closest(".login")) return;
     const head = event.target.closest(".card > .head, .card > .preview");
     if (head && !isSelectingIn(head)) {
       toggleCard(head.parentElement);

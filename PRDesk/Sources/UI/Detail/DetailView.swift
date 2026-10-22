@@ -32,7 +32,13 @@ struct DetailView: View {
         }
         // Start WebKit and load the page ahead of the first selection, which otherwise shows
         // nothing for a second or so.
-        .onAppear { _ = timelinePage.webView }
+        .onAppear {
+            _ = timelinePage.webView
+            // Links to this repository's issues and PRs open here, not in the browser.
+            for page in [timelinePage, filesPage] {
+                page.openItem = { [model] number in model.openItem(number: number) }
+            }
+        }
         .toolbar {
             // In the inspector's part of the window toolbar, over the pane it switches, only for a
             // PR. Otherwise an invisible spacer stands in: without an item of its own the inspector
@@ -216,6 +222,10 @@ private struct DetailHeader: View {
             .fixedSize()
             .help("Priority on the board (1/2/3, 0 to clear)")
 
+            if model.canAddToDesk(item) {
+                Button("Add to Desk", systemImage: "plus") { model.perform(.addToDesk, on: item.id) }
+                    .help("Keep this item on the desk, in Triage (a)")
+            }
             iconButton(state.isPinned ? "Unpin" : "Pin", symbol: state.isPinned ? "pin.slash" : "pin") {
                 model.perform(.togglePin, on: item.id)
             }

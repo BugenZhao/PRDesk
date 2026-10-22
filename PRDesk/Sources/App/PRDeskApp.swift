@@ -33,6 +33,14 @@ struct PRDeskApp: App {
                 Button("Inbox") { model.mode = .inbox }
                     .keyboardShortcut("2")
             }
+            CommandMenu("Go") {
+                Button("Back") { model.goBack() }
+                    .keyboardShortcut("[")
+                    .disabled(model.backHistory.isEmpty)
+                Button("Forward") { model.goForward() }
+                    .keyboardShortcut("]")
+                    .disabled(model.forwardHistory.isEmpty)
+            }
             // In the conversation or files of the detail pane, wherever focus is.
             CommandGroup(after: .textEditing) {
                 Button("Find…") { WebDocument.performFind(.showFindInterface) }

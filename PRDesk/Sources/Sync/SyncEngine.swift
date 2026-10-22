@@ -112,8 +112,8 @@ actor SyncEngine {
         return response.viewer.login
     }
 
-    /// Fetches one item by number and stores it.
-    func fetchItem(number: Int) async throws -> Item {
+    /// Fetches one item by number, storing it unless `store` is false.
+    func fetchItem(number: Int, store: Bool = true) async throws -> Item {
         let response = try await client.query(
             ItemQuery.byNumber,
             variables: ItemQuery.NumberVariables(owner: Self.owner, name: Self.name, number: number),
@@ -122,7 +122,7 @@ actor SyncEngine {
         guard let item = response.repository?.issueOrPullRequest?.item(fetchedAt: Date()) else {
             throw SyncError.notFound(number)
         }
-        try await db.upsert([item])
+        if store { try await db.upsert([item]) }
         return item
     }
 

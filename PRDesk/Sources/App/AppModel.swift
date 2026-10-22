@@ -13,6 +13,8 @@ enum ItemAction {
     case openInBrowser
     /// Vote on the item's author; voting the same way again clears the vote.
     case voteAuthor(Vote)
+    /// Brings an item opened from a link onto the desk.
+    case addToDesk
 }
 
 @MainActor
@@ -207,6 +209,15 @@ final class AppModel {
 
     func start() {
         guard tasks.isEmpty else { return }
+        // A mouse's back and forward buttons move through the history like ⌘[ and ⌘].
+        mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: .otherMouseDown) { [weak self] event in
+            let button = event.buttonNumber
+            guard button == 3 || button == 4 else { return event }
+            MainActor.assumeIsolated {
+                if button == 3 { self?.goBack() } else { self?.goForward() }
+            }
+            return nil
+        }
         tasks.append(Task { [weak self, db] in
             do {
                 for try await snapshot in db.observeSnapshot() {
@@ -368,6 +379,130 @@ final class AppModel {
         return files
     }
 
+    // MARK: Opened from links
+
+    /// Issues and PRs opened from links in the detail pane that aren't on the desk, newest first.
+    /// They stay in the Opened section for this session, until added or replaced.
+    private(set) var openedItems: [Item] = []
+    private static let openedLimit = 10
+
+    /// Opens issue or PR `number` of the repository: selects it where the list shows it, reveals it
+    /// if it is on the desk but hidden, and otherwise fetches it into Opened.
+    func openItem(number: Int) {
+        if let selection = rows.lazy.compactMap(\.selectionID).first(where: { self.itemsByID[$0.itemID]?.number == number && $0.section != .recent }) {
+            self.selection = selection
+        } else if let item = snapshot.items.first(where: { $0.number == number }), isOnDesk(item) {
+            reveal(item.id)
+        } else if let item = snapshot.items.first(where: { $0.number == number }) ?? openedItems.first(where: { $0.number == number }) {
+            showOpened(item)
+        } else {
+            Task {
+                do {
+                    showOpened(try await engine.fetchItem(number: number, store: false))
+                } catch {
+                    logger.error("Opening #\(number) failed: \(String(describing: error), privacy: .public)")
+                    writeError = "Couldn't open #\(number): \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
+    private func showOpened(_ item: Item) {
+        openedItems.removeAll { $0.id == item.id }
+        openedItems.insert(item, at: 0)
+        if openedItems.count > Self.openedLimit { openedItems.removeLast() }
+        collapsed.remove(.opened)
+        rebuild()
+        selection = TableSelection(section: .opened, itemID: item.id)
+    }
+
+    /// Whether the item is only in Opened: fetched from a link and not stored, so not on the desk.
+    func isOpenedOnly(_ item: Item) -> Bool {
+        !snapshot.items.contains { $0.id == item.id }
+    }
+
+    /// Whether adding the item would list it: not for one closed too long ago (pinning keeps it).
+    func canAddToDesk(_ item: Item) -> Bool {
+        isOpenedOnly(item) && isOnDesk(item)
+    }
+
+    /// Stores items opened from links, which puts them on the desk (in Triage, without a Status).
+    private func addToDesk(_ items: [Item]) {
+        let new = items.filter(isOpenedOnly)
+        guard !new.isEmpty else { return }
+        Task {
+            do {
+                try await db.upsert(new)
+            } catch {
+                logger.error("Adding items failed: \(error)")
+            }
+        }
+    }
+
+    /// Listed in some dashboard section, rather than left out by age or as the other tracker's.
+    private func isOnDesk(_ item: Item) -> Bool {
+        let row = row(for: item)
+        if row.board?.isForeign == true { return false }
+        let cutoff = Date().addingTimeInterval(-ListSection.closedRetention)
+        return item.isOpen || (item.closedAt ?? item.updatedAt) >= cutoff || row.state.isPinned
+    }
+
+    // MARK: History
+
+    /// Items selected before the current one, for Back (⌘[), and those gone back over, for Forward.
+    private(set) var backHistory: [Item.ID] = []
+    private(set) var forwardHistory: [Item.ID] = []
+    @ObservationIgnored private var isMovingInHistory = false
+    @ObservationIgnored private var mouseMonitor: Any?
+    private static let historyLimit = 100
+
+    func goBack() {
+        moveInHistory(from: &backHistory, to: &forwardHistory)
+    }
+
+    func goForward() {
+        moveInHistory(from: &forwardHistory, to: &backHistory)
+    }
+
+    /// Selects the newest item of `source` that can still be shown, pushing the current one onto
+    /// `destination`.
+    private func moveInHistory(from source: inout [Item.ID], to destination: inout [Item.ID]) {
+        while let id = source.popLast() {
+            guard let target = historyTarget(for: id) else { continue }
+            if let current = selection?.itemID { destination.append(current) }
+            isMovingInHistory = true
+            defer { isMovingInHistory = false }
+            switch target {
+            case let .row(row): selection = row
+            case .reveal: reveal(id)
+            }
+            return
+        }
+    }
+
+    private enum HistoryTarget {
+        case row(TableSelection)
+        /// On the desk, but hidden by the filter or a collapsed section.
+        case reveal
+    }
+
+    /// Where `id` can be selected again, or nil once it has left the desk.
+    private func historyTarget(for id: Item.ID) -> HistoryTarget? {
+        if let row = rows.lazy.compactMap(\.selectionID).first(where: { $0.itemID == id && $0.section != .recent }) {
+            return .row(row)
+        }
+        if openedItems.contains(where: { $0.id == id }) { return .row(TableSelection(section: .opened, itemID: id)) }
+        if let item = itemsByID[id], isOnDesk(item) { return .reveal }
+        return nil
+    }
+
+    private func recordHistory(from old: TableSelection?) {
+        guard !isMovingInHistory, let old, old.itemID != selection?.itemID else { return }
+        if backHistory.last != old.itemID { backHistory.append(old.itemID) }
+        if backHistory.count > Self.historyLimit { backHistory.removeFirst() }
+        forwardHistory = []
+    }
+
     /// Shows an item in the dashboard section it belongs to, clearing anything that would hide it.
     func reveal(_ itemID: Item.ID) {
         guard let item = itemsByID[itemID], let section = ListSection.triageSection(of: row(for: item)) else { return }
@@ -387,9 +522,22 @@ final class AppModel {
     /// Applies `action` to several items at once. Toggles work on the group: if every item already
     /// has the status, priority, pin or vote, it is cleared from all; otherwise all get it.
     func perform(_ action: ItemAction, on itemIDs: [Item.ID]) {
-        let items = itemIDs.compactMap { itemsByID[$0] }
+        var items = itemIDs.compactMap { itemsByID[$0] }
         guard !items.isEmpty else { return }
         let now = Date()
+        switch action {
+        case .triage, .priority:
+            // The other tracker's items stay its own; anything opened from a link joins the desk.
+            items = items.filter { board(for: $0)?.isForeign != true }
+            addToDesk(items)
+        case .togglePin:
+            addToDesk(items)
+        case .addToDesk:
+            addToDesk(items.filter(canAddToDesk))
+        default:
+            break
+        }
+        guard !items.isEmpty else { return }
         switch action {
         case let .triage(status):
             // A woken Skipped item is back in Triage, so skipping it again renews the skip.
@@ -419,6 +567,8 @@ final class AppModel {
             let authors = Array(Set(items.compactMap(\.author)))
             let clear = authors.allSatisfy { self.vote(for: $0) == vote }
             setVotes(authors.map { ($0, clear ? nil : vote) })
+        case .addToDesk:
+            break
         }
     }
 
@@ -642,6 +792,7 @@ final class AppModel {
 
     private func selectionChanged(from old: TableSelection?) {
         guard selection?.itemID != old?.itemID else { return }
+        recordHistory(from: old)
         dwellTask?.cancel()
         loadDetail()
         guard let item = selectedItem else {
@@ -668,6 +819,24 @@ final class AppModel {
 
     private func rebuild() {
         itemsByID = Dictionary(uniqueKeysWithValues: snapshot.items.map { ($0.id, $0) })
+        // Opened items that were added since are on the desk now; follow the selection there.
+        let added = openedItems.filter { item in itemsByID[item.id].map(isOnDesk) ?? false }
+        if !added.isEmpty {
+            openedItems.removeAll { item in added.contains { $0.id == item.id } }
+            if let selection, selection.section == .opened, let item = itemsByID[selection.itemID], added.contains(where: { $0.id == item.id }),
+               let section = ListSection.triageSection(of: row(for: item))
+            {
+                autoSelect(TableSelection(section: section, itemID: item.id))
+            }
+        }
+        for item in openedItems where itemsByID[item.id] == nil {
+            itemsByID[item.id] = item
+        }
+        let openedRows: [TableRow] = openedItems.isEmpty ? [] : {
+            let isCollapsed = collapsed.contains(.opened)
+            return [.header(.opened, count: openedItems.count, collapsed: isCollapsed)]
+                + (isCollapsed ? [] : openedItems.map { .item(.opened, row(for: itemsByID[$0.id] ?? $0)) })
+        }()
         let cutoff = Date().addingTimeInterval(-ListSection.closedRetention)
         let filter = ItemFilter(filterText)
         let affiliations = affiliations
@@ -701,7 +870,7 @@ final class AppModel {
                 return filter.matches(row, badges: badges, contribution: contribution) ? row : nil
             }
             visibleCount = rows.count
-            self.rows = [.header(.inbox, count: rows.count, collapsed: false)] + rows.map { .item(.inbox, $0) }
+            self.rows = openedRows + [.header(.inbox, count: rows.count, collapsed: false)] + rows.map { .item(.inbox, $0) }
             return
         }
 
@@ -723,7 +892,7 @@ final class AppModel {
         let triage = members[.triage] ?? []
         members[.triage] = triage.filter { $0.authorVote != .down } + triage.filter { $0.authorVote == .down }
 
-        var rows: [TableRow] = []
+        var rows = openedRows
         for section in Self.dashboardSections {
             let items = members[section] ?? []
             // While filtering, show every match rather than hiding some in collapsed sections.

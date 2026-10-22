@@ -32,10 +32,11 @@ struct ItemRow: Hashable, Sendable {
 }
 
 enum ListSection: String, CaseIterable, Codable, Sendable {
-    case recent, pinned, working, good, triage, backlog, closed, skipped, muted, inbox
+    case opened, recent, pinned, working, good, triage, backlog, closed, skipped, muted, inbox
 
     var title: String {
         switch self {
+        case .opened: "Opened from links"
         case .recent: "Recently viewed"
         case .pinned: "Pinned"
         case .working: "Working"
@@ -52,6 +53,8 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
     /// What the section holds and how it relates to the board (Status on vllm-project #56).
     var help: String {
         switch self {
+        case .opened:
+            "Issues and PRs opened from links in the detail pane that aren't on the desk. Kept until you quit; add one (a) or give it a Status to keep it."
         case .recent:
             "The last \(Self.recentLimit) items you opened. Not tied to the board; they also stay in their own section."
         case .pinned:

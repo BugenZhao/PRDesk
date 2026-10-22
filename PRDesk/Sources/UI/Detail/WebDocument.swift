@@ -16,6 +16,8 @@ final class WebDocument: NSObject {
     let kind: Kind
     /// The menu for right-clicking a person, set by the view showing the page.
     var loginMenu: ((String) -> NSMenu)?
+    /// Opens issue or PR `number` of the repository in the app, for a link to it.
+    var openItem: ((Int) -> Void)?
 
     /// Every page's base URL, so relative links in GitHub's HTML resolve.
     static let baseURL = URL(string: "https://github.com/")!
@@ -179,6 +181,8 @@ extension WebDocument: WKScriptMessageHandler {
             pageReady()
         case "loginMenu":
             if let login = body["login"] as? String, let menu = loginMenu?(login) { popUp(menu, x: x, y: y) }
+        case "openItem":
+            if let number = body["number"] as? Int { openItem?(number) }
         case "fileMenu":
             if let path = body["path"] as? String { popUp(fileMenu(path: path, url: body["url"] as? String ?? ""), x: x, y: y) }
         default:

@@ -269,6 +269,7 @@ struct ItemTableView: NSViewRepresentable {
                 case "0": .priority(nil)
                 case "p": .togglePin
                 case "n": .markRead
+                case "a": .addToDesk
                 case "+", "=": .voteAuthor(.up)
                 case "-": .voteAuthor(.down)
                 case "o", "\r": .openInBrowser

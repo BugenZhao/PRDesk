@@ -199,6 +199,8 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
   - 自上次查看以来的新内容高亮，并自动滚到第一条新内容
 - **Checks**：按状态分组列出 check runs 和 statuses，失败的置顶，点击打开日志 URL
 - **Files**（v1 只读）：变更文件列表和 diff，同样是一个 `WKWebView` 页面；每个文件默认折叠，文件名过长时省略目录部分，文件头滚动时吸顶；按扩展名语法高亮（highlight.js，新旧两侧分别高亮）；复制时不带行号和 +/-；可切换自动换行；展开的文件接近屏幕时才生成 diff，⌘F 查找前补齐
+- **站内链接**：详情里指向本仓库 issue / PR 的链接在 app 内打开：已在列表里的直接跳过去（必要时展开所在分组、清掉过滤）；不在的临时取来，放进列表顶部的 **Opened from links** 分组（只在本次运行内保留，不写库），可以 Add to Desk（`a`，进 Triage），设置 Status / 优先级 / Pin 也会顺带加入。指向当前条目某条评论的链接直接展开并滚到那条评论。⌘-click 和 ↗ 按钮仍在浏览器打开
+- **前进 / 后退**：⌘[ / ⌘]（以及鼠标侧键）在选中过的条目间来回，回到某条目时恢复它的滚动位置和展开状态
 - **写操作**：底部是 Markdown 评论框（支持预览，`⌘↩` 发送）；open 的条目可以 Close：PR 直接关，issue 选 completed / not planned。框里有内容时先作为评论发出再关（Close with comment）。关之前要确认，没有快捷键
   - PR：Comment / Approve / Request changes，以带正文的整体 review 提交
   - Issue：仅 Comment
