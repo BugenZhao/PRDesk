@@ -26,9 +26,15 @@ Local data lives in `~/Library/Application Support/PR Desk/` (SQLite via GRDB, a
 
 ## Apple's coding-assistant docs
 
-`vendor/xcode-docs/` holds the guides Xcode ships for its own coding assistant
-(refresh with `scripts/vendor-xcode-docs.sh` after updating Xcode). They cover APIs newer than
-most training data — read the relevant one before touching these areas, and prefer it over memory:
+Xcode ships guides for its own coding assistant. They cover APIs newer than most training data —
+read the relevant one before touching these areas, and prefer it over memory. They live inside
+Xcode (not copied here, so they stay current with the installed Xcode):
+
+```sh
+XC="$(xcode-select -p)/.."
+ls "$XC/PlugIns/IDEIntelligenceChat.framework/Versions/A/Resources/AdditionalDocumentation"  # new SDK APIs
+ls "$XC/PlugIns/IDEAnalytics.framework/Versions/A/Resources/TriageDocs"  # crash/hang/launch/energy analysis
+```
 
 | Area | Doc |
 |---|---|
