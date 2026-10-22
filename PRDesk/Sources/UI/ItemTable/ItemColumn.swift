@@ -28,7 +28,7 @@ enum ItemColumn: String, CaseIterable {
         case .priority: 16
         case .number: 42
         case .title: 520
-        case .author: 150
+        case .author: 168
         case .review: 40
         case .turn: 46
         case .ci: 36
@@ -112,7 +112,8 @@ enum ItemColumn: String, CaseIterable {
                     mark = [.chip("1st", color: .secondaryLabelColor)]
                 }
             }
-            return [name] + vote + mark + orgBadges.map(\.cellRun)
+            let avatar: CellRun = .avatar(item.author.flatMap(AvatarCache.shared.image(for:)))
+            return [avatar, name] + vote + mark + orgBadges.map(\.cellRun)
 
         case .review:
             return reviewRuns(row, viewer: viewer)
@@ -181,17 +182,28 @@ enum ItemColumn: String, CaseIterable {
         return .segments(parts, font: bold ? CellFont.regularBold : CellFont.regular, flexible: true)
     }
 
+    /// Review and CI share one shape: a small mark, then a count, in the same fixed slots.
+    private static let markSlot: CGFloat = 10
+    private static let countSlot: CGFloat = 16
+    /// Sized to sit level with the CI dot.
+    private static let markPointSize: CGFloat = 8
+
     /// Approvals as a check and a count, the check filled when one of them is the viewer's; a red
-    /// cross in front when the viewer requested changes. Fixed slots keep the column aligned.
+    /// cross after them when the viewer requested changes.
     private func reviewRuns(_ row: ItemRow, viewer: String?) -> [CellRun] {
         let item = row.item
         guard item.kind == .pullRequest else { return [] }
         let mine = viewer.flatMap(item.review(by:))?.state
-        let changes: CellRun? = mine == "CHANGES_REQUESTED" ? .symbol("xmark", color: .systemRed) : nil
         let count = item.approvalCount
-        guard count > 0 else { return [.slot(changes, width: 12)] }
-        let check: CellRun = .symbol(mine == "APPROVED" ? "checkmark.circle.fill" : "checkmark", color: .systemGreen)
-        return [.slot(changes, width: 12), check, .text(String(count), color: .systemGreen, font: CellFont.digits)]
+        let check: CellRun? = count > 0
+            ? .symbol(mine == "APPROVED" ? "checkmark.circle.fill" : "checkmark", color: .systemGreen, pointSize: Self.markPointSize)
+            : nil
+        let approvals: CellRun? = count > 0 ? .text(String(count), color: .systemGreen, font: CellFont.digits) : nil
+        var runs: [CellRun] = [.slot(check, width: Self.markSlot), .slot(approvals, width: Self.countSlot)]
+        if mine == "CHANGES_REQUESTED" {
+            runs.append(.symbol("xmark", color: .systemRed, pointSize: Self.markPointSize))
+        }
+        return runs
     }
 
     /// A dot for the CI state (green passed, red failed, yellow running, gray cancelled), filled
@@ -210,7 +222,7 @@ enum ItemColumn: String, CaseIterable {
         }
         let isReady = item.labels.contains { $0.name == "ready" }
         let failed: CellRun? = ci.failed > 0 ? .text(String(ci.failed), color: .systemRed, font: CellFont.digits) : nil
-        return [isReady ? .dot(color) : .ring(color), .slot(failed, width: 18)]
+        return [.slot(isReady ? .dot(color) : .ring(color), width: Self.markSlot), .slot(failed, width: Self.countSlot)]
     }
 }
 

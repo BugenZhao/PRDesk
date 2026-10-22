@@ -13,13 +13,15 @@ indirect enum CellRun {
     /// Fixed width, so what follows lines up from row to row; the run (if any) sits at its start,
     /// or its end when `trailing`.
     case slot(CellRun?, width: CGFloat, trailing: Bool = false)
-    case symbol(String, color: NSColor)
+    case symbol(String, color: NSColor, pointSize: CGFloat = 11)
     /// An item state icon (asset template or SF Symbol), tinted.
     case icon(StateIcon, color: NSColor)
     /// Differently colored pieces of one string that truncate together, e.g. a dimmed title prefix.
     case segments([(text: String, color: NSColor)], font: NSFont = CellFont.regular, flexible: Bool = false)
     /// Small rounded image, e.g. an org avatar.
     case image(NSImage)
+    /// A person's avatar in a circle; a placeholder circle while it loads.
+    case avatar(NSImage?)
 }
 
 /// NSFont is immutable, so sharing these across isolation domains is safe.
@@ -84,7 +86,7 @@ final class RunsCellView: NSTableCellView {
             width
         case .symbol, .icon:
             Self.symbolSize
-        case .image:
+        case .image, .avatar:
             Self.imageSize
         case let .segments(parts, font, _):
             ceil(Self.attributed(parts, font: font, override: nil).size().width)
@@ -147,8 +149,8 @@ final class RunsCellView: NSTableCellView {
             let width = min(naturalWidth(run), rect.width)
             draw(run, in: NSRect(x: trailing ? rect.maxX - width : rect.minX, y: rect.minY, width: width, height: rect.height))
 
-        case let .symbol(name, color):
-            let config = NSImage.SymbolConfiguration(pointSize: 11, weight: .medium)
+        case let .symbol(name, color, pointSize):
+            let config = NSImage.SymbolConfiguration(pointSize: pointSize, weight: pointSize < 11 ? .bold : .medium)
                 .applying(.init(paletteColors: [emphasized ? .alternateSelectedControlTextColor : color]))
             guard let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
                 .withSymbolConfiguration(config)
@@ -163,6 +165,19 @@ final class RunsCellView: NSTableCellView {
 
         case let .image(image):
             drawImage(image, in: rect)
+
+        case let .avatar(image):
+            let size = Self.imageSize
+            let circle = NSBezierPath(ovalIn: NSRect(x: rect.minX, y: rect.midY - size / 2, width: size, height: size))
+            if let image {
+                NSGraphicsContext.saveGraphicsState()
+                circle.addClip()
+                image.draw(in: circle.bounds, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+                NSGraphicsContext.restoreGraphicsState()
+            } else {
+                NSColor.quaternaryLabelColor.setFill()
+                circle.fill()
+            }
 
         case let .icon(.symbol(name), color):
             draw(.symbol(name, color: color), in: rect)
