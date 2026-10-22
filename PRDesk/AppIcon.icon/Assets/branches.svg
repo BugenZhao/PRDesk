@@ -1,13 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Everything navy lives in one layer, and pieces overlap rather than abut, so the glass
+       rendering sees a single shape without hairline seams. Line width 38. -->
   <g fill="#1E3A8A">
-    <!-- left trunk between the two left nodes -->
-    <rect x="369" y="423" width="38" height="178"/>
-    <!-- right trunk, curving up and over to the arrow -->
-    <rect x="617" y="470" width="38" height="131"/>
-    <path d="M655 470 A129 129 0 0 0 526 341 L526 379 A91 91 0 0 1 617 470 Z"/>
-    <rect x="496" y="341" width="40" height="38"/>
-    <!-- arrowhead pointing back to the base branch -->
-    <rect x="457" y="320" width="96" height="38" rx="19" transform="rotate(-45 505 339)"/>
-    <rect x="457" y="362" width="96" height="38" rx="19" transform="rotate(45 505 381)"/>
+    <!-- base-branch nodes -->
+    <path fill-rule="evenodd" d="M315 360 a73 73 0 1 0 146 0 a73 73 0 1 0 -146 0 Z M353 360 a35 35 0 1 0 70 0 a35 35 0 1 0 -70 0 Z M315 664 a73 73 0 1 0 146 0 a73 73 0 1 0 -146 0 Z M353 664 a35 35 0 1 0 70 0 a35 35 0 1 0 -70 0 Z"/>
+    <!-- left trunk, overlapping into both rings -->
+    <rect x="369" y="420" width="38" height="184"/>
+    <!-- right trunk: up from the open node, curving left into the arrow (one outline) -->
+    <path d="M655 610 V470 A129 129 0 0 0 526 341 H500 V379 H526 A91 91 0 0 1 617 470 V610 Z"/>
+    <!-- arrowhead (one chevron outline with round arm ends) -->
+    <path d="M457.2 360 L512.6 304.6 A19 19 0 0 1 539.4 331.4 L510.8 360 L539.4 388.6 A19 19 0 0 1 512.6 415.4 Z"/>
   </g>
 </svg>
