@@ -104,7 +104,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 | Author | 头像 + 用户名 + 投票图标；贡献者标记和组织徽章（见 §5、§5.2）靠右对齐 |
 | Review | 裸 ✓ + approve 总数（含我）：我 approve 过时为绿色，只有别人 approve 时为灰色；我 request changes 时后面多一个红 ✗。和 CI 列同样的结构：小标记 + 数字，固定位置 |
 | Turn | `review`（请求我 review 且未完成）/ `me` / `them` / 空（已关闭） |
-| CI | 色点：绿 通过 / 红 失败 / 黄 运行中 / 灰 被取消；带 `ready` label 时实心，否则空心；后面固定位置显示失败数 |
+| CI | 色点：绿 通过 / 红 失败 / 黄 运行中 / 灰 被取消；带 `ready` label 时实心，否则空心；失败 / 运行中的数量在悬停提示里 |
 | Size | `+add` 靠左、`−del` 靠右；用比系统绿 / 红深一档的颜色（GitHub diff 配色），和 Review / CI 区分（Issue 为空） |
 | Age / Upd | 相对时间 |
 

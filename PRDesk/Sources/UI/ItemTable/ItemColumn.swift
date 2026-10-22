@@ -31,7 +31,7 @@ enum ItemColumn: String, CaseIterable {
         case .author: 168
         case .review: 40
         case .turn: 46
-        case .ci: 36
+        case .ci: 22
         case .size: 84
         case .age: 34
         case .updated: 34
@@ -212,7 +212,7 @@ enum ItemColumn: String, CaseIterable {
     }
 
     /// A dot for the CI state (green passed, red failed, yellow running, gray cancelled), filled
-    /// when the PR has the `ready` label and hollow otherwise, then the number of failed checks.
+    /// when the PR has the `ready` label and hollow otherwise. Counts are in the tooltip.
     private func ciRuns(_ item: Item) -> [CellRun] {
         guard let ci = item.ci else { return [] }
         let color: NSColor = if ci.failed > 0 {
@@ -226,9 +226,26 @@ enum ItemColumn: String, CaseIterable {
             .systemGray
         }
         let isReady = item.labels.contains { $0.name == "ready" }
-        let failed: CellRun? = ci.failed > 0 ? .text(String(ci.failed), color: .systemRed, font: CellFont.digits) : nil
-        let dot: CellRun = .symbol(isReady ? "circle.fill" : "circle", color: color, pointSize: Self.markPointSize)
-        return [.slot(dot, width: Self.markSlot), .slot(failed, width: Self.countSlot)]
+        return [.symbol(isReady ? "circle.fill" : "circle", color: color, pointSize: Self.markPointSize)]
+    }
+
+    /// E.g. "CI: 2 failed, 1 pending of 14 · ready".
+    static func ciTooltip(_ item: Item) -> String? {
+        guard let ci = item.ci else { return nil }
+        var parts: [String] = []
+        if ci.failed > 0 { parts.append("\(ci.failed) failed") }
+        if ci.pending > 0 { parts.append("\(ci.pending) pending") }
+        var text = if !parts.isEmpty {
+            "CI: \(parts.joined(separator: ", ")) of \(ci.total)"
+        } else {
+            switch ci.state {
+            case "SUCCESS": "CI passed"
+            case "FAILURE", "ERROR": "CI cancelled"
+            default: "CI \(ci.state.lowercased())"
+            }
+        }
+        if item.labels.contains(where: { $0.name == "ready" }) { text += " · ready" }
+        return text
     }
 }
 

@@ -374,7 +374,11 @@ struct ItemTableView: NSViewRepresentable {
                 cell.alignment = column.alignment
                 cell.runs = column.runs(for: itemRow, viewer: viewer, badges: parent.badges, contribution: parent.contribution, now: Date())
                 cell.alphaValue = itemRow.item.isOpen ? 1 : 0.55
-                cell.toolTip = column == .author ? authorTooltip(itemRow.item.author) : nil
+                cell.toolTip = switch column {
+                case .author: authorTooltip(itemRow.item.author)
+                case .ci: ItemColumn.ciTooltip(itemRow.item)
+                default: nil
+                }
                 return cell
             }
         }
