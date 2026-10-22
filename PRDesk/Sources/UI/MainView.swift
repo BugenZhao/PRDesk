@@ -5,9 +5,18 @@ struct MainView: View {
     @State private var showsDetail = true
 
     var body: some View {
+        // The status bar sits under the whole split view, so neither the list nor the detail pane
+        // runs beneath it.
+        VStack(spacing: 0) {
+            content
+            StatusBar()
+        }
+    }
+
+    private var content: some View {
         @Bindable var model = model
 
-        VStack(spacing: 0) {
+        return VStack(spacing: 0) {
             ItemTableView(
                 rows: model.rows,
                 viewer: model.viewer,
@@ -28,13 +37,7 @@ struct MainView: View {
         .frame(minWidth: 560, maxHeight: .infinity)
         .inspector(isPresented: $showsDetail) {
             DetailView(isShown: showsDetail)
-                // The inspector column ignores the status bar's inset; keep its bottom (the
-                // composer's buttons) clear of the bar.
-                .padding(.bottom, StatusBar.height)
                 .inspectorColumnWidth(min: 360, ideal: 480, max: 1000)
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            StatusBar()
         }
         .toolbar {
             ToolbarItem(placement: .principal) {
