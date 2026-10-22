@@ -98,6 +98,11 @@ final class AppDatabase: Sendable {
             try db.execute(sql: "DELETE FROM meta WHERE key = 'lastSyncStartedAt'")
             try db.execute(sql: "DELETE FROM detailCache")
         }
+        migrator.registerMigration("v6") { db in
+            // Comments are no longer flagged by their text; refetch events and details flagged by v5.
+            try db.execute(sql: "DELETE FROM meta WHERE key = 'lastSyncStartedAt'")
+            try db.execute(sql: "DELETE FROM detailCache")
+        }
         return migrator
     }
 }

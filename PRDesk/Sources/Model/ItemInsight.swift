@@ -17,8 +17,12 @@ struct ItemInsight: Hashable, Sendable {
     var isReviewRequestedFromMe: Bool
     /// The pending request looks deliberate rather than automatic (e.g. CODEOWNERS on open or push).
     var isManualRequest: Bool
-    /// The viewer has commented on, reviewed or pushed to the item (bots and "[AUTOMATED]" excluded).
+    /// The viewer has commented on, reviewed or pushed to the item (bots excluded).
     var hasParticipated: Bool
+    /// The viewer authored the item.
+    var isMine: Bool
+    /// Latest activity by any person (bots excluded), as far as the recent events tell.
+    var lastHumanActivityAt: Date
     /// An untracked item comes back when it is requested for review again afterwards.
     var isTracked: Bool
 
@@ -32,6 +36,10 @@ struct ItemInsight: Hashable, Sendable {
             return event.kind != .reviewRequested || isMe(event.target)
         }
         othersActivityAt = othersActivity.map(\.at).max()
+        // Only recent events are known; if they are all bots, people may have been active just
+        // before them, so fall back to the update time rather than calling the item stale.
+        lastHumanActivityAt = human.map(\.at).max() ?? (item.events.isEmpty ? item.createdAt : item.updatedAt)
+        isMine = isMe(item.author)
 
         let seen = [state?.seenAt, baseline].compactMap(\.self).max() ?? .distantPast
         isUnread = (othersActivityAt ?? .distantPast) > seen

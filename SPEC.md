@@ -51,7 +51,8 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 
 - **Recently viewed**：最近查看的 8 条
 - **Pinned**：`p` 置顶的条目
-- **Focus**：open，且未被 `d` 移出（或移出后又有新动态），且满足任一条件：Turn = me、优先级 H、有待我处理的 review request
+- **Focus**：open，且未被 `d` 移出（或移出后又有新动态），且满足任一条件：优先级 H；或 Turn = me。例外：自己的 PR 若 30 天没有任何人（不含 bot）的动静，且没标 H，则不进 Focus
+- **Review requests**：自动的 review 请求（作者在 PR 打开、转 ready 或 push 前后发出的，基本是 CODEOWNERS），PR 已 ready、我从没参与过；14 天没动静的降到 All tracked。别人发起的、或在其他时间发起的请求视为手动请求，算 Turn = me
 - **All tracked**：其余，默认折叠
 - 同一条目可同时出现在多个组里；组的折叠状态持久化
 

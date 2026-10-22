@@ -452,8 +452,17 @@ final class AppModel {
     /// follow-ups on things they took part in), or marked high priority.
     private static func isFocus(_ row: ItemRow) -> Bool {
         guard row.item.isOpen, row.insight.isTracked, !isDismissed(row) else { return false }
-        return row.insight.turn == .me || row.state.priority == .high
+        if row.state.priority == .high { return true }
+        // Own PRs nobody has touched in a while (e.g. parked drafts with conflicts) aren't urgent.
+        if row.item.kind == .pullRequest, row.insight.isMine,
+           Date().timeIntervalSince(row.insight.lastHumanActivityAt) > ownStaleAfter
+        {
+            return false
+        }
+        return row.insight.turn == .me
     }
+
+    private static let ownStaleAfter: TimeInterval = 30 * 24 * 3600
 
     /// Requests in queue for later: automatic (CODEOWNERS-style) review requests on ready PRs the
     /// viewer hasn't touched, until they go quiet for `requestStaleAfter`.

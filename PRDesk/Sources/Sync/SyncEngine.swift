@@ -33,7 +33,7 @@ actor SyncEngine {
     private static let lastSyncKey = "lastSyncStartedAt"
     private static let viewerKey = "viewer"
     private static let windowLength: TimeInterval = 10 * 24 * 3600
-    private static let maxConcurrentFetches = 8
+    private static let maxConcurrentFetches = 6
 
     let client: GitHubClient
     private let db: AppDatabase
