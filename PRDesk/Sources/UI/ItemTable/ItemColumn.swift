@@ -32,11 +32,19 @@ enum ItemColumn: String, CaseIterable {
         case .review: 40
         case .turn: 46
         case .ci: 22
-        case .size: 84
+        case .size: Self.sizeWidth
         case .age: 34
         case .updated: 34
         }
     }
+
+    /// Fits "+8888 −8888" with just the cell's run spacing between, so four-digit sizes never
+    /// truncate; also the column's minimum, which overrides a narrower width saved from before.
+    private static let sizeWidth: CGFloat = {
+        let texts = ["+8888", "−8888"].map { ceil($0.size(withAttributes: [.font: CellFont.digits]).width) }
+        // The spring between the two runs adds a spacing on each side.
+        return texts.reduce(0, +) + 2 * RunsCellView.spacing + 2 * RunsCellView.inset
+    }()
 
     var alignment: RunsCellView.Alignment {
         switch self {
@@ -75,7 +83,7 @@ enum ItemColumn: String, CaseIterable {
             column.minWidth = 160
             column.resizingMask = []
         } else {
-            column.minWidth = min(width, 16)
+            column.minWidth = self == .size ? width : min(width, 16)
             column.resizingMask = .userResizingMask
         }
         return column

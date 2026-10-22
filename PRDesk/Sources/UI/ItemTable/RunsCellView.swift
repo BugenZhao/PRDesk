@@ -41,8 +41,8 @@ final class RunsCellView: NSTableCellView {
     var runs: [CellRun] = [] { didSet { needsDisplay = true } }
     var alignment: Alignment = .leading { didSet { needsDisplay = true } }
 
-    private let spacing: CGFloat = 4
-    private let inset: CGFloat = 2
+    nonisolated static let spacing: CGFloat = 4
+    nonisolated static let inset: CGFloat = 2
     private static let dotSize: CGFloat = 7
     private static let symbolSize: CGFloat = 13
     private static let imageSize: CGFloat = 13
@@ -60,8 +60,8 @@ final class RunsCellView: NSTableCellView {
     override func draw(_: NSRect) {
         guard !runs.isEmpty else { return }
         let natural = runs.map(naturalWidth)
-        let gaps = spacing * CGFloat(runs.count - 1)
-        let available = bounds.width - 2 * inset - gaps
+        let gaps = Self.spacing * CGFloat(runs.count - 1)
+        let available = bounds.width - 2 * Self.inset - gaps
         let fixed = zip(runs, natural).reduce(0) { $0 + ($1.0.isFlexible ? 0 : $1.1) }
         // Flexible runs share what the fixed ones leave, earlier runs first; springs get the rest.
         var remaining = max(0, available - fixed)
@@ -76,10 +76,10 @@ final class RunsCellView: NSTableCellView {
             widths[index] = remaining / CGFloat(springs.count)
         }
         let total = widths.reduce(0, +) + gaps
-        var x = alignment == .trailing ? bounds.maxX - inset - total : inset
+        var x = alignment == .trailing ? bounds.maxX - Self.inset - total : Self.inset
         for (run, width) in zip(runs, widths) {
             draw(run, in: NSRect(x: x, y: 0, width: width, height: bounds.height))
-            x += width + spacing
+            x += width + Self.spacing
         }
     }
 
