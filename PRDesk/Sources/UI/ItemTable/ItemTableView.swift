@@ -15,6 +15,7 @@ struct ItemTableView: NSViewRepresentable {
     var onSort: (ItemSort) -> Void
     var onToggleSection: (ListSection) -> Void
     var onFocusFilter: () -> Void
+    var onFocusComposer: () -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -160,6 +161,7 @@ struct ItemTableView: NSViewRepresentable {
             case "j": move(by: 1)
             case "k": move(by: -1)
             case "/": parent.onFocusFilter()
+            case "c": parent.onFocusComposer()
             default:
                 let action: ItemAction? = switch key {
                 case "1": .priority(.high)

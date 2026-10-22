@@ -47,15 +47,19 @@ actor GitHubClient {
         return decoder
     }()
 
+    /// Runs a GraphQL query. Partial errors are logged and tolerated (e.g. one missing user in a
+    /// batch) unless `strict`, which mutations use so a failed write is never mistaken for success.
     func query<Variables: Encodable & Sendable, Response: Decodable & Sendable>(
         _ query: String,
         variables: Variables,
-        as _: Response.Type = Response.self
+        as _: Response.Type = Response.self,
+        strict: Bool = false
     ) async throws -> Response {
         let body = try JSONEncoder().encode(Body(query: query, variables: variables))
         let data = try await perform(method: "POST", url: Self.endpoint, body: body)
         let envelope = try Self.decoder.decode(Envelope<Response>.self, from: data)
         if let errors = envelope.errors, !errors.isEmpty {
+            if strict { throw GraphQLClientError.emptyData(errors) }
             logger.warning("GraphQL errors: \(errors.map(\.message).joined(separator: "; "), privacy: .public)")
         }
         guard let result = envelope.data else {

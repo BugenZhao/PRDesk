@@ -45,7 +45,11 @@ struct DetailView: View {
         if let detail = model.detail, detail.number == item.number {
             switch tab {
             case .conversation:
-                ConversationView(item: item, detail: detail, previousSeenAt: model.selectedItemPreviousSeenAt)
+                VStack(spacing: 0) {
+                    ConversationView(item: item, detail: detail, previousSeenAt: model.selectedItemPreviousSeenAt)
+                    Divider()
+                    ComposerView(item: item, detail: detail)
+                }
             case .checks:
                 ChecksView(checks: detail.checks)
             }

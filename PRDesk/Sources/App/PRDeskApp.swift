@@ -24,6 +24,11 @@ struct PRDeskApp: App {
                     Task { await model.sync() }
                 }
                 .keyboardShortcut("r")
+                Divider()
+                Button("Dashboard") { model.mode = .dashboard }
+                    .keyboardShortcut("1")
+                Button("Inbox") { model.mode = .inbox }
+                    .keyboardShortcut("2")
             }
         }
 

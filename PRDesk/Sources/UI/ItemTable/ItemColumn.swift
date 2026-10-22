@@ -85,7 +85,7 @@ enum ItemColumn: String, CaseIterable {
         let item = row.item
         switch self {
         case .unread:
-            return row.insight.isUnread ? [.dot(.controlAccentColor)] : []
+            return row.insight.isUnread || row.note != nil ? [.dot(.controlAccentColor)] : []
 
         case .priority:
             guard let priority = row.state.priority else { return [] }
@@ -139,6 +139,9 @@ enum ItemColumn: String, CaseIterable {
         case .merged: runs.append(.chip("merged", color: .systemPurple))
         case .closed: runs.append(.chip("closed", color: .systemRed))
         case .open: if item.mergeable == "CONFLICTING" { runs.append(.chip("conflicts", color: .systemRed)) }
+        }
+        if let note = row.note {
+            runs.append(.chip(note.reasonLabel, color: .controlAccentColor))
         }
         if let summary = row.insight.summary, let at = row.insight.summaryAt {
             runs.append(.text("\(summary) \(at.compactAge(relativeTo: now))", color: .tertiaryLabelColor, font: CellFont.small, maxWidth: 180))

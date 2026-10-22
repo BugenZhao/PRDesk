@@ -23,7 +23,8 @@ struct MainView: View {
                 onAction: { model.perform($0, on: $1) },
                 onSort: { model.sort = $0 },
                 onToggleSection: { model.toggleCollapsed($0) },
-                onFocusFilter: { model.requestFilterFocus() }
+                onFocusFilter: { model.requestFilterFocus() },
+                onFocusComposer: { model.requestComposerFocus() }
             )
         }
         .frame(minWidth: 640, maxHeight: .infinity)
@@ -32,6 +33,15 @@ struct MainView: View {
                 .inspectorColumnWidth(min: 360, ideal: 520, max: 1000)
         }
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                Picker("View", selection: $model.mode) {
+                    Text("Dashboard").tag(AppModel.ListMode.dashboard)
+                    Text(model.inbox.isEmpty ? "Inbox" : "Inbox \(model.inbox.count)").tag(AppModel.ListMode.inbox)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+            }
             ToolbarItem(placement: .navigation) {
                 Button("Add", systemImage: "plus") { showsAdd = true }
                     .help("Track a PR or issue by number or URL")
@@ -72,7 +82,7 @@ struct MainView: View {
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
             Spacer(minLength: 8)
-            Text("j/k move · 1/2/3 priority · p pin · d drop from focus · n mark read · o open · u untrack")
+            Text("j/k move · 1/2/3 priority · p pin · d drop from focus · n mark read · c comment · o open · u untrack")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
                 .lineLimit(1)

@@ -45,9 +45,18 @@ final class AppModel {
     var collapsed: Set<ListSection> { didSet { Defaults.set(collapsed, for: .collapsed); rebuild() } }
     var selection: TableSelection? { didSet { selectionChanged(from: oldValue) } }
 
+    enum ListMode: Hashable {
+        case dashboard, inbox
+    }
+
+    var mode: ListMode = .dashboard { didSet { rebuild() } }
+    /// Unread notifications for issues and PRs in the repository, newest first.
+    private(set) var inbox: [InboxNote] = []
+
     /// Bumped to move keyboard focus to the filter field or back to the table.
     private(set) var filterFocusRequest = 0
     private(set) var tableFocusRequest = 0
+    private(set) var composerFocusRequest = 0
 
     private(set) var affiliations = Affiliations()
     /// Bumped when `affiliations` changes, for views that cache rendered badges.
@@ -157,12 +166,71 @@ final class AppModel {
                 rateLimit = result.rateLimit
             }
             syncState = .idle
+            await syncInbox()
             Task { await refreshAffiliations() }
         } catch {
             logger.error("Sync failed: \(String(describing: error), privacy: .public)")
             syncState = .failed(error.localizedDescription)
         }
     }
+
+    private func syncInbox() async {
+        do {
+            let notes = try await engine.fetchInbox()
+            // Notifications can be for items no tracking search found; fetch a few at a time.
+            let known = Set(snapshot.items.map(\.number))
+            for number in Set(notes.map(\.number)).subtracting(known).prefix(10) {
+                _ = try? await engine.fetchItem(number: number)
+            }
+            inbox = notes.sorted { $0.updatedAt > $1.updatedAt }
+            rebuild()
+        } catch {
+            logger.error("Inbox sync failed: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    /// Marks the item's notification thread read on GitHub, if it has one.
+    private func markNotificationRead(number: Int) {
+        guard let note = inbox.first(where: { $0.number == number }) else { return }
+        inbox.removeAll { $0.threadID == note.threadID }
+        rebuild()
+        Task { [engine, logger] in
+            do {
+                try await engine.markThreadRead(note.threadID)
+            } catch {
+                logger.error("Failed to mark thread read: \(String(describing: error), privacy: .public)")
+            }
+        }
+    }
+
+    // MARK: Writing
+
+    /// Unsent composer text per item number, kept across selection changes and launches.
+    @ObservationIgnored private var drafts: [Int: String] = Defaults.get(.drafts) ?? [:]
+
+    func draft(for number: Int) -> String {
+        drafts[number] ?? ""
+    }
+
+    func setDraft(_ text: String, for number: Int) {
+        drafts[number] = text.isEmpty ? nil : text
+        Defaults.set(drafts, for: .drafts)
+    }
+
+    func submit(_ submission: Submission, body: String, item: Item, detail: ItemDetail) async throws {
+        try await engine.submit(submission, body: body, subjectID: detail.id)
+        setDraft("", for: item.number)
+        // Our own action shouldn't make the item look unread.
+        updateState(item) { $0.seenAt = Date() }
+        _ = try? await engine.refresh(ids: [item.id])
+        loadDetail(force: true)
+    }
+
+    func renderMarkdown(_ text: String) async throws -> String {
+        try await engine.renderMarkdown(text)
+    }
+
+    func requestComposerFocus() { composerFocusRequest += 1 }
 
     // MARK: Actions
 
@@ -179,6 +247,7 @@ final class AppModel {
             updateState(item) { $0.focusDismissedAt = now }
         case .markRead:
             updateState(item) { $0.seenAt = now }
+            markNotificationRead(number: item.number)
         case .toggleUntrack:
             updateState(item) { $0.untrackedAt = $0.untrackedAt == nil ? now : nil }
         case .openInBrowser:
@@ -292,6 +361,7 @@ final class AppModel {
                 state.viewedAt = now
                 state.seenAt = now
             }
+            markNotificationRead(number: item.number)
         }
     }
 
@@ -313,6 +383,20 @@ final class AppModel {
             return filter.matches(row, orgs: orgs) ? row : nil
         }
         visibleCount = visible.count
+
+        if mode == .inbox {
+            let byNumber = Dictionary(uniqueKeysWithValues: snapshot.items.map { ($0.number, $0) })
+            let rows: [ItemRow] = inbox.compactMap { note in
+                guard let item = byNumber[note.number] else { return nil }
+                let state = state(for: item)
+                var row = ItemRow(item: item, state: state, insight: ItemInsight(item: item, state: state, viewer: viewer, baseline: snapshot.baseline))
+                row.note = note
+                return filter.matches(row, orgs: orgs) ? row : nil
+            }
+            visibleCount = rows.count
+            self.rows = [.header(.inbox, count: rows.count, collapsed: false)] + rows.map { .item(.inbox, $0) }
+            return
+        }
 
         let ordered = visible.sorted(by: sort.areInIncreasingOrder)
         let recent = visible
@@ -352,7 +436,7 @@ final class AppModel {
 /// Small typed wrapper over UserDefaults for UI preferences.
 enum Defaults {
     enum Key: String {
-        case sort, collapsed
+        case sort, collapsed, drafts
     }
 
     static func get<T: Decodable>(_ key: Key) -> T? {
