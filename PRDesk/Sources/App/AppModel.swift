@@ -337,34 +337,61 @@ final class AppModel {
     // MARK: Actions
 
     func perform(_ action: ItemAction, on itemID: Item.ID) {
-        guard let item = itemsByID[itemID] else { return }
+        perform(action, on: [itemID])
+    }
+
+    /// Applies `action` to several items at once. Toggles work on the group: if every item already
+    /// has the status, priority, pin or vote, it is cleared from all; otherwise all get it.
+    func perform(_ action: ItemAction, on itemIDs: [Item.ID]) {
+        let items = itemIDs.compactMap { itemsByID[$0] }
+        guard !items.isEmpty else { return }
         let now = Date()
-        let entry = board(for: item)
+        let what = items.count == 1 ? "#\(items[0].number)" : "\(items.count) items"
         switch action {
         case let .triage(status):
-            let next = entry?.triage == status ? nil : status
-            writeBoard("set the status of #\(item.number)") { engine in
-                try await engine.setTriage(next, number: item.number, contentID: item.id)
+            let next = items.allSatisfy { board(for: $0)?.triage == status } ? nil : status
+            let changes = items.filter { board(for: $0)?.triage != next }
+            writeBoard("set the status of \(what)") { engine in
+                for item in changes {
+                    try await engine.setTriage(next, number: item.number, contentID: item.id)
+                }
             }
         case let .priority(priority):
-            let current = entry?.priorityValue
-            let next = priority == current ? nil : priority
-            guard next != current else { return }
-            writeBoard("set the priority of #\(item.number)") { engine in
-                try await engine.setPriority(next, number: item.number, contentID: item.id)
+            let next = items.allSatisfy { board(for: $0)?.priorityValue == priority } ? nil : priority
+            let changes = items.filter { board(for: $0)?.priorityValue != next }
+            guard !changes.isEmpty else { return }
+            writeBoard("set the priority of \(what)") { engine in
+                for item in changes {
+                    try await engine.setPriority(next, number: item.number, contentID: item.id)
+                }
             }
         case .togglePin:
-            updateState(item) { $0.pinnedAt = $0.pinnedAt == nil ? now : nil }
+            let pin = !items.allSatisfy { state(for: $0).isPinned }
+            for item in items {
+                updateState(item) { state in
+                    if pin { state.pinnedAt = state.pinnedAt ?? now } else { state.pinnedAt = nil }
+                }
+            }
         case .markRead:
-            updateState(item) { $0.seenAt = now }
-            markNotificationRead(number: item.number)
+            for item in items {
+                updateState(item) { $0.seenAt = now }
+                markNotificationRead(number: item.number)
+            }
         case .openInBrowser:
-            if let url = URL(string: item.url) { NSWorkspace.shared.open(url) }
+            // Opening dozens of tabs is never what a stray keypress meant.
+            for item in items.prefix(Self.maxTabsAtOnce) {
+                if let url = URL(string: item.url) { NSWorkspace.shared.open(url) }
+            }
         case let .voteAuthor(vote):
-            guard let author = item.author else { return }
-            setVote(self.vote(for: author) == vote ? nil : vote, for: author)
+            let authors = Array(Set(items.compactMap(\.author)))
+            let clear = authors.allSatisfy { self.vote(for: $0) == vote }
+            for author in authors {
+                setVote(clear ? nil : vote, for: author)
+            }
         }
     }
+
+    private static let maxTabsAtOnce = 10
 
     /// Saves the item's board Comment, if it changed.
     func setComment(_ comment: String, for item: Item) {

@@ -12,7 +12,8 @@ struct ItemTableView: NSViewRepresentable {
     var contribution: (String) -> Contribution?
     /// Changes when badge data or avatars change, which the rows themselves don't reflect.
     var badgeVersion: Int
-    var onAction: (ItemAction, Item.ID) -> Void
+    /// An action on the selected items (or the right-clicked one, if it is outside the selection).
+    var onAction: (ItemAction, [Item.ID]) -> Void
     var onSort: (ItemSort) -> Void
     var onToggleSection: (ListSection) -> Void
     var onFocusFilter: () -> Void
@@ -30,7 +31,7 @@ struct ItemTableView: NSViewRepresentable {
         table.style = .plain
         table.rowHeight = 20
         table.intercellSpacing = NSSize(width: 6, height: 0)
-        table.allowsMultipleSelection = false
+        table.allowsMultipleSelection = true
         table.allowsEmptySelection = true
         table.floatsGroupRows = true
         table.usesAlternatingRowBackgroundColors = true
@@ -106,6 +107,9 @@ struct ItemTableView: NSViewRepresentable {
             isApplyingUpdate = true
             defer { isApplyingUpdate = false }
 
+            // What is selected, by identity, before rows move around.
+            let selected = Set(table.selectedRowIndexes.compactMap { rows.indices.contains($0) ? rows[$0].selectionID : nil })
+
             if parent.rows != rows || parent.viewer != viewer {
                 rows = parent.rows
                 viewer = parent.viewer
@@ -119,7 +123,9 @@ struct ItemTableView: NSViewRepresentable {
 
             if let selection = parent.selection {
                 if let row = index(of: selection) {
-                    select(row)
+                    // Keep a multiple selection the primary item belongs to; otherwise select it alone.
+                    let others = selected.contains(selection) ? selected.compactMap(index(of:)) : []
+                    select(row, alongWith: others)
                 } else if let replacement = nearestItemRow(to: lastSelectedRow) {
                     // The selected item left its section (e.g. triaged out of Triage): select its neighbor.
                     select(replacement)
@@ -142,11 +148,12 @@ struct ItemTableView: NSViewRepresentable {
             rows.firstIndex { $0.selectionID == selection }
         }
 
-        private func select(_ row: Int) {
+        private func select(_ row: Int, alongWith others: [Int] = []) {
             guard let table else { return }
             lastSelectedRow = row
-            if table.selectedRow != row {
-                table.selectRowIndexes([row], byExtendingSelection: false)
+            let indexes = IndexSet(others).union([row])
+            if table.selectedRowIndexes != indexes {
+                table.selectRowIndexes(indexes, byExtendingSelection: false)
                 table.scrollRowToVisible(row)
             }
         }
@@ -158,9 +165,15 @@ struct ItemTableView: NSViewRepresentable {
                 ?? (0 ..< start).reversed().first { rows[$0].selectionID != nil }
         }
 
-        private var selectedItemID: Item.ID? {
-            guard let table, rows.indices.contains(table.selectedRow) else { return nil }
-            return rows[table.selectedRow].selectionID?.itemID
+        /// Selected items, top to bottom, each once even if it shows in several sections.
+        private var selectedItemIDs: [Item.ID] {
+            guard let table else { return [] }
+            return unique(table.selectedRowIndexes.compactMap { rows.indices.contains($0) ? rows[$0].selectionID?.itemID : nil })
+        }
+
+        private func unique(_ ids: [Item.ID]) -> [Item.ID] {
+            var seen = Set<Item.ID>()
+            return ids.filter { seen.insert($0).inserted }
         }
 
         // MARK: Keyboard
@@ -192,7 +205,8 @@ struct ItemTableView: NSViewRepresentable {
                 default: nil
                 }
                 guard let action else { return false }
-                if let id = selectedItemID { parent.onAction(action, id) }
+                let ids = selectedItemIDs
+                if !ids.isEmpty { parent.onAction(action, ids) }
             }
             return true
         }
@@ -242,7 +256,7 @@ struct ItemTableView: NSViewRepresentable {
             guard let table, rows.indices.contains(table.clickedRow),
                   let id = rows[table.clickedRow].selectionID?.itemID
             else { return }
-            parent.onAction(.openInBrowser, id)
+            parent.onAction(.openInBrowser, [id])
         }
 
         // MARK: Context menu
@@ -282,35 +296,47 @@ struct ItemTableView: NSViewRepresentable {
             return menu
         }
 
-        private var clickedItemID: Item.ID? {
-            guard let table, rows.indices.contains(table.clickedRow) else { return nil }
-            return rows[table.clickedRow].selectionID?.itemID
+        /// Rows a context-menu command applies to: the whole selection when the right-clicked row is
+        /// part of it, as in Finder, otherwise just that row.
+        private var menuTargets: [ItemRow] {
+            guard let table, rows.indices.contains(table.clickedRow), rows[table.clickedRow].selectionID != nil else { return [] }
+            let indexes = table.selectedRowIndexes.contains(table.clickedRow) ? Array(table.selectedRowIndexes) : [table.clickedRow]
+            var seen = Set<Item.ID>()
+            return indexes.compactMap { index in
+                guard rows.indices.contains(index), case let .item(_, row) = rows[index], seen.insert(row.item.id).inserted else { return nil }
+                return row
+            }
         }
 
         func menuNeedsUpdate(_ menu: NSMenu) {
-            let enabled = clickedItemID != nil
-            for item in menu.items { item.isHidden = !enabled }
-            // Check the items matching the clicked row's status, priority and author vote.
-            guard let table, rows.indices.contains(table.clickedRow), case let .item(_, row) = rows[table.clickedRow] else { return }
+            let targets = menuTargets
+            for item in menu.items { item.isHidden = targets.isEmpty }
+            // Check what all targets share; a dash when only some do.
+            func state(_ matches: (ItemRow) -> Bool) -> NSControl.StateValue {
+                let count = targets.count(where: matches)
+                return count == 0 ? .off : count == targets.count ? .on : .mixed
+            }
             for item in menu.items where item.action == #selector(performMenuAction(_:)) {
                 item.state = switch Self.menuActions[item.tag].1 {
-                case let .triage(status): row.triage == status ? .on : .off
-                case let .priority(priority?): row.priority == priority ? .on : .off
-                case let .voteAuthor(vote): row.authorVote == vote ? .on : .off
+                case let .triage(status): state { $0.triage == status }
+                case let .priority(priority?): state { $0.priority == priority }
+                case let .voteAuthor(vote): state { $0.authorVote == vote }
                 default: .off
                 }
             }
         }
 
         @objc private func performMenuAction(_ sender: NSMenuItem) {
-            guard let id = clickedItemID else { return }
-            parent.onAction(Self.menuActions[sender.tag].1, id)
+            let ids = menuTargets.map(\.item.id)
+            guard !ids.isEmpty else { return }
+            parent.onAction(Self.menuActions[sender.tag].1, ids)
         }
 
         @objc private func copyLink() {
-            guard let table, rows.indices.contains(table.clickedRow), case let .item(_, row) = rows[table.clickedRow] else { return }
+            let urls = menuTargets.map(\.item.url)
+            guard !urls.isEmpty else { return }
             NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(row.item.url, forType: .string)
+            NSPasteboard.general.setString(urls.joined(separator: "\n"), forType: .string)
         }
 
         // MARK: NSTableViewDataSource
