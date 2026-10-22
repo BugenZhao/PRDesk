@@ -21,6 +21,8 @@ struct ItemTableView: NSViewRepresentable {
     /// Selection made by the table itself (e.g. moving to a neighbor when the selected row goes
     /// away); unlike user selection it must not count as opening the item.
     var onAutoSelect: (TableSelection?) -> Void
+    /// Undo for list actions, answering ⌘Z while the table has focus.
+    var listUndoManager: UndoManager
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -51,6 +53,7 @@ struct ItemTableView: NSViewRepresentable {
         table.doubleAction = #selector(Coordinator.openClickedItem)
         table.keyHandler = { [weak coordinator] event in coordinator?.handleKey(event) ?? false }
         table.headerClickHandler = { [weak coordinator] row in coordinator?.toggleHeader(at: row) ?? false }
+        table.listUndoManager = listUndoManager
         table.menu = coordinator.makeContextMenu()
         coordinator.table = table
         coordinator.startClock()
@@ -94,6 +97,11 @@ struct ItemTableView: NSViewRepresentable {
         /// Set while the table is changed programmatically, so callbacks don't write back.
         private var isApplyingUpdate = false
         private var lastSelectedRow = -1
+        /// The selection the table last showed, to tell a new one (scrolled to) from the same one
+        /// at a new index after rows came or went above it (left where it is).
+        private var shownSelection: TableSelection?
+        /// Above this many inserted and removed rows (a new filter, the Inbox), reload instead of animating.
+        private static let maxAnimatedChanges = 60
         private var clock: Task<Void, Never>?
 
         init(_ parent: ItemTableView) {
@@ -111,10 +119,14 @@ struct ItemTableView: NSViewRepresentable {
             let selected = Set(table.selectedRowIndexes.compactMap { rows.indices.contains($0) ? rows[$0].selectionID : nil })
 
             if parent.rows != rows || parent.viewer != viewer {
+                let old = rows
+                let viewerChanged = parent.viewer != viewer
                 rows = parent.rows
                 viewer = parent.viewer
                 badgeVersion = parent.badgeVersion
-                table.reloadData()
+                if viewerChanged || !animateChanges(from: old, in: table) {
+                    table.reloadData()
+                }
             } else if parent.badgeVersion != badgeVersion {
                 badgeVersion = parent.badgeVersion
                 let author = table.column(withIdentifier: ItemColumn.author.identifier)
@@ -125,17 +137,19 @@ struct ItemTableView: NSViewRepresentable {
                 if let row = index(of: selection) {
                     // Keep a multiple selection the primary item belongs to; otherwise select it alone.
                     let others = selected.contains(selection) ? selected.compactMap(index(of:)) : []
-                    select(row, alongWith: others)
+                    select(row, alongWith: others, scroll: selection != shownSelection)
                 } else if let replacement = nearestItemRow(to: lastSelectedRow) {
                     // The selected item left its section (e.g. triaged out of Triage): select its neighbor.
-                    select(replacement)
+                    select(replacement, scroll: true)
                     let id = rows[replacement].selectionID
                     DispatchQueue.main.async { self.parent.onAutoSelect(id) }
                 } else {
                     table.deselectAll(nil)
+                    shownSelection = nil
                 }
-            } else if table.selectedRow != -1 {
-                table.deselectAll(nil)
+            } else {
+                if table.selectedRow != -1 { table.deselectAll(nil) }
+                shownSelection = nil
             }
 
             if parent.focusRequest != focusRequest {
@@ -148,14 +162,61 @@ struct ItemTableView: NSViewRepresentable {
             rows.firstIndex { $0.selectionID == selection }
         }
 
-        private func select(_ row: Int, alongWith others: [Int] = []) {
+        /// Selects `row`, scrolling to it only when asked: a selection that just moved because
+        /// rows came or went above it (a section toggled) stays where the user scrolled.
+        private func select(_ row: Int, alongWith others: [Int] = [], scroll: Bool) {
             guard let table else { return }
             lastSelectedRow = row
+            shownSelection = rows[row].selectionID
             let indexes = IndexSet(others).union([row])
             if table.selectedRowIndexes != indexes {
                 table.selectRowIndexes(indexes, byExtendingSelection: false)
-                table.scrollRowToVisible(row)
             }
+            if scroll { table.scrollRowToVisible(row) }
+        }
+
+        /// Moves, inserts and removes rows with animation instead of reloading, so an item given a
+        /// new Status travels to its new section and one leaving the list fades out. Returns false
+        /// when the change is too big to animate, for the caller to reload.
+        private func animateChanges(from old: [TableRow], in table: NSTableView) -> Bool {
+            let oldKeys = old.map(\.animationKey)
+            let newKeys = rows.map(\.animationKey)
+            let oldSet = Set(oldKeys)
+            let newSet = Set(newKeys)
+            guard oldSet.count == oldKeys.count, newSet.count == newKeys.count else { return false }
+            let removed = IndexSet(oldKeys.indices.filter { !newSet.contains(oldKeys[$0]) })
+            let insertedCount = newKeys.count { !oldSet.contains($0) }
+            guard removed.count + insertedCount <= Self.maxAnimatedChanges else { return false }
+
+            // Changes in an update block apply one after another, each to the rows as the previous
+            // one left them; `current` follows along.
+            var current = oldKeys.indices.filter { !removed.contains($0) }.map { oldKeys[$0] }
+            table.beginUpdates()
+            table.removeRows(at: removed, withAnimation: [.effectFade, .slideUp])
+            for (target, key) in newKeys.enumerated() {
+                if current.indices.contains(target), current[target] == key { continue }
+                // Everything before `target` already matches, so a row still to place sits after it.
+                if let source = current[target...].firstIndex(of: key) {
+                    table.moveRow(at: source, to: target)
+                    current.insert(current.remove(at: source), at: target)
+                } else {
+                    table.insertRows(at: [target], withAnimation: [.effectFade, .slideDown])
+                    current.insert(key, at: target)
+                }
+            }
+            table.endUpdates()
+
+            // Rows that stayed or moved may show something new: a header's count, an item's
+            // section, Turn or priority tint.
+            let oldRows = Dictionary(uniqueKeysWithValues: zip(oldKeys, old))
+            let changed = IndexSet(rows.indices.filter { index in oldRows[newKeys[index]].map { $0 != rows[index] } ?? false })
+            if !changed.isEmpty {
+                table.reloadData(forRowIndexes: changed, columnIndexes: IndexSet(integersIn: 0 ..< table.numberOfColumns))
+                for row in changed {
+                    if let view = table.rowView(atRow: row, makeIfNecessary: false) as? ItemRowView { configure(view, for: row) }
+                }
+            }
+            return true
         }
 
         private func nearestItemRow(to index: Int) -> Int? {
@@ -409,6 +470,11 @@ struct ItemTableView: NSViewRepresentable {
                 view.identifier = ItemRowView.identifier
                 return view
             }()
+            configure(view, for: row)
+            return view
+        }
+
+        private func configure(_ view: ItemRowView, for row: Int) {
             switch rows[row] {
             case let .item(_, itemRow):
                 view.tint = itemRow.priority?.rowTint
@@ -418,7 +484,6 @@ struct ItemTableView: NSViewRepresentable {
                 // On the row: a group row doesn't show its cell's tooltip.
                 view.toolTip = section.help
             }
-            return view
         }
 
         /// Toggles the section if `row` is a header; see `ItemNSTableView.mouseDown`.
@@ -442,7 +507,8 @@ struct ItemTableView: NSViewRepresentable {
             guard !isApplyingUpdate, let table = notification.object as? NSTableView else { return }
             let row = table.selectedRow
             if row >= 0 { lastSelectedRow = row }
-            parent.selection = rows.indices.contains(row) ? rows[row].selectionID : nil
+            shownSelection = rows.indices.contains(row) ? rows[row].selectionID : nil
+            parent.selection = shownSelection
         }
 
         func tableView(_ tableView: NSTableView, sortDescriptorsDidChange _: [NSSortDescriptor]) {
@@ -454,11 +520,47 @@ struct ItemTableView: NSViewRepresentable {
     }
 }
 
-/// Routes single-key shortcuts to the coordinator before normal table handling.
+private extension TableRow {
+    /// Identity across updates, for animating them. An item in the triage sections keeps one
+    /// identity whatever its section, so a new Status moves it; Recently viewed, Pinned and the
+    /// Inbox show copies, which keep their own.
+    enum AnimationKey: Hashable {
+        case header(ListSection)
+        case item(ListSection?, Item.ID)
+    }
+
+    var animationKey: AnimationKey {
+        switch self {
+        case let .header(section, _, _): .header(section)
+        case let .item(section, row): .item([.recent, .pinned, .inbox].contains(section) ? section : nil, row.item.id)
+        }
+    }
+}
+
+/// Routes single-key shortcuts to the coordinator before normal table handling, and ⌘Z to the
+/// list's own undo.
 final class ItemNSTableView: NSTableView {
     var keyHandler: ((NSEvent) -> Bool)?
     /// Returns whether the row was a section header and was toggled.
     var headerClickHandler: ((Int) -> Bool)?
+    weak var listUndoManager: UndoManager?
+
+    @objc func undo(_: Any?) { listUndoManager?.undo() }
+    @objc func redo(_: Any?) { listUndoManager?.redo() }
+
+    override func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
+        guard let manager = listUndoManager else { return super.validateUserInterfaceItem(item) }
+        switch item.action {
+        case #selector(undo(_:)):
+            (item as? NSMenuItem)?.title = manager.undoMenuItemTitle
+            return manager.canUndo
+        case #selector(redo(_:)):
+            (item as? NSMenuItem)?.title = manager.redoMenuItemTitle
+            return manager.canRedo
+        default:
+            return super.validateUserInterfaceItem(item)
+        }
+    }
 
     override func keyDown(with event: NSEvent) {
         if keyHandler?(event) == true { return }

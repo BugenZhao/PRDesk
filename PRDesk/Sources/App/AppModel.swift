@@ -372,34 +372,21 @@ final class AppModel {
         let items = itemIDs.compactMap { itemsByID[$0] }
         guard !items.isEmpty else { return }
         let now = Date()
-        let what = items.count == 1 ? "#\(items[0].number)" : "\(items.count) items"
         switch action {
         case let .triage(status):
             // A woken Skipped item is back in Triage, so skipping it again renews the skip.
             let has = { (item: Item) in self.triage(for: item) == status }
             let next = items.allSatisfy(has) ? nil : status
             let changes = next == nil ? items : items.filter { !has($0) }
-            writeBoard("set the status of \(what)") { engine in
-                for item in changes {
-                    try await engine.setTriage(next, number: item.number, contentID: item.id)
-                }
-            }
+            setTriage(changes.map { ($0, next) })
         case let .priority(priority):
             let next = items.allSatisfy { board(for: $0)?.priorityValue == priority } ? nil : priority
             let changes = items.filter { board(for: $0)?.priorityValue != next }
             guard !changes.isEmpty else { return }
-            writeBoard("set the priority of \(what)") { engine in
-                for item in changes {
-                    try await engine.setPriority(next, number: item.number, contentID: item.id)
-                }
-            }
+            setPriority(changes.map { ($0, next) })
         case .togglePin:
             let pin = !items.allSatisfy { state(for: $0).isPinned }
-            for item in items {
-                updateState(item) { state in
-                    if pin { state.pinnedAt = state.pinnedAt ?? now } else { state.pinnedAt = nil }
-                }
-            }
+            setPins(items.map { ($0, pin ? state(for: $0).pinnedAt ?? now : nil) })
         case .markRead:
             for item in items {
                 updateState(item) { $0.seenAt = now }
@@ -413,15 +400,68 @@ final class AppModel {
         case let .voteAuthor(vote):
             let authors = Array(Set(items.compactMap(\.author)))
             let clear = authors.allSatisfy { self.vote(for: $0) == vote }
-            for author in authors {
-                setVote(clear ? nil : vote, for: author)
-            }
+            setVotes(authors.map { ($0, clear ? nil : vote) })
         }
     }
 
     private static let maxTabsAtOnce = 10
 
     /// Runs a board write, reporting failure in `writeError`.
+    // MARK: Undo
+
+    /// Undo for list actions: Status, Priority, pins and author votes. The table answers ⌘Z with
+    /// it while it has focus; text fields keep their own. Each step records what it replaced, so
+    /// undoing it registers the redo.
+    @ObservationIgnored let undoManager = UndoManager()
+
+    private func registerUndo(_ name: String, _ undo: @escaping @MainActor (AppModel) -> Void) {
+        undoManager.registerUndo(withTarget: self) { model in MainActor.assumeIsolated { undo(model) } }
+        undoManager.setActionName(name)
+    }
+
+    private func setTriage(_ changes: [(item: Item, status: TriageStatus?)]) {
+        guard !changes.isEmpty else { return }
+        let previous = changes.map { (item: $0.item, status: board(for: $0.item)?.triage) }
+        registerUndo("Set Status") { $0.setTriage(previous) }
+        let what = changes.count == 1 ? "#\(changes[0].item.number)" : "\(changes.count) items"
+        writeBoard("set the status of \(what)") { engine in
+            for change in changes {
+                try await engine.setTriage(change.status, number: change.item.number, contentID: change.item.id)
+            }
+        }
+    }
+
+    private func setPriority(_ changes: [(item: Item, priority: Priority?)]) {
+        guard !changes.isEmpty else { return }
+        let previous = changes.map { (item: $0.item, priority: board(for: $0.item)?.priorityValue) }
+        registerUndo("Set Priority") { $0.setPriority(previous) }
+        let what = changes.count == 1 ? "#\(changes[0].item.number)" : "\(changes.count) items"
+        writeBoard("set the priority of \(what)") { engine in
+            for change in changes {
+                try await engine.setPriority(change.priority, number: change.item.number, contentID: change.item.id)
+            }
+        }
+    }
+
+    private func setPins(_ changes: [(item: Item, pinnedAt: Date?)]) {
+        guard !changes.isEmpty else { return }
+        let previous = changes.map { (item: $0.item, pinnedAt: state(for: $0.item).pinnedAt) }
+        registerUndo(changes.contains { $0.pinnedAt != nil } ? "Pin" : "Unpin") { $0.setPins(previous) }
+        for change in changes {
+            let pinnedAt = change.pinnedAt
+            updateState(change.item) { $0.pinnedAt = pinnedAt }
+        }
+    }
+
+    private func setVotes(_ changes: [(author: String, vote: Vote?)]) {
+        guard !changes.isEmpty else { return }
+        let previous = changes.map { (author: $0.author, vote: vote(for: $0.author)) }
+        registerUndo("Vote") { $0.setVotes(previous) }
+        for change in changes {
+            setVote(change.vote, for: change.author)
+        }
+    }
+
     private func writeBoard(_ what: String, _ write: @escaping @Sendable (SyncEngine) async throws -> Void) {
         Task { [engine, logger] in
             do {

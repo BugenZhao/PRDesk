@@ -100,7 +100,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 - **Recently closed**：最近 14 天 merged / closed 的条目，默认折叠
 - **Skipped**、**Muted**：对应 Status 的 open 条目，默认折叠
 
-除 Recently viewed 和 Pinned 外，每个条目只出现在一个组里。所有组始终显示，空的也显示（数量为 0）；组标题的 tooltip 说明这个组装的是什么、和 board 的关系。组的折叠状态持久化。过滤时显示所有匹配项，忽略折叠。
+除 Recently viewed 和 Pinned 外，每个条目只出现在一个组里。所有组始终显示，空的也显示（数量为 0）；组标题的 tooltip 说明这个组装的是什么、和 board 的关系。组的折叠状态持久化，展开 / 折叠不改变滚动位置。过滤时显示所有匹配项，忽略折叠。改了 Status 的条目带动画移到新的组（新的组折叠时淡出），选中落到原位置的下一条
 
 ### 4.2 列
 
@@ -140,6 +140,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 | `⌘` / `⇧` 点击 | 多选；下面的快捷键和右键菜单作用于所有选中条目（右键的行不在选区里时只作用于该行）。切换类操作按整体切换：都已是该状态则清除，否则全部设置 |
 | `/` | 聚焦过滤框 |
 | `w` / `b` / `s` / `m` | Status 设为 Working / Backlog / Skipped / Muted；再按一次同一个键清除 Status（回到未分诊）；被唤醒的 Skipped 条目按 `s` 是重新 skip，不清除 |
+| `⌘Z` / `⇧⌘Z` | 列表有焦点时，撤销 / 重做列表里的操作：Status、Priority、Pin、作者投票（Mark as read、Close 不能撤销）；文本框里仍是文字的撤销 |
 | `1` / `2` / `3` / `0` | Priority 设为 H / M / L / 清除 |
 | `p` | 置顶 / 取消置顶 |
 | `n` | 标为已读 |

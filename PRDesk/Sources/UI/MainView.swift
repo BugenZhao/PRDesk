@@ -31,7 +31,8 @@ struct MainView: View {
                 onToggleSection: { model.toggleCollapsed($0) },
                 onFocusFilter: { model.requestFilterFocus() },
                 onFocusComposer: { model.requestComposerFocus() },
-                onAutoSelect: { model.autoSelect($0) }
+                onAutoSelect: { model.autoSelect($0) },
+                listUndoManager: model.undoManager
             )
         }
         .frame(minWidth: 560, maxHeight: .infinity)
