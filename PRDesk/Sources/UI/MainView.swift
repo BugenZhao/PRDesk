@@ -173,7 +173,7 @@ private struct StatusBar: View {
                 Link("Board #\(BoardQuery.number)", destination: Self.boardURL)
                     .help("Open the triage board on GitHub")
                 Spacer(minLength: 12)
-                Text("\(model.visibleCount) items")
+                Text(model.visibleCount == 1 ? "1 item" : "\(model.visibleCount) items")
                 Text("·")
                 SyncStatus()
             }
@@ -196,24 +196,25 @@ private struct SyncStatus: View {
             switch model.syncState {
             case .syncing:
                 ProgressView().controlSize(.mini)
-                Text("syncing…")
+                Text("Syncing…")
             case let .failed(message):
-                Label("sync failed", systemImage: "exclamationmark.triangle.fill")
+                Label("Sync failed", systemImage: "exclamationmark.triangle.fill")
                     .labelStyle(.titleAndIcon)
                     .foregroundStyle(.red)
                     .help(message)
             case .idle:
                 if let last = model.lastSyncedAt {
                     TimelineView(.periodic(from: .now, by: 5)) { context in
-                        Text("synced \(last.compactAge(relativeTo: context.date))")
+                        let age = last.compactAge(relativeTo: context.date)
+                        Text(age == "now" ? "Synced just now" : "Synced \(age) ago")
                     }
                 }
             }
             if let rateLimit = model.rateLimit {
                 Text("·")
-                Text("api \(String(rateLimit.remaining))")
+                Text("API quota \(rateLimit.remaining.formatted()) left")
                     .foregroundStyle(rateLimit.remaining < 500 ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
-                    .help("GraphQL rate limit resets \(rateLimit.resetAt.formatted(.relative(presentation: .named)))")
+                    .help("GitHub GraphQL points left this hour; resets \(rateLimit.resetAt.formatted(.relative(presentation: .named))). Below 500, syncing slows down.")
             }
         }
     }

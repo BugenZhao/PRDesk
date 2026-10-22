@@ -76,7 +76,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 │ ▸ Backlog 31                                      │                                                    │
 │                                                   │ ┌ 评论框 ──────────────── Comment / Approve … ┐   │
 ├───────────────────────────────────────────────────┴────────────────────────────────────────────────────┤
-└ 状态栏：BugenZhao · vllm-project/vllm · Board #56                    403 items · synced 12s · api 4821 ┘
+└ 状态栏：BugenZhao · vllm-project/vllm · Board #56                    403 items · Synced 12s ago · API quota 4,821 left ┘
 ```
 
 ### 4.1 分组
