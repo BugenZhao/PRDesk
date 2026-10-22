@@ -165,7 +165,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 ## 5.2 贡献者标记
 
 - 统计每个作者在 vllm 合并过的 PR 数（GitHub search，每批 40 人，每周刷新；为 0 的每天刷新）
-- 合并数 ≥ 阈值（默认 10，设置 → Affiliations 可改）：作者名后显示灰色描边 seal 图标
+- 合并数 ≥ 阈值（默认 10，设置 → Affiliations 可改）：作者名后显示蓝色描边 seal 图标
 - 合并数 = 0：显示灰色 "1st"
 - 悬停显示具体数字；列表、详情头部、时间线都显示
 - 过滤：`merged:N`、`merged:>=N`（也支持 `>`、`<`、`<=`）、`is:regular`、`is:first`

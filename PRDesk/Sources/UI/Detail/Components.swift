@@ -76,7 +76,7 @@ struct BadgeIcons: View {
                 if contribution.isRegular {
                     Image(systemName: "checkmark.seal")
                         .font(.system(size: size - 2))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.blue)
                         .help(contribution.summary)
                 } else if contribution.isFirstTime {
                     Chip(text: "1st")

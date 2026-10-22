@@ -105,7 +105,7 @@ enum ItemColumn: String, CaseIterable {
             var mark: [CellRun] = []
             if let contribution = item.author.flatMap(contribution) {
                 if contribution.isRegular {
-                    mark = [.symbol("checkmark.seal", color: .secondaryLabelColor)]
+                    mark = [.symbol("checkmark.seal", color: .systemBlue)]
                 } else if contribution.isFirstTime {
                     mark = [.chip("1st", color: .secondaryLabelColor)]
                 }
