@@ -272,15 +272,20 @@ private struct CISummary: View {
         }
     }
 
+    // As the list's CI column: a failed rollup with no failed checks means they were cancelled.
     private var color: Color {
         if ci.failed > 0 { return .red }
         if ci.pending > 0 || ci.state == "PENDING" || ci.state == "EXPECTED" { return .yellow }
-        return ci.state == "SUCCESS" ? .green : .red
+        return ci.state == "SUCCESS" ? .green : .gray
     }
 
     private var text: String {
         if ci.failed > 0 { return "CI \(ci.failed) failed" }
         if ci.pending > 0 { return "CI \(ci.pending) pending" }
-        return ci.state == "SUCCESS" ? "CI passed" : "CI \(ci.state.lowercased())"
+        switch ci.state {
+        case "SUCCESS": return "CI passed"
+        case "FAILURE", "ERROR": return "CI cancelled"
+        default: return "CI \(ci.state.lowercased())"
+        }
     }
 }
