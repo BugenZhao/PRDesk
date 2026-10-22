@@ -65,9 +65,9 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 ## 4. 主界面
 
 ```
-┌ 顶栏：                              Dashboard | Inbox (n)                       ⟳  ▣ │ Conversation | Checks | Files ┐
+┌ 顶栏：                    Dashboard | Inbox (n)        🔍 Filter (/)  ⟳  ▣ │ Conversation | Checks | Files ┐
 ├ 列表 ─────────────────────────────────────────────┬ 详情 ──────────────────────────────────────────────┤
-│ Filter (/)          643 items   快捷键提示        │ #56492 [Core] Extensible KV cache                  │
+│                                                   │ #56492 [Core] Extensible KV cache                  │
 │ ▾ Recently viewed 8                               │ by njhill ◆◆  draft  CI ● 16 failed  conflicts     │
 │ ▾ Pinned 2                                        │ [Triage Working Backlog Skipped Muted] [H M L –]   │
 │ ▾ Working 9                                       │ [Pin] [Open ↗]   Comment: ...                      │
@@ -76,7 +76,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 │ ▸ Backlog 31                                      │                                                    │
 │                                                   │ ┌ 评论框 ──────────────── Comment / Approve … ┐   │
 ├───────────────────────────────────────────────────┴────────────────────────────────────────────────────┤
-└ 状态栏：BugenZhao · vllm-project/vllm · Board #56                    403 items · Synced 12s ago · API quota 4,821 left ┘
+└ 状态栏：j/k move · w/b/s/m … (快捷键提示)   BugenZhao · vllm-project/vllm · Board #56 · 403 items · Synced 12s ago · API quota 4,821 left ┘
 ```
 
 ### 4.1 分组
@@ -120,7 +120,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 
 ### 4.4 过滤
 
-- 自由文本匹配标题、编号、作者
+- 过滤框在顶栏列表一侧（`/` 聚焦，回车或空时按 esc 回到列表）；自由文本匹配标题、编号、作者
 - 支持 token：`is:pr` `is:issue` `is:draft` `is:open` `is:unread` `is:pinned` `is:first` `is:regular` `status:triage|working|backlog|skipped|muted` `turn:me` `author:x` `label:x` `ci:fail` `p:h` `org:redhat` `vote:down` `merged:>=10`；前面加 `-` 取反
 
 ### 4.5 快捷键

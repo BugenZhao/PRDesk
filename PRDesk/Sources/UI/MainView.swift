@@ -3,14 +3,11 @@ import SwiftUI
 struct MainView: View {
     @Environment(AppModel.self) private var model
     @State private var showsDetail = true
-    @FocusState private var filterFocused: Bool
 
     var body: some View {
         @Bindable var model = model
 
         VStack(spacing: 0) {
-            filterBar
-            Divider()
             ItemTableView(
                 rows: model.rows,
                 viewer: model.viewer,
@@ -49,7 +46,18 @@ struct MainView: View {
                 .labelsHidden()
                 .fixedSize()
             }
-            // The list's own action, at the right end of its part of the toolbar.
+            // The filter and the list's own action, at the right end of the list's part of the
+            // toolbar rather than over the detail pane.
+            ToolbarItem(placement: .primaryAction) {
+                FilterField(
+                    text: $model.filterText,
+                    prompt: "Filter (/)",
+                    focusRequest: model.filterFocusRequest,
+                    onDone: { model.requestTableFocus() }
+                )
+            }
+            // Its own capsule, so Sync doesn't read as part of the field.
+            ToolbarSpacer(.fixed, placement: .primaryAction)
             ToolbarItem(placement: .primaryAction) {
                 Button("Sync Now", systemImage: "arrow.clockwise") {
                     Task { await model.sync() }
@@ -65,7 +73,6 @@ struct MainView: View {
                 .help("Show or hide the detail pane")
             }
         }
-        .onChange(of: model.filterFocusRequest) { filterFocused = true }
         .alert(
             "GitHub not updated",
             isPresented: Binding(get: { model.writeError != nil }, set: { if !$0 { model.writeError = nil } }),
@@ -83,31 +90,6 @@ struct MainView: View {
             model.start()
         }
     }
-
-    private var filterBar: some View {
-        @Bindable var model = model
-        return HStack(spacing: 8) {
-            TextField("Filter (/)", text: $model.filterText)
-                .textFieldStyle(.roundedBorder)
-                .controlSize(.small)
-                .frame(maxWidth: 260)
-                .focused($filterFocused)
-                .onSubmit { model.requestTableFocus() }
-                .onKeyPress(.escape) {
-                    if model.filterText.isEmpty { model.requestTableFocus() } else { model.filterText = "" }
-                    return .handled
-                }
-                .help("Text, or tokens like status:triage is:pr turn:me author:x label:x ci:fail p:h org:redhat vote:down merged:>=10 is:first")
-            Spacer(minLength: 8)
-            Text("j/k move · w/b/s/m working/backlog/skip/mute · 1/2/3 priority · p pin · n mark read · c comment · o open · +/- vote author · esc deselect")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-                .lineLimit(1)
-                .truncationMode(.head)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-    }
 }
 
 /// The window's bottom bar, as in Finder: where the list comes from on the left, item count and
@@ -117,17 +99,27 @@ private struct StatusBar: View {
 
     static let height: CGFloat = 22
 
+    private static let shortcuts = "j/k move · w/b/s/m working/backlog/skip/mute · 1/2/3 priority · p pin · n mark read · c comment · o open · +/- vote author · / filter · esc deselect"
+    private static let filterHelp = "Filter with text, or tokens like status:triage is:pr turn:me author:x label:x ci:fail p:h org:redhat vote:down merged:>=10 is:first"
+
     private static let boardURL = URL(string: "https://github.com/orgs/\(BoardQuery.owner)/projects/\(BoardQuery.number)")!
 
     var body: some View {
         VStack(spacing: 0) {
             Divider()
             HStack(spacing: 6) {
+                // Shortcuts give way first when the window is narrow.
+                Text(Self.shortcuts)
+                    .foregroundStyle(.tertiary)
+                    .truncationMode(.tail)
+                    .layoutPriority(-1)
+                    .help(Self.filterHelp)
+                Spacer(minLength: 12)
                 Text([model.viewer, SyncEngine.repo].compactMap(\.self).joined(separator: " · "))
                 Text("·")
                 Link("Board #\(BoardQuery.number)", destination: Self.boardURL)
                     .help("Open the triage board on GitHub")
-                Spacer(minLength: 12)
+                Text("·")
                 Text(model.visibleCount == 1 ? "1 item" : "\(model.visibleCount) items")
                 Text("·")
                 SyncStatus()
