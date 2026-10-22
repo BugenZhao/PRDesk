@@ -33,7 +33,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
   - 首次同步回溯 90 天；closed/merged 的保留 14 天后淡出
 - **手动**：`+ Add`（粘贴编号或 URL）把条目加到 board 上（不设 Status），之后就一直跟踪
 - **增量**：每 60s 用 `updated:>=上次同步时间` 拉增量；选中条目时实时拉详情；窗口激活时立即同步一次
-- **限流**：顶栏显示 GraphQL 剩余额度；低于 500 时自动降低轮询频率
+- **限流**：底部状态栏显示 GraphQL 剩余额度；低于 500 时自动降低轮询频率
 - **Board**：每次同步都拉 board 的全部条目（Status、Priority、Comment）；board 上不在本地的条目按 id 补拉
 - **Inbox**：GitHub Notifications（仅本仓库、仅 participating，不含 watching），未读数显示在 tab、Dock 和菜单栏上；打开条目或按 `n` 即在 GitHub 上标记已读
 
@@ -65,7 +65,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 ## 4. 主界面
 
 ```
-┌ 顶栏：Dashboard | Inbox (n) | + Add                          BugenZhao · vllm-project/vllm · synced 12s · api 4821 ⟳ ┐
+┌ 顶栏：+ Add                         Dashboard | Inbox (n)                                                  ⟳  ▣ ┐
 ├ 列表 ─────────────────────────────────────────────┬ 详情 ──────────────────────────────────────────────┤
 │ Filter (/)          643 items   快捷键提示        │ #56492 [Core] Extensible KV cache                  │
 │ ▾ Recently viewed 8                               │ by njhill ◆◆  draft  CI ● 16 failed  conflicts     │
@@ -75,7 +75,8 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 │ ▾ Triage 180                                      │ ...时间线...                                       │
 │ ▸ Backlog 31                                      │                                                    │
 │                                                   │ ┌ 评论框 ──────────────── Comment / Approve … ┐   │
-└───────────────────────────────────────────────────┴────────────────────────────────────────────────────┘
+├───────────────────────────────────────────────────┴────────────────────────────────────────────────────┤
+└ 状态栏：BugenZhao · vllm-project/vllm · Board #56                    403 items · synced 12s · api 4821 ┘
 ```
 
 ### 4.1 分组

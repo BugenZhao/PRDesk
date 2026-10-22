@@ -34,6 +34,9 @@ struct MainView: View {
             DetailView()
                 .inspectorColumnWidth(min: 360, ideal: 480, max: 1000)
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            StatusBar()
+        }
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Picker("View", selection: $model.mode) {
@@ -51,11 +54,6 @@ struct MainView: View {
                         AddItemView { showsAdd = false }
                     }
             }
-            // Status is information, not a control, so it sits without the glass capsule.
-            ToolbarItem(placement: .primaryAction) {
-                SyncStatusView()
-            }
-            .sharedBackgroundVisibility(.hidden)
             ToolbarItem(placement: .primaryAction) {
                 Button("Sync Now", systemImage: "arrow.clockwise") {
                     Task { await model.sync() }
@@ -104,10 +102,6 @@ struct MainView: View {
                     return .handled
                 }
                 .help("Text, or tokens like status:triage is:pr turn:me author:x label:x ci:fail p:h org:redhat vote:down merged:>=10 is:first")
-            Text("\(model.visibleCount) items")
-                .font(.caption)
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
             Spacer(minLength: 8)
             Text("j/k move · w/b/s/m working/backlog/skip/mute · 1/2/3 priority · p pin · n mark read · c comment · o open · +/- vote author")
                 .font(.caption2)
@@ -163,16 +157,46 @@ private struct AddItemView: View {
     }
 }
 
-private struct SyncStatusView: View {
+/// The window's bottom bar, as in Finder: where the list comes from on the left, item count and
+/// sync state on the right.
+private struct StatusBar: View {
+    @Environment(AppModel.self) private var model
+
+    private static let boardURL = URL(string: "https://github.com/orgs/\(BoardQuery.owner)/projects/\(BoardQuery.number)")!
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Divider()
+            HStack(spacing: 6) {
+                Text([model.viewer, SyncEngine.repo].compactMap(\.self).joined(separator: " · "))
+                Text("·")
+                Link("Board #\(BoardQuery.number)", destination: Self.boardURL)
+                    .help("Open the triage board on GitHub")
+                Spacer(minLength: 12)
+                Text("\(model.visibleCount) items")
+                Text("·")
+                SyncStatus()
+            }
+            .font(.caption)
+            .monospacedDigit()
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .padding(.horizontal, 10)
+            .frame(height: 22)
+        }
+        .background(.bar)
+    }
+}
+
+private struct SyncStatus: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         HStack(spacing: 6) {
-            Text([model.viewer, SyncEngine.repo].compactMap(\.self).joined(separator: " · "))
-                .foregroundStyle(.secondary)
             switch model.syncState {
             case .syncing:
-                Text("syncing…").foregroundStyle(.secondary)
+                ProgressView().controlSize(.mini)
+                Text("syncing…")
             case let .failed(message):
                 Label("sync failed", systemImage: "exclamationmark.triangle.fill")
                     .labelStyle(.titleAndIcon)
@@ -182,18 +206,15 @@ private struct SyncStatusView: View {
                 if let last = model.lastSyncedAt {
                     TimelineView(.periodic(from: .now, by: 5)) { context in
                         Text("synced \(last.compactAge(relativeTo: context.date))")
-                            .foregroundStyle(.secondary)
                     }
                 }
             }
             if let rateLimit = model.rateLimit {
+                Text("·")
                 Text("api \(String(rateLimit.remaining))")
-                    .foregroundStyle(rateLimit.remaining < 500 ? .orange : .secondary)
+                    .foregroundStyle(rateLimit.remaining < 500 ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
                     .help("GraphQL rate limit resets \(rateLimit.resetAt.formatted(.relative(presentation: .named)))")
             }
         }
-        .font(.caption)
-        .monospacedDigit()
-        .padding(.horizontal, 6)
     }
 }
