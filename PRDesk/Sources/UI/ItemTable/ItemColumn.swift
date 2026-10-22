@@ -181,20 +181,17 @@ enum ItemColumn: String, CaseIterable {
         return .segments(parts, font: bold ? CellFont.regularBold : CellFont.regular, flexible: true)
     }
 
-    /// The viewer's verdict, then the number of approvals (the viewer's included), each in a
-    /// fixed slot so they line up down the column.
+    /// Approvals as a check and a count, the check filled when one of them is the viewer's; a red
+    /// cross in front when the viewer requested changes. Fixed slots keep the column aligned.
     private func reviewRuns(_ row: ItemRow, viewer: String?) -> [CellRun] {
         let item = row.item
         guard item.kind == .pullRequest else { return [] }
-        let verdict: CellRun? = switch viewer.flatMap(item.review(by:))?.state {
-        case "APPROVED": .symbol("checkmark", color: .systemGreen)
-        case "CHANGES_REQUESTED": .symbol("xmark", color: .systemRed)
-        default: nil
-        }
-        let approvals: CellRun? = item.approvalCount > 0
-            ? .text(String(item.approvalCount), color: .systemGreen, font: CellFont.digits)
-            : nil
-        return [.slot(verdict, width: 12), .slot(approvals, width: 14)]
+        let mine = viewer.flatMap(item.review(by:))?.state
+        let changes: CellRun? = mine == "CHANGES_REQUESTED" ? .symbol("xmark", color: .systemRed) : nil
+        let count = item.approvalCount
+        guard count > 0 else { return [.slot(changes, width: 12)] }
+        let check: CellRun = .symbol(mine == "APPROVED" ? "checkmark.circle.fill" : "checkmark", color: .systemGreen)
+        return [.slot(changes, width: 12), check, .text(String(count), color: .systemGreen, font: CellFont.digits)]
     }
 
     /// A dot for the CI state (green passed, red failed, yellow running, gray cancelled), filled
