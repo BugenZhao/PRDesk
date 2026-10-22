@@ -191,7 +191,7 @@ enum ItemColumn: String, CaseIterable {
     /// Sized to sit level with the CI dot.
     private static let markPointSize: CGFloat = 8
 
-    /// Approvals as a check and a count, the check filled when one of them is the viewer's; a red
+    /// Approvals as a circled check and a count, the circle filled when one of them is the viewer's; a red
     /// cross after them when the viewer requested changes.
     private func reviewRuns(_ row: ItemRow, viewer: String?) -> [CellRun] {
         let item = row.item
@@ -199,7 +199,7 @@ enum ItemColumn: String, CaseIterable {
         let mine = viewer.flatMap(item.review(by:))?.state
         let count = item.approvalCount
         let check: CellRun? = count > 0
-            ? .symbol(mine == "APPROVED" ? "checkmark.circle.fill" : "checkmark", color: .systemGreen, pointSize: Self.markPointSize)
+            ? .symbol(mine == "APPROVED" ? "checkmark.circle.fill" : "checkmark.circle", color: .systemGreen, pointSize: Self.markPointSize)
             : nil
         let approvals: CellRun? = count > 0 ? .text(String(count), color: .systemGreen, font: CellFont.digits) : nil
         var runs: [CellRun] = [.slot(check, width: Self.markSlot), .slot(approvals, width: Self.countSlot)]
