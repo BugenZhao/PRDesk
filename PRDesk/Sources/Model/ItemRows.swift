@@ -57,13 +57,13 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
         case .pinned:
             "Items you pinned (p). Kept on this Mac, not on the board; they also stay in their own section."
         case .working:
-            "Status Working on the board (old Good and Pending count too), except approved PRs, and your own items without a Status. Yours to move first. The subscription is left alone."
+            "Status Working on the board (old Good and Pending count too), except approved PRs, and your own items without a Status. Your own items go first, then those waiting on you. The subscription is left alone."
         case .good:
-            "Status Working and approved: waiting to be merged."
+            "Status Working and approved: waiting to be merged. Your own items go first."
         case .triage:
             "No Status yet: not on the board, on it without a Status, or Done but open again. Also Skipped items someone asked you about since, with the reason. Your own items count as Working instead. Downvoted authors go last."
         case .backlog:
-            "Status Backlog: worth caring about, but later. The subscription is left alone."
+            "Status Backlog: worth caring about, but later. Your own items go first. The subscription is left alone."
         case .closed:
             "Merged or closed in the last \(Int(Self.closedRetention / 86400)) days, whatever the Status. The board's own workflow sets Done."
         case .skipped:

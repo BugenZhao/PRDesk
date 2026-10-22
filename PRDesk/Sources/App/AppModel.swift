@@ -607,9 +607,9 @@ final class AppModel {
             if !item.isOpen, (item.closedAt ?? item.updatedAt) < cutoff, !row.state.isPinned { return nil }
             return row
         }
-        workingItems = Self.yourMoveFirst(candidates
+        workingItems = Self.mineFirst(Self.yourMoveFirst(candidates
             .filter { [.working, .good].contains(ListSection.triageSection(of: $0)) }
-            .sorted { $0.item.updatedAt > $1.item.updatedAt })
+            .sorted { $0.item.updatedAt > $1.item.updatedAt }))
         let visible = filter.isEmpty ? candidates : candidates.filter { filter.matches($0, orgs: orgs, contribution: contribution) }
 
         visibleCount = visible.count
@@ -638,7 +638,10 @@ final class AppModel {
         for row in ordered {
             if let section = ListSection.triageSection(of: row) { members[section, default: []].append(row) }
         }
-        members[.working] = Self.yourMoveFirst(members[.working] ?? [])
+        members[.working] = Self.mineFirst(Self.yourMoveFirst(members[.working] ?? []))
+        for section in [ListSection.good, .backlog] {
+            members[section] = Self.mineFirst(members[section] ?? [])
+        }
         // Downvoted authors still get triaged, just last.
         let triage = members[.triage] ?? []
         members[.triage] = triage.filter { $0.authorVote != .down } + triage.filter { $0.authorVote == .down }
@@ -659,6 +662,11 @@ final class AppModel {
     /// Stable partition putting items whose turn is the viewer's first.
     private static func yourMoveFirst(_ rows: [ItemRow]) -> [ItemRow] {
         rows.filter { $0.insight.turn == .me } + rows.filter { $0.insight.turn != .me }
+    }
+
+    /// The viewer's own items first; each part keeps its order.
+    private static func mineFirst(_ rows: [ItemRow]) -> [ItemRow] {
+        rows.filter(\.insight.isMine) + rows.filter { !$0.insight.isMine }
     }
 }
 

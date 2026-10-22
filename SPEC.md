@@ -93,10 +93,10 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 
 - **Recently viewed**：最近查看的 8 条（本地）
 - **Pinned**：`p` 置顶的条目（本地）
-- **Working**：Status = Working 的 open 条目，加上我自己开的、没有 Status 的 open 条目；approve 了的 PR 除外；Turn = me 的排在前面
-- **Good**：同上，已 approve 的 open PR
+- **Working**：Status = Working 的 open 条目，加上我自己开的、没有 Status 的 open 条目；approve 了的 PR 除外；我自己开的排最前，其次 Turn = me 的
+- **Good**：同上，已 approve 的 open PR；我自己开的排最前
 - **Triage**：别人开的、未分诊的 open 条目，加上被唤醒的 Skipped 条目；downvote 过的作者的条目沉到底部
-- **Backlog**：Status = Backlog 的 open 条目，默认折叠
+- **Backlog**：Status = Backlog 的 open 条目，默认折叠；我自己开的排最前
 - **Recently closed**：最近 14 天 merged / closed 的条目，默认折叠
 - **Skipped**、**Muted**：对应 Status 的 open 条目，默认折叠
 
