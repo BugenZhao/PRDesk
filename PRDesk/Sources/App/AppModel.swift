@@ -59,6 +59,8 @@ final class AppModel {
             if hasSelection != (selection != nil) { hasSelection.toggle() }
             let isPullRequest = selectedItem?.kind == .pullRequest
             if selectionIsPullRequest != isPullRequest { selectionIsPullRequest = isPullRequest }
+            restoredSelection = nil
+            if selection != oldValue { Defaults.set(selection, for: .selection) }
             selectionChanged(from: oldValue)
         }
     }
@@ -77,11 +79,19 @@ final class AppModel {
     /// The detail pane's tab. Here rather than in the pane, for the View menu's commands.
     var detailTab: DetailTab = .conversation
 
-    enum ListMode: Hashable {
+    enum ListMode: String, Hashable, Codable {
         case dashboard, inbox
     }
 
-    var mode: ListMode = .dashboard { didSet { rebuild() } }
+    var mode: ListMode = Defaults.get(.mode) ?? .dashboard {
+        didSet {
+            Defaults.set(mode, for: .mode)
+            rebuild()
+        }
+    }
+
+    /// The selection when the app last quit, put back once the list first has rows.
+    @ObservationIgnored private var restoredSelection: TableSelection? = Defaults.get(.selection)
     /// Unread notifications for issues and PRs in the repository, newest first.
     private(set) var inbox: [InboxNote] = [] {
         didSet { updateDockBadge() }
@@ -252,6 +262,7 @@ final class AppModel {
                         updateDockBadge()
                     }
                     rebuild()
+                    restoreSelection()
                     if let item = selectedItem, let detail, detail.number == item.number, detail.itemUpdatedAt < item.updatedAt {
                         loadDetail()
                     }
@@ -321,6 +332,7 @@ final class AppModel {
             }
             inbox = notes.sorted { $0.updatedAt > $1.updatedAt }
             rebuild()
+            restoreSelection()
         } catch {
             logger.error("Inbox sync failed: \(String(describing: error), privacy: .public)")
         }
@@ -820,6 +832,19 @@ final class AppModel {
 
     /// Selects without counting as the user opening the item: nothing is marked viewed or read.
     /// Otherwise each read Inbox row leaving the list would select (and then read) the next one.
+    /// Reopens on the item selected when the app quit, as the app selecting it rather than the
+    /// user opening it: it isn't marked viewed or read.
+    private func restoreSelection() {
+        guard let restored = restoredSelection, selection == nil, !rows.isEmpty,
+              // The Inbox comes from GitHub after launch; wait for it.
+              restored.section != .inbox || !inbox.isEmpty
+        else { return }
+        restoredSelection = nil
+        // Its section may be collapsed or the item gone by now; then start without a selection.
+        guard rows.contains(where: { $0.selectionID == restored }) else { return }
+        autoSelect(restored)
+    }
+
     func autoSelect(_ selection: TableSelection?) {
         isAutoSelecting = true
         defer { isAutoSelecting = false }
@@ -955,7 +980,7 @@ final class AppModel {
 /// Small typed wrapper over UserDefaults for UI preferences.
 enum Defaults {
     enum Key: String {
-        case sort, collapsed, drafts, mergedThreshold, syncInterval
+        case sort, collapsed, drafts, mergedThreshold, syncInterval, selection, mode
     }
 
     static func get<T: Decodable>(_ key: Key) -> T? {

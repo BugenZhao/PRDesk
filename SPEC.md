@@ -87,6 +87,8 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 └ 状态栏：j/k move · w/b/s/m … (快捷键提示)   BugenZhao · vllm-project/vllm · Board #56 · 403 items · Synced 12s ago · API quota 4,821 left ┘
 ```
 
+重启后回到上次的样子：Dashboard / Inbox、选中的条目（只是选中，不算打开：不标已读、不进 Recently viewed）、详情面板是否显示。
+
 ### 4.1 分组
 
 从上到下：

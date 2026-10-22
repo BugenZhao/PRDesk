@@ -109,7 +109,7 @@ enum TableRow: Hashable {
 }
 
 /// The same item can appear in several sections, so a selection names both.
-struct TableSelection: Hashable {
+struct TableSelection: Hashable, Codable {
     var section: ListSection
     var itemID: Item.ID
 }
