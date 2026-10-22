@@ -152,7 +152,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 
 ## 5. 组织徽章
 
-显示四种：**vLLM committer**、**Inferact**、**Red Hat**、**NVIDIA**。图标用对应 GitHub 组织的头像（缓存到本地）。vLLM 另有低一档的灰色徽章（头像去色），给不是 committer 的 `vllm-project` 组织成员和仓库 collaborator（triage 及以上权限）。
+显示四种：**vLLM committer**、**Inferact**、**Red Hat**、**NVIDIA**。图标用内置的透明底 logo（vLLM、Inferact、NVIDIA 只用标志不带文字），没有内置 logo 的（Red Hat）用 GitHub 组织头像（缓存到本地）。vLLM 另有低一档的灰色徽章（logo 去色），给不是 committer 的 `vllm-project` 组织成员和仓库 collaborator（triage 及以上权限）。
 
 判定来源按优先级从高到低，命中即生效，悬停显示命中来源：
 
@@ -180,7 +180,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 
 - 统计每个作者在 vllm 合并过的 PR 数（GitHub search，每批 40 人，每周刷新；为 0 的每天刷新）
 - 合并数 ≥ 阈值（默认 10，设置 → Affiliations 可改）：作者名后显示绿色描边 seal 图标；已有组织徽章的作者不显示
-- 合并数 = 0：显示 "1st" 小方块（青色底白字，大小形状同组织徽章）
+- 合并数 = 0：显示 "1st" 小方块（灰底白字，大小形状同组织徽章）
 - 悬停显示具体数字；列表、详情头部、时间线都显示
 - 过滤：`merged:N`、`merged:>=N`（也支持 `>`、`<`、`<=`）、`is:regular`、`is:first`
 - 只存本地，不写 board，也不影响分组

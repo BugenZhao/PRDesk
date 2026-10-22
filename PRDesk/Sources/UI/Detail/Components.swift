@@ -87,8 +87,8 @@ struct BadgeIcons: View {
             }
             ForEach(badges, id: \.org) { badge in
                 Group {
-                    if let image = badge.isSecondary ? cache.grayscaleImage(for: badge.org.avatarLogin) : cache.image(for: badge.org.avatarLogin) {
-                        Image(nsImage: image).resizable()
+                    if let image = badge.image {
+                        Image(nsImage: image).resizable().scaledToFit()
                     } else {
                         BadgeTile(text: badge.org.shortLabel, color: Color(nsColor: .tertiaryLabelColor), size: size)
                     }

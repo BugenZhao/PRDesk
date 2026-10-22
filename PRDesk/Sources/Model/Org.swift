@@ -15,7 +15,17 @@ enum Org: String, CaseIterable, Codable, Sendable, Identifiable {
         }
     }
 
-    /// GitHub organization whose avatar is used as the badge icon.
+    /// Bundled logo on a transparent background, used as the badge icon instead of the avatar.
+    var logoAsset: String? {
+        switch self {
+        case .vllm: "org-vllm"
+        case .inferact: "org-inferact"
+        case .redhat: nil
+        case .nvidia: "org-nvidia"
+        }
+    }
+
+    /// GitHub organization whose avatar is the badge icon when there's no logo asset.
     var avatarLogin: String {
         switch self {
         case .vllm: "vllm-project"

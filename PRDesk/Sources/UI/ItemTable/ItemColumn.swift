@@ -271,11 +271,11 @@ extension NSColor {
             : NSColor(srgbRed: 0.81, green: 0.13, blue: 0.18, alpha: 1)
     }
 
-    /// The first-timer tile: a teal deep enough to carry white text.
+    /// The first-timer tile: an opaque gray deep enough to carry white text.
     static let firstTimer = NSColor(name: nil) { appearance in
         appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-            ? NSColor(srgbRed: 0.16, green: 0.58, blue: 0.66, alpha: 1)
-            : NSColor(srgbRed: 0.04, green: 0.52, blue: 0.60, alpha: 1)
+            ? NSColor(white: 0.45, alpha: 1)
+            : NSColor(white: 0.58, alpha: 1)
     }
 }
 
@@ -298,9 +298,7 @@ extension Vote {
 extension Badge {
     @MainActor
     var cellRun: CellRun {
-        let cache = AvatarCache.shared
-        let image = isSecondary ? cache.grayscaleImage(for: org.avatarLogin) : cache.image(for: org.avatarLogin)
-        return if let image { .image(image) } else { .tile(org.shortLabel, color: .tertiaryLabelColor) }
+        if let image { .image(image) } else { .tile(org.shortLabel, color: .tertiaryLabelColor) }
     }
 }
 

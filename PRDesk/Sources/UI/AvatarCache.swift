@@ -31,14 +31,10 @@ final class AvatarCache {
         return nil
     }
 
-    /// The avatar without color, for a lesser badge; nil while it loads.
-    func grayscaleImage(for login: String) -> NSImage? {
-        let key = login.lowercased()
+    /// `image` without color, for a lesser badge, cached under `key`.
+    func grayscale(_ image: NSImage, key: String) -> NSImage? {
         if let image = grayscaleImages[key] { return image }
-        guard let image = image(for: key),
-              let data = image.tiffRepresentation,
-              let input = CIImage(data: data)
-        else { return nil }
+        guard let data = image.tiffRepresentation, let input = CIImage(data: data) else { return nil }
         let filter = CIFilter.colorControls()
         filter.inputImage = input
         filter.saturation = 0
@@ -71,5 +67,17 @@ final class AvatarCache {
         else { return nil }
         try? data.write(to: file)
         return data
+    }
+}
+
+extension Badge {
+    /// The org's bundled logo, else its GitHub avatar (nil while that loads); without color for a
+    /// secondary badge.
+    @MainActor
+    var image: NSImage? {
+        let cache = AvatarCache.shared
+        let key = org.logoAsset ?? org.avatarLogin.lowercased()
+        guard let image = org.logoAsset.flatMap(NSImage.init(named:)) ?? cache.image(for: org.avatarLogin) else { return nil }
+        return isSecondary ? cache.grayscale(image, key: key) : image
     }
 }
