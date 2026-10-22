@@ -19,10 +19,8 @@ final class WebDocument: NSObject {
     /// Opens issue or PR `number` of the repository in the app, for a link to it.
     var openItem: ((Int) -> Void)?
 
-    /// Where the pages live: on the app's own scheme, so the fonts it serves are same-origin (a page
-    /// on github.com may not load fonts from a custom scheme). A `<base>` in each page points
-    /// relative links in GitHub's HTML back at github.com.
-    static let pageURL = URL(string: "\(LocalResourceHandler.scheme)://page/")!
+    /// Every page's base URL, so relative links in GitHub's HTML resolve.
+    static let baseURL = URL(string: "https://github.com/")!
 
     init(kind: Kind) {
         self.kind = kind
@@ -116,15 +114,6 @@ final class WebDocument: NSObject {
         run(script)
     }
 
-    /// Sets the text of the page's `<style id=…>`, now and after any reload.
-    func setStyle(_ id: String, _ css: String) {
-        setting(id, "PRDesk.setStyle(\(Self.jsString(id)), \(Self.jsString(css)))")
-    }
-
-    private static func jsString(_ string: String) -> String {
-        (try? String(decoding: JSONEncoder().encode(string), as: UTF8.self)) ?? "\"\""
-    }
-
     private func pageReady() {
         isReady = true
         for script in settings.values { webView.evaluateJavaScript(script) }
@@ -144,7 +133,7 @@ final class WebDocument: NSObject {
         }
         let configuration = WKWebViewConfiguration()
         configuration.userContentController = controller
-        configuration.setURLSchemeHandler(LocalResourceHandler.shared, forURLScheme: LocalResourceHandler.scheme)
+        configuration.setURLSchemeHandler(AvatarSchemeHandler.shared, forURLScheme: AvatarSchemeHandler.scheme)
         let webView = DocumentWebView(frame: .zero, configuration: configuration)
         webView.setValue(false, forKey: "drawsBackground")
         webView.underPageBackgroundColor = .clear
@@ -161,7 +150,7 @@ final class WebDocument: NSObject {
 
     private func load(_ webView: WKWebView) {
         isReady = false
-        webView.loadHTMLString(WebResources.page(kind), baseURL: Self.pageURL)
+        webView.loadHTMLString(WebResources.page(kind), baseURL: Self.baseURL)
     }
 
     private func popUp(_ menu: NSMenu, x: Double, y: Double) {
@@ -206,12 +195,13 @@ extension WebDocument: WKNavigationDelegate, WKUIDelegate {
     func webView(_: WKWebView, decidePolicyFor action: WKNavigationAction) async -> WKNavigationActionPolicy {
         guard let url = action.request.url else { return .cancel }
         if action.navigationType == .linkActivated {
-            // Every link opens in the browser; the page handles its own anchors (footnotes).
+            // In-page anchors (footnotes) scroll; every other link opens in the browser.
+            if url.fragment != nil, url.absoluteString.hasPrefix(Self.baseURL.absoluteString + "#") { return .allow }
             NSWorkspace.shared.open(url)
             return .cancel
         }
         // Only the page itself loads here: a dropped file or a frame in a body never replaces it.
-        return url == Self.pageURL || url.scheme == "about" ? .allow : .cancel
+        return url == Self.baseURL || url.scheme == "about" ? .allow : .cancel
     }
 
     func webView(_: WKWebView, createWebViewWith _: WKWebViewConfiguration, for action: WKNavigationAction, windowFeatures _: WKWindowFeatures) -> WKWebView? {
@@ -384,28 +374,20 @@ final class WebDocumentContainer: NSView, @MainActor NSTextFinderBarContainer {
     }
 }
 
-/// Serves the pages what WebKit can't load itself: `prdesk-local://avatar/<login>` from the app's
-/// avatar cache (so avatars already on disk show at once), `prdesk-local://badge/<org>` as the
-/// list draws that badge, and `prdesk-local://font/<family>/<face>` for the monospaced font.
+/// Serves `prdesk-avatar://avatar/<login>` from the app's avatar cache, so pages show avatars
+/// already on disk at once, and `prdesk-avatar://badge/<org>` as the list draws that badge.
 @MainActor
-final class LocalResourceHandler: NSObject, WKURLSchemeHandler {
-    static let shared = LocalResourceHandler()
-    static let scheme = "prdesk-local"
-
-    static func url(_ kind: String, _ name: String) -> String {
-        "\(scheme)://\(kind)/\(name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? name)"
-    }
+final class AvatarSchemeHandler: NSObject, WKURLSchemeHandler {
+    static let shared = AvatarSchemeHandler()
+    static let scheme = "prdesk-avatar"
 
     static func url(for login: String) -> String {
-        url("avatar", login)
+        "\(scheme)://avatar/\(login.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? login)"
     }
 
     static func url(for badge: Badge) -> String {
-        url("badge", "\(badge.org.rawValue)\(badge.isSecondary ? "-secondary" : "")")
+        "\(scheme)://badge/\(badge.org.rawValue)\(badge.isSecondary ? "-secondary" : "")"
     }
-
-    /// Font files built so far, by family and face.
-    private var fonts: [String: Data] = [:]
 
     private var running: Set<ObjectIdentifier> = []
 
@@ -416,11 +398,7 @@ final class LocalResourceHandler: NSObject, WKURLSchemeHandler {
         let name = url.lastPathComponent
         let appearance = webView.effectiveAppearance
         Task {
-            let data: Data? = switch url.host {
-            case "badge": await Self.badgeData(name, appearance: appearance)
-            case "font": fontData(family: url.deletingLastPathComponent().lastPathComponent, face: name)
-            default: await AvatarCache.data(for: name)
-            }
+            let data = if url.host == "badge" { await Self.badgeData(name, appearance: appearance) } else { await AvatarCache.data(for: name) }
             guard running.remove(id) != nil else { return }
             guard let data else {
                 task.didFailWithError(URLError(.fileDoesNotExist))
@@ -428,12 +406,7 @@ final class LocalResourceHandler: NSObject, WKURLSchemeHandler {
             }
             let response = HTTPURLResponse(
                 url: url, statusCode: 200, httpVersion: nil,
-                // Fonts load in CORS mode, and the page's origin is github.com.
-                headerFields: [
-                    "Content-Type": url.host == "font" ? "font/otf" : Self.mimeType(of: data),
-                    "Cache-Control": "max-age=86400",
-                    "Access-Control-Allow-Origin": "*",
-                ]
+                headerFields: ["Content-Type": Self.mimeType(of: data), "Cache-Control": "max-age=86400"]
             )!
             task.didReceive(response)
             task.didReceive(data)
@@ -443,14 +416,6 @@ final class LocalResourceHandler: NSObject, WKURLSchemeHandler {
 
     func webView(_: WKWebView, stop task: any WKURLSchemeTask) {
         running.remove(ObjectIdentifier(task))
-    }
-
-    private func fontData(family: String, face: String) -> Data? {
-        let key = "\(family)/\(face)"
-        if let data = fonts[key] { return data }
-        guard let font = MonospaceFont.fontFile(family: family, face: face), let data = SFNT.data(from: font) else { return nil }
-        fonts[key] = data
-        return data
     }
 
     /// The badge's image (a bundled logo, or the org's avatar), drawn for the page's appearance.

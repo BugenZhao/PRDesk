@@ -9,7 +9,7 @@
 .md a:hover { text-decoration: underline; }
 .md h1, .md h2, .md h3, .md h4, .md h5, .md h6 { margin: 12px 0 6px; line-height: 1.25; }
 .md h1 { font-size: 17px; } .md h2 { font-size: 15px; } .md h3, .md h4, .md h5, .md h6 { font-size: 13px; }
-.md code, .md pre, .md tt, .md kbd { font: 11.5px var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace); }
+.md code, .md pre, .md tt, .md kbd { font: 11.5px ui-monospace, SFMono-Regular, Menlo, monospace; }
 .md code { background: rgba(127, 127, 127, .15); padding: 1px 4px; border-radius: 4px; }
 .md pre { background: rgba(127, 127, 127, .12); padding: 8px 10px; border-radius: 6px; white-space: pre-wrap; }
 .md pre code { background: none; padding: 0; }

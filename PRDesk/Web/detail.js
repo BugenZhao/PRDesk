@@ -502,14 +502,6 @@ const PRDesk = (() => {
    * scrolls to its comment. ⌘-click, the ↗ buttons and other links go to the browser.
    */
   function handleLink(event, link) {
-    // Anchors within the page (footnotes) scroll here; with the <base>, they'd point at github.com.
-    const raw = link.getAttribute("href");
-    if (raw.startsWith("#")) {
-      event.preventDefault();
-      const target = document.getElementById(decodeURIComponent(raw.slice(1))) || document.getElementsByName(decodeURIComponent(raw.slice(1)))[0];
-      if (target) scrollToElement(target);
-      return;
-    }
     if (event.metaKey || event.shiftKey || event.altKey || link.closest(".icon-link")) return;
     const target = itemLink(link.href);
     if (!target) return;
@@ -548,14 +540,5 @@ const PRDesk = (() => {
     setAllFiles,
     buildExpandedFiles,
     setWrap(wrap) { document.documentElement.classList.toggle("nowrap", !wrap); },
-    setStyle(id, css) {
-      let style = document.getElementById(id);
-      if (!style) {
-        style = document.createElement("style");
-        style.id = id;
-        document.head.append(style);
-      }
-      style.textContent = css;
-    },
   };
 })();

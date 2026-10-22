@@ -54,7 +54,6 @@ private struct WebBody: NSViewRepresentable {
         controller.add(WeakMessageHandler(context.coordinator), name: "height")
         let configuration = WKWebViewConfiguration()
         configuration.userContentController = controller
-        configuration.setURLSchemeHandler(LocalResourceHandler.shared, forURLScheme: LocalResourceHandler.scheme)
         let webView = PassthroughWebView(frame: .zero, configuration: configuration)
         webView.setValue(false, forKey: "drawsBackground")
         webView.navigationDelegate = context.coordinator
@@ -85,7 +84,7 @@ private struct WebBody: NSViewRepresentable {
         func load(_ html: String, into webView: WKWebView) {
             guard html != loadedHTML else { return }
             loadedHTML = html
-            webView.loadHTMLString(HTMLTemplate.page(html), baseURL: WebDocument.pageURL)
+            webView.loadHTMLString(HTMLTemplate.page(html), baseURL: URL(string: "https://github.com/"))
         }
 
         func userContentController(_: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -118,9 +117,7 @@ enum HTMLTemplate {
         """
         <!doctype html>
         <html><head><meta charset="utf-8"><meta name="color-scheme" content="light dark">
-        <base href="https://github.com/">
-        <style>\(css)
-        \(MonospaceFont.css(family: MonospaceFont.family))</style></head>
+        <style>\(css)</style></head>
         <body><div id="content" class="md">\(body)</div>
         <script>
           const content = document.getElementById('content');
