@@ -357,13 +357,13 @@ final class AppModel {
 
     func requestComposerFocus() { composerFocusRequest += 1 }
 
-    @ObservationIgnored private var filesCache: [Int: (updatedAt: Date?, files: [ParsedFile])] = [:]
+    @ObservationIgnored private var filesCache: [Int: (updatedAt: Date?, files: [PullFile])] = [:]
 
-    /// Changed files of a PR with parsed diffs, cached until the PR is updated.
-    func files(for number: Int) async throws -> [ParsedFile] {
+    /// Changed files of a PR, cached until the PR is updated.
+    func files(for number: Int) async throws -> [PullFile] {
         let updatedAt = snapshot.items.first { $0.number == number }?.updatedAt
         if let cached = filesCache[number], cached.updatedAt == updatedAt { return cached.files }
-        let files = try await ParsedFile.parse(engine.fetchFiles(number: number))
+        let files = try await engine.fetchFiles(number: number)
         filesCache[number] = (updatedAt, files)
         return files
     }

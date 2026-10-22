@@ -33,6 +33,15 @@ struct PRDeskApp: App {
                 Button("Inbox") { model.mode = .inbox }
                     .keyboardShortcut("2")
             }
+            // In the conversation or files of the detail pane, wherever focus is.
+            CommandGroup(after: .textEditing) {
+                Button("Find…") { WebDocument.performFind(.showFindInterface) }
+                    .keyboardShortcut("f")
+                Button("Find Next") { WebDocument.performFind(.nextMatch) }
+                    .keyboardShortcut("g")
+                Button("Find Previous") { WebDocument.performFind(.previousMatch) }
+                    .keyboardShortcut("g", modifiers: [.command, .shift])
+            }
             // Works wherever focus is; `o` in the list does the same for the selected rows.
             CommandGroup(after: .newItem) {
                 Button("Open on GitHub") {

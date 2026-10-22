@@ -19,63 +19,6 @@ struct PullFile: Decodable, Equatable, Identifiable, Sendable {
     }
 }
 
-/// A changed file with its patch already parsed into lines.
-struct ParsedFile: Identifiable, Sendable {
-    let file: PullFile
-    /// Nil when GitHub sent no textual patch (binary or too large).
-    let lines: [DiffLine]?
-
-    var id: String { file.id }
-
-    /// Parses every patch once, off the main thread; large PRs have thousands of lines.
-    @concurrent
-    static func parse(_ files: [PullFile]) async -> [ParsedFile] {
-        files.map { ParsedFile(file: $0, lines: $0.patch.map(DiffLine.parse)) }
-    }
-}
-
-/// A rendered diff line with old/new line numbers.
-struct DiffLine: Equatable, Identifiable, Sendable {
-    enum Kind: Sendable { case context, added, removed, hunk }
-
-    let id: Int
-    let kind: Kind
-    let text: String
-    let oldNumber: Int?
-    let newNumber: Int?
-
-    /// Parses a unified-diff patch, numbering lines from each `@@ -a,b +c,d @@` header.
-    static func parse(_ patch: String) -> [DiffLine] {
-        var lines: [DiffLine] = []
-        var old = 0
-        var new = 0
-        for (index, raw) in patch.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
-            let line = String(raw)
-            if line.hasPrefix("@@") {
-                if let match = line.firstMatch(of: /@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/) {
-                    old = Int(match.1) ?? 0
-                    new = Int(match.2) ?? 0
-                }
-                lines.append(DiffLine(id: index, kind: .hunk, text: line, oldNumber: nil, newNumber: nil))
-            } else if line.hasPrefix("+") {
-                lines.append(DiffLine(id: index, kind: .added, text: String(line.dropFirst()), oldNumber: nil, newNumber: new))
-                new += 1
-            } else if line.hasPrefix("-") {
-                lines.append(DiffLine(id: index, kind: .removed, text: String(line.dropFirst()), oldNumber: old, newNumber: nil))
-                old += 1
-            } else if line.hasPrefix("\\") {
-                // "\ No newline at end of file"
-                continue
-            } else {
-                lines.append(DiffLine(id: index, kind: .context, text: String(line.dropFirst()), oldNumber: old, newNumber: new))
-                old += 1
-                new += 1
-            }
-        }
-        return lines
-    }
-}
-
 extension SyncEngine {
     /// Changed files of a PR (GitHub returns at most 3000).
     func fetchFiles(number: Int) async throws -> [PullFile] {

@@ -28,7 +28,9 @@ Local data lives in `~/Library/Application Support/PR Desk/` (SQLite via GRDB, a
   filter parsing, sections and sorting
 - `PRDesk/Sources/App` — `AppModel` (the `@Observable` main-actor state) and the app entry point
 - `PRDesk/Sources/UI` — SwiftUI shell; the list is an `NSTableView` with drawn cells (`ItemTable/`);
-  the detail timeline is native with per-comment `WKWebView` bodies (`Detail/`)
+  the conversation and the files diff are each one long-lived `WKWebView` page (`Detail/WebDocument`)
+  that Swift fills with JSON (`TimelineDocument`, `FilesDocument`) and `PRDesk/Web/detail.js` patches
+  in place by block id; styles, scripts and highlight.js live in `PRDesk/Web/`
 
 ## Apple's coding-assistant docs
 
@@ -56,8 +58,8 @@ signatures, `webViewContentBackground`, `attributedTextFormattingDefinition`). B
 snippet, check the API in the SDK's `.swiftinterface`
 (`$(xcrun --sdk macosx --show-sdk-path)/System/Library/Frameworks/<Framework>.framework/Modules/`).
 
-Decisions already made against these docs: keep the `WKWebView` comment bodies (SwiftUI `WebView`
-can't hand scrolling to the outer list); don't adopt default `MainActor` isolation (most model types
+Decisions already made against these docs: keep `WKWebView` for the detail pages (SwiftUI `WebView`
+lacks the find bar client, context-menu control and URL scheme handlers they use); don't adopt default `MainActor` isolation (most model types
 are used off the main actor); no glass on content (cards, chips, rows).
 
 ## Gotchas learned here

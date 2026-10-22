@@ -73,6 +73,11 @@ final class AvatarCache {
         }
     }
 
+    /// An avatar's image data, from disk or GitHub, for web pages.
+    nonisolated static func data(for login: String) async -> Data? {
+        await fetch(login.lowercased())
+    }
+
     /// Disk and network I/O, off the main thread: this is reached while the table builds cells.
     @concurrent
     private static func fetch(_ key: String) async -> Data? {

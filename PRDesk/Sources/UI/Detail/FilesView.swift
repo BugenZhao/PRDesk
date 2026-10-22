@@ -1,21 +1,34 @@
 import SwiftUI
 
-/// Read-only diff of a PR's changed files.
+/// Read-only diff of a PR's changed files, highlighted, in one web page (see `detail.js`).
 struct FilesView: View {
     @Environment(AppModel.self) private var model
     let item: Item
+    let page: WebDocument
 
-    @State private var files: [ParsedFile]?
+    @State private var loaded: Loaded?
     @State private var error: String?
-    @State private var expanded: [String: Bool] = [:]
+    @AppStorage("wrapDiffLines") private var wrapLines = true
+
+    private struct Loaded {
+        var number: Int
+        var files: [PullFile]
+        var payload: String
+    }
 
     var body: some View {
         Group {
-            if let files {
-                if files.isEmpty {
+            if let loaded, loaded.number == item.number {
+                if loaded.files.isEmpty {
                     ContentUnavailableView("No Changes", systemImage: "doc")
                 } else {
-                    list(files)
+                    VStack(spacing: 0) {
+                        toolbar(loaded.files)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                        Divider()
+                        WebDocumentView(document: page, key: String(loaded.number), payload: loaded.payload)
+                    }
                 }
             } else if let error {
                 ContentUnavailableView {
@@ -26,152 +39,42 @@ struct FilesView: View {
                     Button("Retry") { Task { await load() } }
                 }
             } else {
-                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                DelayedProgressView()
             }
         }
         .task(id: "\(item.number)-\(item.updatedAt.timeIntervalSince1970)") { await load() }
+        .onChange(of: wrapLines, initial: true) { page.setting("wrap", "PRDesk.setWrap(\(wrapLines))") }
     }
 
-    private func list(_ files: [ParsedFile]) -> some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 8, pinnedViews: []) {
-                HStack {
-                    Text("\(files.count) file\(files.count == 1 ? "" : "s")")
-                    Text("+\(files.reduce(0) { $0 + $1.file.additions })").foregroundStyle(.green)
-                    Text("−\(files.reduce(0) { $0 + $1.file.deletions })").foregroundStyle(.red)
-                    Spacer()
-                    Button("Expand all") { expanded = Dictionary(uniqueKeysWithValues: files.map { ($0.id, true) }) }
-                    Button("Collapse all") { expanded = Dictionary(uniqueKeysWithValues: files.map { ($0.id, false) }) }
-                }
-                .font(.caption.monospacedDigit())
-                .buttonStyle(.link)
-
-                ForEach(files) { parsed in
-                    // Files start collapsed.
-                    FileDiffView(file: parsed.file, lines: parsed.lines, expanded: Binding(
-                        get: { expanded[parsed.id] ?? false },
-                        set: { expanded[parsed.id] = $0 }
-                    ))
-                }
-            }
-            .padding(10)
+    private func toolbar(_ files: [PullFile]) -> some View {
+        HStack(spacing: 6) {
+            Text("\(files.count) file\(files.count == 1 ? "" : "s")")
+            Text("+\(files.reduce(0) { $0 + $1.additions })").foregroundStyle(.green)
+            Text("−\(files.reduce(0) { $0 + $1.deletions })").foregroundStyle(.red)
+            Spacer()
+            Toggle("Wrap lines", isOn: $wrapLines)
+                .toggleStyle(.checkbox)
+            Button("Expand all") { page.run("PRDesk.setAllFiles(true)") }
+                .padding(.leading, 4)
+            Button("Collapse all") { page.run("PRDesk.setAllFiles(false)") }
         }
+        .font(.caption.monospacedDigit())
+        .controlSize(.small)
+        .buttonStyle(.link)
     }
 
     private func load() async {
         error = nil
+        let number = item.number
+        let url = item.url
         do {
-            files = try await model.files(for: item.number)
+            let files = try await model.files(for: number)
+            let payload = await FilesDocument.payload(files, number: number, pullURL: url)
+            guard !Task.isCancelled else { return }
+            loaded = Loaded(number: number, files: files, payload: payload)
         } catch {
+            guard !Task.isCancelled else { return }
             self.error = error.localizedDescription
-        }
-    }
-}
-
-private struct FileDiffView: View {
-    let file: PullFile
-    let lines: [DiffLine]?
-    @Binding var expanded: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            header
-            if expanded {
-                Divider()
-                if let lines {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(lines) { DiffLineView(line: $0) }
-                    }
-                } else {
-                    Text("No textual diff (binary or too large).")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(8)
-                }
-            }
-        }
-        .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
-        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5))
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-    }
-
-    private var header: some View {
-        HStack(spacing: 6) {
-            Image(systemName: expanded ? "chevron.down" : "chevron.right")
-                .foregroundStyle(.secondary)
-                .frame(width: 10)
-            Image(systemName: statusSymbol.0).foregroundStyle(statusSymbol.1)
-            Group {
-                if let previous = file.previousFilename {
-                    Text("\(previous) → \(file.filename)")
-                } else {
-                    Text(file.filename)
-                }
-            }
-            .font(.caption.monospaced())
-            .lineLimit(1)
-            .truncationMode(.middle)
-            .textSelection(.enabled)
-            Spacer()
-            Text("+\(file.additions)").foregroundStyle(.green)
-            Text("−\(file.deletions)").foregroundStyle(.red)
-        }
-        .font(.caption.monospacedDigit())
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .contentShape(Rectangle())
-        .onTapGesture { expanded.toggle() }
-    }
-
-    private var statusSymbol: (String, Color) {
-        switch file.status {
-        case "added": ("plus.square", .green)
-        case "removed": ("minus.square", .red)
-        case "renamed", "copied": ("arrow.right.square", .blue)
-        default: ("square.and.pencil", .orange)
-        }
-    }
-}
-
-private struct DiffLineView: View {
-    let line: DiffLine
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 0) {
-            number(line.oldNumber)
-            number(line.newNumber)
-            Text(marker + line.text)
-                .foregroundStyle(line.kind == .hunk ? Color.secondary : Color.primary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.leading, 4)
-                .textSelection(.enabled)
-        }
-        .font(.system(size: 11, design: .monospaced))
-        .background(background)
-    }
-
-    private func number(_ value: Int?) -> some View {
-        Text(value.map(String.init) ?? "")
-            .foregroundStyle(.tertiary)
-            .frame(width: 38, alignment: .trailing)
-            .padding(.trailing, 4)
-    }
-
-    private var marker: String {
-        switch line.kind {
-        case .added: "+"
-        case .removed: "-"
-        case .context: " "
-        case .hunk: ""
-        }
-    }
-
-    private var background: Color {
-        switch line.kind {
-        case .added: .green.opacity(0.14)
-        case .removed: .red.opacity(0.14)
-        case .hunk: .blue.opacity(0.08)
-        case .context: .clear
         }
     }
 }

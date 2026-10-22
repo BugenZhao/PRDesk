@@ -6,6 +6,9 @@ struct DetailView: View {
     /// Whether the inspector is open; its toolbar items otherwise linger after it closes.
     let isShown: Bool
     @State private var tab: DetailTab = .conversation
+    /// The pages live as long as the pane, so switching items or tabs doesn't reload them.
+    @State private var timelinePage = WebDocument(kind: .timeline)
+    @State private var filesPage = WebDocument(kind: .files)
 
     enum DetailTab: Hashable {
         case conversation, checks, files
@@ -59,14 +62,14 @@ struct DetailView: View {
             switch tab {
             case .conversation:
                 VStack(spacing: 0) {
-                    ConversationView(item: item, detail: detail, previousSeenAt: model.selectedItemPreviousSeenAt)
+                    ConversationView(item: item, detail: detail, previousSeenAt: model.selectedItemPreviousSeenAt, page: timelinePage)
                     Divider()
                     ComposerView(item: item, detail: detail)
                 }
             case .checks:
                 ChecksView(checks: detail.checks)
             case .files:
-                FilesView(item: item)
+                FilesView(item: item, page: filesPage)
             }
         } else if case let .failed(message) = model.detailState {
             ContentUnavailableView {

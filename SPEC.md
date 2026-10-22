@@ -18,7 +18,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 | 语言 | Swift 6（strict concurrency） |
 | 工程 | Tuist（与 MNGA 一致） |
 | UI | SwiftUI 搭外壳（窗口、分栏、详情、设置）；主列表用 AppKit `NSTableView`（经 `NSViewRepresentable`），保证几百行下的密度、性能和键盘手感 |
-| 正文渲染 | 时间线骨架全部原生（SwiftUI：事件行、头像、作者徽章、折叠、时间、review 状态）。只有每条评论或 review 的**正文**用 `WKWebView` 渲染 GitHub 返回的 `bodyHTML`，配自带 CSS、跟随系统配色，保证代码块、表格、图片、`<details>` 显示正确。WebView 按需创建：折叠的条目不创建，按内容高度自适应，滚动由外层原生容器负责 |
+| 正文渲染 | 整条时间线（事件行、头像、作者徽章、折叠、时间、review 状态和 GitHub 返回的 `bodyHTML` 正文）在**一个** `WKWebView` 页面里渲染，配自带 CSS、跟随系统配色，保证代码块、表格、图片、`<details>` 显示正确。页面常驻：切换条目时只发新数据，按条目 id 原地更新，滚动位置、展开状态和已加载的图片都保留；折叠的条目不生成正文。滚动、跨评论选择文字、查找（⌘F）都由 WebKit 负责 |
 | 存储 | SQLite（GRDB），位于 `~/Library/Application Support/PR Desk/` |
 | 网络 | GitHub GraphQL 为主，REST 补充（通知、个别写操作） |
 | 鉴权 | 设置里保存了 PAT（存 Keychain）就用它，否则用 `gh auth token` |
@@ -198,7 +198,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
   - 可全部展开 / 折叠
   - 自上次查看以来的新内容高亮，并自动滚到第一条新内容
 - **Checks**：按状态分组列出 check runs 和 statuses，失败的置顶，点击打开日志 URL
-- **Files**（v1 只读）：变更文件列表和 diff；每个文件默认折叠，文件名过长时省略中间
+- **Files**（v1 只读）：变更文件列表和 diff，同样是一个 `WKWebView` 页面；每个文件默认折叠，文件名过长时省略目录部分，文件头滚动时吸顶；按扩展名语法高亮（highlight.js，新旧两侧分别高亮）；复制时不带行号和 +/-；可切换自动换行；展开的文件接近屏幕时才生成 diff，⌘F 查找前补齐
 - **写操作**：底部是 Markdown 评论框（支持预览，`⌘↩` 发送）；open 的条目可以 Close：PR 直接关，issue 选 completed / not planned。框里有内容时先作为评论发出再关（Close with comment）。关之前要确认，没有快捷键
   - PR：Comment / Approve / Request changes，以带正文的整体 review 提交
   - Issue：仅 Comment
