@@ -221,6 +221,19 @@ final class DocumentWebView: WKWebView {
         "WKMenuItemIdentifierDownloadMedia", "WKMenuItemIdentifierInspectElement",
     ]
 
+    /// The list's single-key shortcuts (j/k, w/b/s/m, 1/2/3, …) keep working while reading the
+    /// page; the page has no text fields of its own to type into.
+    override func keyDown(with event: NSEvent) {
+        if event.modifierFlags.intersection([.command, .control, .option]).isEmpty,
+           event.charactersIgnoringModifiers != "\u{1b}",
+           let table = window?.contentView?.firstDescendant(of: ItemNSTableView.self),
+           table.keyHandler?(event) == true
+        {
+            return
+        }
+        super.keyDown(with: event)
+    }
+
     override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
         super.willOpenMenu(menu, with: event)
         #if DEBUG
@@ -237,6 +250,15 @@ final class DocumentWebView: WKWebView {
             if item.isSeparatorItem, previousWasSeparator { menu.removeItem(item) } else { previousWasSeparator = item.isSeparatorItem }
         }
         if let last = menu.items.last, last.isSeparatorItem { menu.removeItem(last) }
+    }
+}
+
+private extension NSView {
+    func firstDescendant<View: NSView>(of type: View.Type) -> View? {
+        for subview in subviews {
+            if let match = subview as? View ?? subview.firstDescendant(of: type) { return match }
+        }
+        return nil
     }
 }
 
