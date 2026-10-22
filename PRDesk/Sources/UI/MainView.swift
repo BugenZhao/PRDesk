@@ -74,7 +74,7 @@ struct MainView: View {
                 Button("Detail", systemImage: "sidebar.right") {
                     showsDetail.toggle()
                 }
-                .help("Show or hide the detail pane")
+                .help("Show or hide the detail pane (⌘B)")
             }
         }
         .alert(

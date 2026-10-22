@@ -153,7 +153,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 | `⌘R` | 立即同步 |
 | `⌘1` / `⌘2` | 切换 Dashboard / Inbox |
 | `⌥⌘1` / `⌥⌘2` / `⌥⌘3` | PR 详情切到 Conversation / Checks / Files |
-| `⌃⌘I` | 显示 / 隐藏详情面板（重启后保持） |
+| `⌘B` | 显示 / 隐藏详情面板（重启后保持） |
 
 ## 5. 组织徽章
 

@@ -56,11 +56,14 @@ private struct MenuBarLabel: View {
 /// need, so moving the selection doesn't rebuild the menus.
 private struct AppCommands: Commands {
     let model: AppModel
+    /// The same setting as `MainView`'s, which shows the pane.
+    @AppStorage("showsDetail") private var showsDetail = true
 
     var body: some Commands {
-        // View > Show / Hide Inspector (⌃⌘I) for the detail pane.
-        InspectorCommands()
         CommandGroup(after: .toolbar) {
+            Button(showsDetail ? "Hide Detail" : "Show Detail") { showsDetail.toggle() }
+                .keyboardShortcut("b")
+            Divider()
             Button("Sync Now") {
                 Task { await model.sync() }
             }
