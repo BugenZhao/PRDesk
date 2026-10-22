@@ -81,7 +81,7 @@ enum ItemColumn: String, CaseIterable {
     }
 
     @MainActor
-    func runs(for row: ItemRow, viewer: String?, badges: (String) -> [CellRun], now: Date) -> [CellRun] {
+    func runs(for row: ItemRow, viewer: String?, badges: (String) -> [Badge], now: Date) -> [CellRun] {
         let item = row.item
         switch self {
         case .unread:
@@ -98,7 +98,7 @@ enum ItemColumn: String, CaseIterable {
             return titleRuns(row, now: now)
 
         case .author:
-            return [.text(item.author ?? "ghost", flexible: true)] + (item.author.map(badges) ?? [])
+            return [.text(item.author ?? "ghost", flexible: true)] + (item.author.map(badges) ?? []).map(\.cellRun)
 
         case .review:
             return reviewRuns(row, viewer: viewer)
@@ -181,6 +181,13 @@ enum ItemColumn: String, CaseIterable {
             runs.append(.chip("rdy", color: .systemGreen))
         }
         return runs
+    }
+}
+
+extension Badge {
+    @MainActor
+    var cellRun: CellRun {
+        if let image = AvatarCache.shared.image(for: org.avatarLogin) { .image(image) } else { .chip(org.shortLabel, color: .secondaryLabelColor) }
     }
 }
 

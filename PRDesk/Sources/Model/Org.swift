@@ -25,6 +25,16 @@ enum Org: String, CaseIterable, Codable, Sendable, Identifiable {
         }
     }
 
+    /// Fallback label while the avatar loads.
+    var shortLabel: String {
+        switch self {
+        case .vllm: "V"
+        case .inferact: "I"
+        case .redhat: "RH"
+        case .nvidia: "NV"
+        }
+    }
+
     /// Names accepted by the `org:` filter token.
     var filterNames: [String] {
         switch self {

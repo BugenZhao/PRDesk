@@ -72,6 +72,21 @@ final class AppDatabase: Sendable {
             // Events were not fetched before; force the next sync to start over.
             try db.execute(sql: "DELETE FROM meta WHERE key = 'lastSyncStartedAt'")
         }
+        migrator.registerMigration("v3") { db in
+            try db.create(table: "userInfo") { t in
+                t.primaryKey("login", .text)
+                t.column("company", .text)
+                t.column("orgs", .jsonText).notNull()
+                t.column("emailDomains", .jsonText).notNull()
+                t.column("fetchedAt", .datetime).notNull()
+            }
+            try db.create(table: "orgOverride") { t in
+                t.column("login", .text).notNull()
+                t.column("org", .text).notNull()
+                t.column("include", .boolean).notNull()
+                t.primaryKey(["login", "org"])
+            }
+        }
         return migrator
     }
 }

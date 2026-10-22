@@ -8,7 +8,9 @@ struct ItemTableView: NSViewRepresentable {
     @Binding var selection: TableSelection?
     var sort: ItemSort
     var focusRequest: Int
-    var badges: (String) -> [CellRun]
+    var badges: (String) -> [Badge]
+    /// Changes when badge data or avatars change, which the rows themselves don't reflect.
+    var badgeVersion: Int
     var onAction: (ItemAction, Item.ID) -> Void
     var onSort: (ItemSort) -> Void
     var onToggleSection: (ListSection) -> Void
@@ -73,6 +75,7 @@ struct ItemTableView: NSViewRepresentable {
         private var parent: ItemTableView
         private var rows: [TableRow] = []
         private var viewer: String?
+        private var badgeVersion = 0
         private var focusRequest = 0
         /// Set while the table is changed programmatically, so callbacks don't write back.
         private var isApplyingUpdate = false
@@ -93,7 +96,12 @@ struct ItemTableView: NSViewRepresentable {
             if parent.rows != rows || parent.viewer != viewer {
                 rows = parent.rows
                 viewer = parent.viewer
+                badgeVersion = parent.badgeVersion
                 table.reloadData()
+            } else if parent.badgeVersion != badgeVersion {
+                badgeVersion = parent.badgeVersion
+                let author = table.column(withIdentifier: ItemColumn.author.identifier)
+                table.reloadData(forRowIndexes: IndexSet(integersIn: 0 ..< rows.count), columnIndexes: [author])
             }
 
             if let selection = parent.selection {
@@ -306,8 +314,16 @@ struct ItemTableView: NSViewRepresentable {
                 cell.alignment = column.alignment
                 cell.runs = column.runs(for: itemRow, viewer: viewer, badges: parent.badges, now: Date())
                 cell.alphaValue = itemRow.item.isOpen ? 1 : 0.55
+                cell.toolTip = column == .author ? authorTooltip(itemRow.item.author) : nil
                 return cell
             }
+        }
+
+        private func authorTooltip(_ author: String?) -> String? {
+            guard let author else { return nil }
+            let badges = parent.badges(author)
+            guard !badges.isEmpty else { return author }
+            return ([author] + badges.map { "\($0.org.displayName) — \($0.source)" }).joined(separator: "\n")
         }
 
         private func reusableCell(_ tableView: NSTableView, id: String) -> RunsCellView {

@@ -49,6 +49,10 @@ final class AppModel {
     private(set) var filterFocusRequest = 0
     private(set) var tableFocusRequest = 0
 
+    private(set) var affiliations = Affiliations()
+    /// Bumped when `affiliations` changes, for views that cache rendered badges.
+    private(set) var affiliationsVersion = 0
+
     /// `seenAt` of the selected item when it was opened, before opening moved it forward.
     private(set) var selectedItemPreviousSeenAt: Date?
 
@@ -56,13 +60,16 @@ final class AppModel {
     @ObservationIgnored private var itemsByID: [Item.ID: Item] = [:]
     @ObservationIgnored let db: AppDatabase
     @ObservationIgnored let engine: SyncEngine
+    @ObservationIgnored let affiliationEngine: AffiliationEngine
     @ObservationIgnored private var tasks: [Task<Void, Never>] = []
     @ObservationIgnored private var dwellTask: Task<Void, Never>?
     @ObservationIgnored private let logger = Logger(subsystem: "com.bugenzhao.PRDesk", category: "App")
 
     init(db: AppDatabase) {
         self.db = db
-        engine = SyncEngine(client: GitHubClient(), db: db)
+        let client = GitHubClient()
+        engine = SyncEngine(client: client, db: db)
+        affiliationEngine = AffiliationEngine(client: client, db: db)
         sort = Defaults.get(.sort) ?? ItemSort()
         collapsed = Defaults.get(.collapsed) ?? [.all]
     }
@@ -88,6 +95,18 @@ final class AppModel {
                 }
             } catch {
                 self?.logger.error("Observation failed: \(String(describing: error), privacy: .public)")
+            }
+        })
+        tasks.append(Task { [weak self, db] in
+            do {
+                for try await affiliations in db.observeAffiliations() {
+                    guard let self else { return }
+                    self.affiliations = affiliations
+                    affiliationsVersion += 1
+                    if filterText.contains("org:") { rebuild() }
+                }
+            } catch {
+                self?.logger.error("Affiliation observation failed: \(String(describing: error), privacy: .public)")
             }
         })
         tasks.append(Task { [weak self] in
@@ -122,6 +141,7 @@ final class AppModel {
                 rateLimit = result.rateLimit
             }
             syncState = .idle
+            Task { await refreshAffiliations() }
         } catch {
             logger.error("Sync failed: \(String(describing: error), privacy: .public)")
             syncState = .failed(error.localizedDescription)
@@ -161,6 +181,24 @@ final class AppModel {
             state.pinnedAt = state.pinnedAt ?? Date()
         }
         selection = TableSelection(section: .pinned, itemID: item.id)
+    }
+
+    /// Updates affiliation data for everyone who appears in the list.
+    func refreshAffiliations(force: Bool = false) async {
+        let logins = Set(snapshot.items.compactMap(\.author) + snapshot.items.flatMap { $0.events.compactMap(\.actor) })
+        do {
+            try await affiliationEngine.refresh(logins: logins, force: force)
+        } catch {
+            logger.error("Affiliation refresh failed: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    func setOverride(_ override: OrgOverride) {
+        Task { try? await db.save(override) }
+    }
+
+    func removeOverride(_ override: OrgOverride) {
+        Task { try? await db.delete(override) }
     }
 
     func requestFilterFocus() { filterFocusRequest += 1 }
@@ -205,7 +243,8 @@ final class AppModel {
         itemsByID = Dictionary(uniqueKeysWithValues: snapshot.items.map { ($0.id, $0) })
         let cutoff = Date().addingTimeInterval(-Self.closedRetention)
         let filter = ItemFilter(filterText)
-        let orgs = { (_: String) in [Org]() }
+        let affiliations = affiliations
+        let orgs = { (login: String) in affiliations.badges(for: login).map(\.org) }
 
         let visible: [ItemRow] = snapshot.items.compactMap { item in
             let state = state(for: item)

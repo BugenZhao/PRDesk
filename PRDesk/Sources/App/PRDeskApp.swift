@@ -29,6 +29,7 @@ struct PRDeskApp: App {
 
         Settings {
             SettingsView()
+                .environment(model)
         }
     }
 }

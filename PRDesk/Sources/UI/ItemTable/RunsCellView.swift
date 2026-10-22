@@ -9,6 +9,8 @@ enum CellRun {
     case chip(String, color: NSColor)
     case dot(NSColor)
     case symbol(String, color: NSColor)
+    /// Small rounded image, e.g. an org avatar.
+    case image(NSImage)
 }
 
 /// NSFont is immutable, so sharing these across isolation domains is safe.
@@ -32,6 +34,7 @@ final class RunsCellView: NSTableCellView {
     private let inset: CGFloat = 2
     private static let dotSize: CGFloat = 7
     private static let symbolSize: CGFloat = 13
+    private static let imageSize: CGFloat = 13
     private static let chipHeight: CGFloat = 14
     private static let chipPadding: CGFloat = 4
 
@@ -70,6 +73,8 @@ final class RunsCellView: NSTableCellView {
             Self.dotSize
         case .symbol:
             Self.symbolSize
+        case .image:
+            Self.imageSize
         }
     }
 
@@ -108,7 +113,19 @@ final class RunsCellView: NSTableCellView {
                 width: size.width,
                 height: size.height
             ))
+
+        case let .image(image):
+            drawImage(image, in: rect)
         }
+    }
+
+    private func drawImage(_ image: NSImage, in rect: NSRect) {
+        let size = Self.imageSize
+        let target = NSRect(x: rect.minX, y: rect.midY - size / 2, width: size, height: size)
+        NSGraphicsContext.saveGraphicsState()
+        NSBezierPath(roundedRect: target, xRadius: 3, yRadius: 3).addClip()
+        image.draw(in: target, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+        NSGraphicsContext.restoreGraphicsState()
     }
 
     private func drawText(_ string: String, color: NSColor, font: NSFont, in rect: NSRect) {
