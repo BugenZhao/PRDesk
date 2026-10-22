@@ -84,7 +84,7 @@ private struct DetailHeader: View {
                     .monospacedDigit()
                 // No vertical fixedSize: while the window measures its minimum size it proposes a
                 // tiny width, and a fixed-height title would wrap to a window-sized column.
-                Text(item.title)
+                titleText
                     .lineLimit(3)
                     .textSelection(.enabled)
             }
@@ -132,6 +132,12 @@ private struct DetailHeader: View {
             controls
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// The title with its leading tags ("[Core] ", "fix(x): ") dimmed.
+    private var titleText: Text {
+        let (prefix, rest) = TitlePrefix.split(item.title)
+        return Text("\(Text(prefix).foregroundStyle(.secondary))\(Text(rest))")
     }
 
     private var stateChip: some View {

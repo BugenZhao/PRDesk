@@ -136,7 +136,7 @@ enum ItemColumn: String, CaseIterable {
         let item = row.item
         var runs: [CellRun] = [
             .symbol(item.kindSymbol, color: item.stateColor),
-            .text(item.title, font: row.insight.isUnread ? CellFont.regularBold : CellFont.regular, flexible: true),
+            titleRun(item.title, bold: row.insight.isUnread),
         ]
         if item.isDraft, item.isOpen { runs.append(.chip("draft", color: .secondaryLabelColor)) }
         switch item.state {
@@ -151,6 +151,15 @@ enum ItemColumn: String, CaseIterable {
             runs.append(.text("\(summary) \(at.compactAge(relativeTo: now))", color: .tertiaryLabelColor, font: CellFont.small, maxWidth: 180))
         }
         return runs
+    }
+
+    /// The title with its leading tags ("[Core] ", "fix(x): ") dimmed.
+    private func titleRun(_ title: String, bold: Bool) -> CellRun {
+        let (prefix, rest) = TitlePrefix.split(title)
+        var parts: [(text: String, color: NSColor)] = []
+        if !prefix.isEmpty { parts.append((String(prefix), .secondaryLabelColor)) }
+        parts.append((String(rest), .labelColor))
+        return .segments(parts, font: bold ? CellFont.regularBold : CellFont.regular, flexible: true)
     }
 
     private func reviewRuns(_ row: ItemRow, viewer: String?) -> [CellRun] {

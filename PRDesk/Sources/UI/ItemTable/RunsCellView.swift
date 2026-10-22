@@ -9,6 +9,8 @@ enum CellRun {
     case chip(String, color: NSColor)
     case dot(NSColor)
     case symbol(String, color: NSColor)
+    /// Differently colored pieces of one string that truncate together, e.g. a dimmed title prefix.
+    case segments([(text: String, color: NSColor)], font: NSFont = CellFont.regular, flexible: Bool = false)
     /// Small rounded image, e.g. an org avatar.
     case image(NSImage)
 }
@@ -75,7 +77,23 @@ final class RunsCellView: NSTableCellView {
             Self.symbolSize
         case .image:
             Self.imageSize
+        case let .segments(parts, font, _):
+            ceil(Self.attributed(parts, font: font, override: nil).size().width)
         }
+    }
+
+    private static func attributed(_ parts: [(text: String, color: NSColor)], font: NSFont, override: NSColor?) -> NSAttributedString {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineBreakMode = .byTruncatingTail
+        let result = NSMutableAttributedString()
+        for part in parts {
+            result.append(NSAttributedString(string: part.text, attributes: [
+                .font: font,
+                .foregroundColor: override ?? part.color,
+                .paragraphStyle: paragraph,
+            ]))
+        }
+        return result
     }
 
     private func draw(_ run: CellRun, in rect: NSRect) {
@@ -83,6 +101,14 @@ final class RunsCellView: NSTableCellView {
         switch run {
         case let .text(string, color, font, _, _):
             drawText(string, color: emphasized ? .alternateSelectedControlTextColor : color, font: font, in: rect)
+
+        case let .segments(parts, font, _):
+            let text = Self.attributed(parts, font: font, override: emphasized ? .alternateSelectedControlTextColor : nil)
+            let lineHeight = ceil(font.ascender - font.descender)
+            text.draw(
+                with: NSRect(x: rect.minX, y: rect.midY - lineHeight / 2, width: rect.width, height: lineHeight),
+                options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine]
+            )
 
         case let .chip(string, color):
             let chipRect = NSRect(x: rect.minX, y: rect.midY - Self.chipHeight / 2, width: rect.width, height: Self.chipHeight)
@@ -146,6 +172,9 @@ final class RunsCellView: NSTableCellView {
 
 private extension CellRun {
     var isFlexible: Bool {
-        if case let .text(_, _, _, flexible, _) = self { flexible } else { false }
+        switch self {
+        case let .text(_, _, _, flexible, _), let .segments(_, _, flexible): flexible
+        default: false
+        }
     }
 }
