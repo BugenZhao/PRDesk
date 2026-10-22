@@ -162,7 +162,7 @@ private struct DetailHeader: View {
         let triage = model.triage(for: item)
         return HStack(spacing: 8) {
             Picker("Status", selection: Binding(
-                get: { triage },
+                get: { model.listedTriage(for: item) },
                 set: { status in
                     if let status {
                         if status != triage { model.perform(.triage(status), on: item.id) }

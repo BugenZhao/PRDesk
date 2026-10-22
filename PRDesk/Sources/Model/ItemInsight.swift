@@ -24,10 +24,13 @@ struct ItemInsight: Hashable, Sendable {
     var isReviewRequestedFromMe: Bool
     /// The latest time someone turned to the viewer directly, as far as the recent events tell.
     var directAsk: DirectAsk?
+    /// The viewer opened the item.
+    var isMine: Bool
 
     init(item: Item, state: ItemState?, viewer: String?, baseline: Date?) {
         let isMe = { (login: String?) in sameLogin(login, viewer) }
         let human = item.events.filter { !$0.isAutomated && $0.actor != nil }
+        isMine = isMe(item.author)
 
         let othersActivity = human.filter { event in
             guard !isMe(event.actor) else { return false }

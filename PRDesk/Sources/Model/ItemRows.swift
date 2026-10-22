@@ -22,8 +22,13 @@ struct ItemRow: Hashable, Sendable {
         return ask.reason
     }
 
-    /// The Status as the list treats it: none for a woken Skipped item, which is back in Triage.
-    var listedTriage: TriageStatus? { wakeReason == nil ? triage : nil }
+    /// The Status as the list treats it: none for a woken Skipped item, which is back in Triage,
+    /// and Working for the viewer's own items without one, which have nothing to triage. The
+    /// default is never written to the board.
+    var listedTriage: TriageStatus? {
+        if wakeReason != nil { return nil }
+        return triage ?? (insight.isMine ? .working : nil)
+    }
 }
 
 enum ListSection: String, CaseIterable, Codable, Sendable {
@@ -52,11 +57,11 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
         case .pinned:
             "Items you pinned (p). Kept on this Mac, not on the board; they also stay in their own section."
         case .working:
-            "Status Working on the board (old Good and Pending count too), except approved PRs. Yours to move first. The subscription is left alone."
+            "Status Working on the board (old Good and Pending count too), except approved PRs, and your own items without a Status. Yours to move first. The subscription is left alone."
         case .good:
             "Status Working and approved: waiting to be merged."
         case .triage:
-            "No Status yet: not on the board, on it without a Status, or Done but open again. Also Skipped items someone asked you about since, with the reason. Downvoted authors go last."
+            "No Status yet: not on the board, on it without a Status, or Done but open again. Also Skipped items someone asked you about since, with the reason. Your own items count as Working instead. Downvoted authors go last."
         case .backlog:
             "Status Backlog: worth caring about, but later. The subscription is left alone."
         case .closed:
@@ -80,11 +85,11 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
     static func triageSection(of row: ItemRow) -> ListSection? {
         if row.board?.isForeign == true { return nil }
         guard row.item.isOpen else { return .closed }
-        switch row.triage {
+        switch row.listedTriage {
         case nil: return .triage
         case .working: return row.item.reviewDecision == "APPROVED" ? .good : .working
         case .backlog: return .backlog
-        case .skipped: return row.wakeReason == nil ? .skipped : .triage
+        case .skipped: return .skipped
         case .muted: return .muted
         }
     }

@@ -164,9 +164,15 @@ final class AppModel {
         board[item.number]
     }
 
-    /// The item's Status as the list shows it: none for a Skipped item that was woken.
+    /// The item's Status on the board as the list treats it: none for a Skipped item that was
+    /// woken. What toggles act on, so the default Working of the viewer's own items is left out.
     func triage(for item: Item) -> TriageStatus? {
         board(for: item)?.triage == nil ? nil : row(for: item).listedTriage
+    }
+
+    /// The Status the list shows, the default Working of the viewer's own items included.
+    func listedTriage(for item: Item) -> TriageStatus? {
+        row(for: item).listedTriage
     }
 
     private func row(for item: Item) -> ItemRow {

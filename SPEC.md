@@ -53,6 +53,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 - 名字只描述"我做了什么"，不评价 PR 本身，因为 org 里的人可能看得到 board
 - 从 Skipped / Muted 改成别的状态时，订阅恢复为 SUBSCRIBED（Muted 的通知线程也取消 ignored）
 - 改订阅需要 token 有 `notifications` scope（`gh auth refresh -h github.com -s notifications`）
+- **我自己开的条目**：没有 Status 时当作 Working（显示和过滤都算），不进 Triage，因为没有什么要分诊的；这个默认不写到 board。按 `w` / `b` / `s` / `m` 照常写 Status；在详情里选 Triage 不清除这个默认
 - **Priority**：board 上的单选字段，High / Medium / Low
 - **Comment**：board 上的文本字段，作为这条的备注（通常是下一步要做什么）；app 只读，在列表标题后显示
 - **其他 Status**：`Python Parity Backlog` 属于另一个 tracker，app 完全忽略这些条目（不显示，也不改）。旧的 `Good`、`Pending` 当作 Working，`Stale` 当作 Backlog；open 的条目上出现 Done（比如重新打开了）当作未分诊
@@ -88,9 +89,9 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 
 - **Recently viewed**：最近查看的 8 条（本地）
 - **Pinned**：`p` 置顶的条目（本地）
-- **Working**：Status = Working 的 open 条目，approve 了的 PR 除外；Turn = me 的排在前面
-- **Good**：Status = Working、已 approve 的 open PR
-- **Triage**：未分诊的 open 条目，加上被唤醒的 Skipped 条目；downvote 过的作者的条目沉到底部
+- **Working**：Status = Working 的 open 条目，加上我自己开的、没有 Status 的 open 条目；approve 了的 PR 除外；Turn = me 的排在前面
+- **Good**：同上，已 approve 的 open PR
+- **Triage**：别人开的、未分诊的 open 条目，加上被唤醒的 Skipped 条目；downvote 过的作者的条目沉到底部
 - **Backlog**：Status = Backlog 的 open 条目，默认折叠
 - **Recently closed**：最近 14 天 merged / closed 的条目，默认折叠
 - **Skipped**、**Muted**：对应 Status 的 open 条目，默认折叠

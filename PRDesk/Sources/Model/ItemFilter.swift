@@ -68,8 +68,9 @@ struct ItemFilter: Equatable {
             }
         case "status":
             return switch value {
-            case "triage", "untriaged": row.triage == nil || row.wakeReason != nil
-            default: row.triage?.rawValue.lowercased() == value
+            case "triage", "untriaged": row.listedTriage == nil
+            // A woken Skipped item still matches its Status.
+            default: (row.listedTriage ?? row.triage)?.rawValue.lowercased() == value
             }
         case "turn":
             return row.insight.turn?.rawValue == value
