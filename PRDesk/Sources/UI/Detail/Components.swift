@@ -74,9 +74,9 @@ struct BadgeIcons: View {
         return HStack(spacing: 3) {
             if let contribution = model.contribution(for: login) {
                 if contribution.isRegular {
-                    Image(systemName: "checkmark.seal.fill")
+                    Image(systemName: "checkmark.seal")
                         .font(.system(size: size - 2))
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(.secondary)
                         .help(contribution.summary)
                 } else if contribution.isFirstTime {
                     Chip(text: "1st")
