@@ -33,6 +33,14 @@ struct PRDeskApp: App {
                 Button("Inbox") { model.mode = .inbox }
                     .keyboardShortcut("2")
             }
+            // Works wherever focus is; `o` in the list does the same for the selected rows.
+            CommandGroup(after: .newItem) {
+                Button("Open on GitHub") {
+                    if let id = model.selectedItem?.id { model.perform(.openInBrowser, on: id) }
+                }
+                .keyboardShortcut("o")
+                .disabled(model.selectedItem == nil)
+            }
         }
 
         Settings {
