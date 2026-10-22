@@ -62,7 +62,7 @@ actor GitHubClient {
             attempt += 1
             let data = try await perform(method: "POST", url: Self.endpoint, body: body)
             do {
-                envelope = try Self.decoder.decode(Envelope<Response>.self, from: data)
+                envelope = try await Self.decode(Envelope<Response>.self, from: data)
                 break
             } catch DecodingError.dataCorrupted where attempt < 3 {
                 // GitHub sometimes cuts off a slow response mid-body; treat it like a 502.
@@ -96,7 +96,13 @@ actor GitHubClient {
         json: (any Encodable & Sendable)? = nil,
         as _: Response.Type = Response.self
     ) async throws -> Response {
-        try await Self.decoder.decode(Response.self, from: rest(method, path, query: query, json: json))
+        try await Self.decode(Response.self, from: rest(method, path, query: query, json: json))
+    }
+
+    /// Decodes on the concurrent pool, so parallel fetches don't take turns decoding on the actor.
+    @concurrent
+    private static func decode<T: Decodable & Sendable>(_: T.Type, from data: Data) async throws -> T {
+        try decoder.decode(T.self, from: data)
     }
 
     /// Sends a request with auth, retrying transient failures and rate limiting.
@@ -166,7 +172,7 @@ actor GitHubClient {
         let variables: Variables
     }
 
-    private struct Envelope<Response: Decodable>: Decodable {
+    private struct Envelope<Response: Decodable & Sendable>: Decodable, Sendable {
         let data: Response?
         let errors: [GraphQLError]?
     }

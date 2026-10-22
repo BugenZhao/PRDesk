@@ -19,15 +19,14 @@ enum GitHubAuth {
 
     /// Runs `gh auth token`. GUI apps don't inherit the shell PATH, so try the
     /// usual install locations before falling back to a login shell.
+    @concurrent
     static func ghToken() async -> String? {
-        await Task.detached(priority: .userInitiated) {
-            let fm = FileManager.default
-            let candidates = ["/opt/homebrew/bin/gh", "/usr/local/bin/gh"]
-            if let gh = candidates.first(where: fm.isExecutableFile(atPath:)) {
-                return run(gh, ["auth", "token"])
-            }
-            return run("/bin/zsh", ["-lc", "gh auth token"])
-        }.value
+        let fm = FileManager.default
+        let candidates = ["/opt/homebrew/bin/gh", "/usr/local/bin/gh"]
+        if let gh = candidates.first(where: fm.isExecutableFile(atPath:)) {
+            return run(gh, ["auth", "token"])
+        }
+        return run("/bin/zsh", ["-lc", "gh auth token"])
     }
 
     private static func run(_ executable: String, _ arguments: [String]) -> String? {

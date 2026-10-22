@@ -19,6 +19,21 @@ struct PullFile: Decodable, Equatable, Identifiable, Sendable {
     }
 }
 
+/// A changed file with its patch already parsed into lines.
+struct ParsedFile: Identifiable, Sendable {
+    let file: PullFile
+    /// Nil when GitHub sent no textual patch (binary or too large).
+    let lines: [DiffLine]?
+
+    var id: String { file.id }
+
+    /// Parses every patch once, off the main thread; large PRs have thousands of lines.
+    @concurrent
+    static func parse(_ files: [PullFile]) async -> [ParsedFile] {
+        files.map { ParsedFile(file: $0, lines: $0.patch.map(DiffLine.parse)) }
+    }
+}
+
 /// A rendered diff line with old/new line numbers.
 struct DiffLine: Equatable, Identifiable, Sendable {
     enum Kind: Sendable { case context, added, removed, hunk }

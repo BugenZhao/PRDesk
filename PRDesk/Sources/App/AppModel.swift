@@ -216,9 +216,17 @@ final class AppModel {
         drafts[number] ?? ""
     }
 
+    @ObservationIgnored private var draftSaveTask: Task<Void, Never>?
+
+    /// Updates the draft in memory at once and persists it shortly after typing pauses.
     func setDraft(_ text: String, for number: Int) {
         drafts[number] = text.isEmpty ? nil : text
-        Defaults.set(drafts, for: .drafts)
+        draftSaveTask?.cancel()
+        draftSaveTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled, let self else { return }
+            Defaults.set(drafts, for: .drafts)
+        }
     }
 
     func submit(_ submission: Submission, body: String, item: Item, detail: ItemDetail) async throws {
@@ -236,13 +244,13 @@ final class AppModel {
 
     func requestComposerFocus() { composerFocusRequest += 1 }
 
-    @ObservationIgnored private var filesCache: [Int: (updatedAt: Date?, files: [PullFile])] = [:]
+    @ObservationIgnored private var filesCache: [Int: (updatedAt: Date?, files: [ParsedFile])] = [:]
 
-    /// Changed files of a PR, cached until the PR is updated.
-    func files(for number: Int) async throws -> [PullFile] {
+    /// Changed files of a PR with parsed diffs, cached until the PR is updated.
+    func files(for number: Int) async throws -> [ParsedFile] {
         let updatedAt = snapshot.items.first { $0.number == number }?.updatedAt
         if let cached = filesCache[number], cached.updatedAt == updatedAt { return cached.files }
-        let files = try await engine.fetchFiles(number: number)
+        let files = try await ParsedFile.parse(engine.fetchFiles(number: number))
         filesCache[number] = (updatedAt, files)
         return files
     }

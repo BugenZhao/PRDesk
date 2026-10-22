@@ -5,7 +5,7 @@ struct FilesView: View {
     @Environment(AppModel.self) private var model
     let item: Item
 
-    @State private var files: [PullFile]?
+    @State private var files: [ParsedFile]?
     @State private var error: String?
     @State private var expanded: [String: Bool] = [:]
 
@@ -35,13 +35,13 @@ struct FilesView: View {
         .task(id: "\(item.number)-\(item.updatedAt.timeIntervalSince1970)") { await load() }
     }
 
-    private func list(_ files: [PullFile]) -> some View {
+    private func list(_ files: [ParsedFile]) -> some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 8, pinnedViews: []) {
                 HStack {
                     Text("\(files.count) file\(files.count == 1 ? "" : "s")")
-                    Text("+\(files.reduce(0) { $0 + $1.additions })").foregroundStyle(.green)
-                    Text("−\(files.reduce(0) { $0 + $1.deletions })").foregroundStyle(.red)
+                    Text("+\(files.reduce(0) { $0 + $1.file.additions })").foregroundStyle(.green)
+                    Text("−\(files.reduce(0) { $0 + $1.file.deletions })").foregroundStyle(.red)
                     Spacer()
                     Button("Expand all") { expanded = Dictionary(uniqueKeysWithValues: files.map { ($0.id, true) }) }
                     Button("Collapse all") { expanded = Dictionary(uniqueKeysWithValues: files.map { ($0.id, false) }) }
@@ -49,10 +49,10 @@ struct FilesView: View {
                 .font(.caption.monospacedDigit())
                 .buttonStyle(.link)
 
-                ForEach(files) { file in
-                    FileDiffView(file: file, expanded: Binding(
-                        get: { expanded[file.id] ?? ((file.patch?.count(where: { $0 == "\n" }) ?? 0) < Self.autoExpandLimit) },
-                        set: { expanded[file.id] = $0 }
+                ForEach(files) { parsed in
+                    FileDiffView(file: parsed.file, lines: parsed.lines, expanded: Binding(
+                        get: { expanded[parsed.id] ?? ((parsed.lines?.count ?? 0) < Self.autoExpandLimit) },
+                        set: { expanded[parsed.id] = $0 }
                     ))
                 }
             }
@@ -72,6 +72,7 @@ struct FilesView: View {
 
 private struct FileDiffView: View {
     let file: PullFile
+    let lines: [DiffLine]?
     @Binding var expanded: Bool
 
     var body: some View {
@@ -79,9 +80,9 @@ private struct FileDiffView: View {
             header
             if expanded {
                 Divider()
-                if let patch = file.patch {
+                if let lines {
                     LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(DiffLine.parse(patch)) { DiffLineView(line: $0) }
+                        ForEach(lines) { DiffLineView(line: $0) }
                     }
                 } else {
                     Text("No textual diff (binary or too large).")

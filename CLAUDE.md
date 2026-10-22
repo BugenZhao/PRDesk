@@ -39,6 +39,15 @@ most training data — read the relevant one before touching these areas, and pr
 | Swift 6.2 concurrency | `AdditionalDocumentation/Swift-Concurrency-Updates.md` |
 | Hangs, launch time, crashes, energy | `TriageDocs/*.md` |
 
+Some snippets in these docs don't match the shipped SDK (e.g. `WebPage.NavigationDeciding`
+signatures, `webViewContentBackground`, `attributedTextFormattingDefinition`). Before relying on a
+snippet, check the API in the SDK's `.swiftinterface`
+(`$(xcrun --sdk macosx --show-sdk-path)/System/Library/Frameworks/<Framework>.framework/Modules/`).
+
+Decisions already made against these docs: keep the `WKWebView` comment bodies (SwiftUI `WebView`
+can't hand scrolling to the outer list); don't adopt default `MainActor` isolation (most model types
+are used off the main actor); no glass on content (cards, chips, rows).
+
 ## Gotchas learned here
 
 - Never give views in the window a vertical `fixedSize` or a layout that grows tall at tiny widths:

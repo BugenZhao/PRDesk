@@ -12,7 +12,7 @@ final class AvatarCache {
 
     @ObservationIgnored private var images: [String: NSImage] = [:]
     @ObservationIgnored private var loading: Set<String> = []
-    private static let directory: URL = {
+    nonisolated private static let directory: URL = {
         let dir = AppDatabase.directory.appending(path: "avatars", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
@@ -29,14 +29,20 @@ final class AvatarCache {
     }
 
     private func load(_ key: String) async {
-        let file = Self.directory.appending(path: "\(key).png")
-        var data = try? Data(contentsOf: file)
-        if data == nil, let url = URL(string: "https://github.com/\(key).png?size=64") {
-            data = try? await URLSession.shared.data(from: url).0
-            if let data { try? data.write(to: file) }
-        }
-        guard let data, let image = NSImage(data: data) else { return }
+        guard let data = await Self.fetch(key), let image = NSImage(data: data) else { return }
         images[key] = image
         version += 1
+    }
+
+    /// Disk and network I/O, off the main thread: this is reached while the table builds cells.
+    @concurrent
+    private static func fetch(_ key: String) async -> Data? {
+        let file = directory.appending(path: "\(key).png")
+        if let data = try? Data(contentsOf: file) { return data }
+        guard let url = URL(string: "https://github.com/\(key).png?size=64"),
+              let data = try? await URLSession.shared.data(from: url).0
+        else { return nil }
+        try? data.write(to: file)
+        return data
     }
 }

@@ -16,7 +16,8 @@ struct SettingsView: View {
 
 private struct TokenSettingsView: View {
     @State private var token = ""
-    @State private var hasSavedToken = Keychain.readToken() != nil
+    /// Loaded in `.task`: a keychain read is too slow to repeat on every view rebuild.
+    @State private var hasSavedToken = false
 
     var body: some View {
         Form {
@@ -44,6 +45,7 @@ private struct TokenSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .task { hasSavedToken = Keychain.readToken() != nil }
     }
 }
 

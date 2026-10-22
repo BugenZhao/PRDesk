@@ -49,9 +49,19 @@ struct MainView: View {
                         AddItemView { showsAdd = false }
                     }
             }
+            // Status is information, not a control, so it sits without the glass capsule.
             ToolbarItem(placement: .primaryAction) {
                 SyncStatusView()
             }
+            .sharedBackgroundVisibility(.hidden)
+            ToolbarItem(placement: .primaryAction) {
+                Button("Sync Now", systemImage: "arrow.clockwise") {
+                    Task { await model.sync() }
+                }
+                .help("Sync now (⌘R)")
+                .disabled(model.syncState == .syncing)
+            }
+            ToolbarSpacer(.fixed, placement: .primaryAction)
             ToolbarItem(placement: .primaryAction) {
                 Button("Detail", systemImage: "sidebar.right") {
                     showsDetail.toggle()
@@ -173,11 +183,6 @@ private struct SyncStatusView: View {
                     .foregroundStyle(rateLimit.remaining < 500 ? .orange : .secondary)
                     .help("GraphQL rate limit resets \(rateLimit.resetAt.formatted(.relative(presentation: .named)))")
             }
-            Button("Sync Now", systemImage: "arrow.clockwise") {
-                Task { await model.sync() }
-            }
-            .labelStyle(.iconOnly)
-            .disabled(model.syncState == .syncing)
         }
         .font(.caption)
         .monospacedDigit()

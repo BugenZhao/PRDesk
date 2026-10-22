@@ -129,6 +129,8 @@ extension AppDatabase {
 // MARK: - Detail cache
 
 extension AppDatabase {
+    // Whole-detail JSON coding is heavy; keep it off the caller's actor (usually main).
+    @concurrent
     func cachedDetail(number: Int) async throws -> ItemDetail? {
         let data = try await reader.read { db in
             try Data.fetchOne(db, sql: "SELECT json FROM detailCache WHERE number = ?", arguments: [number])
@@ -136,6 +138,7 @@ extension AppDatabase {
         return data.flatMap { try? JSONDecoder().decode(ItemDetail.self, from: $0) }
     }
 
+    @concurrent
     func saveDetail(_ detail: ItemDetail) async throws {
         let data = try JSONEncoder().encode(detail)
         try await writer.write { db in
