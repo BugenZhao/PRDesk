@@ -55,10 +55,15 @@ final class AppModel {
     var mode: ListMode = .dashboard { didSet { rebuild() } }
     /// Unread notifications for issues and PRs in the repository, newest first.
     private(set) var inbox: [InboxNote] = [] {
-        didSet { NSApp.dockTile.badgeLabel = unreadInboxCount == 0 ? nil : String(unreadInboxCount) }
+        didSet { updateDockBadge() }
     }
 
-    var unreadInboxCount: Int { inbox.count { !$0.isRead } }
+    /// Muted items' notifications don't count; GitHub can't always be stopped from sending them.
+    var unreadInboxCount: Int { inbox.count { !$0.isRead && board[$0.number]?.triage != .muted } }
+
+    private func updateDockBadge() {
+        NSApp.dockTile.badgeLabel = unreadInboxCount == 0 ? nil : String(unreadInboxCount)
+    }
     /// Working and Good items regardless of the filter, the viewer's move first (for the menu bar).
     private(set) var workingItems: [ItemRow] = []
 
@@ -161,7 +166,10 @@ final class AppModel {
                     guard let self else { return }
                     self.snapshot = snapshot
                     if votes != snapshot.votes { votes = snapshot.votes }
-                    if board != snapshot.board { board = snapshot.board }
+                    if board != snapshot.board {
+                        board = snapshot.board
+                        updateDockBadge()
+                    }
                     rebuild()
                     if let item = selectedItem, let detail, detail.number == item.number, detail.itemUpdatedAt < item.updatedAt {
                         loadDetail()
@@ -524,6 +532,7 @@ final class AppModel {
             let rows: [ItemRow] = inbox.compactMap { note in
                 guard let item = byNumber[note.number] else { return nil }
                 var row = row(for: item)
+                if row.triage == .muted { return nil }
                 row.note = note
                 return filter.matches(row, orgs: orgs) ? row : nil
             }

@@ -8,12 +8,12 @@ enum TriageStatus: String, CaseIterable, Codable, Sendable {
     case skipped = "Skipped"
     case muted = "Muted"
 
-    /// The GitHub subscription that goes with the status; nil leaves it alone.
+    /// The GitHub subscription that goes with the status; nil leaves it alone. GitHub ignores
+    /// `IGNORED` on issues and PRs, so Muted also mutes the notification thread (see `setTriage`).
     var subscription: String? {
         switch self {
         case .working, .backlog: nil
-        case .skipped: "UNSUBSCRIBED"
-        case .muted: "IGNORED"
+        case .skipped, .muted: "UNSUBSCRIBED"
         }
     }
 

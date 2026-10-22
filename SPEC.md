@@ -47,11 +47,12 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 | **Working** | 现在要管 | 不变 |
 | **Backlog** | 想管，但以后再说（包括停滞了、暂时不想关心的） | 不变 |
 | **Skipped** | 质量不高或优先级不高，暂时忽略 | UNSUBSCRIBED（只在参与或被 @ 时通知） |
-| **Muted** | 彻底不管，相当于友好的 close | IGNORED（完全不通知） |
+| **Muted** | 彻底不管，相当于友好的 close | UNSUBSCRIBED，并把已有的通知线程设为 ignored（完全不通知）；GitHub 不支持对单个 PR / issue 设 IGNORED，所以还没有通知线程的条目之后被 @ 仍会通知。Inbox 和未读数不计 Muted 条目的通知 |
 | **Done** | 已合并或关闭；由 board 自带的 workflow 设置，app 不写 | 不变 |
 
 - 名字只描述"我做了什么"，不评价 PR 本身，因为 org 里的人可能看得到 board
-- 从 Skipped / Muted 改成别的状态时，订阅恢复为 SUBSCRIBED
+- 从 Skipped / Muted 改成别的状态时，订阅恢复为 SUBSCRIBED（Muted 的通知线程也取消 ignored）
+- 改订阅需要 token 有 `notifications` scope（`gh auth refresh -h github.com -s notifications`）
 - **Priority**：board 上的单选字段，High / Medium / Low
 - **Comment**：board 上的文本字段，作为这条的备注（通常是下一步要做什么）
 - **其他 Status**：`Python Parity Backlog` 属于另一个 tracker，app 完全忽略这些条目（不显示，也不改）。旧的 `Good`、`Pending` 当作 Working，`Stale` 当作 Backlog；open 的条目上出现 Done（比如重新打开了）当作未分诊

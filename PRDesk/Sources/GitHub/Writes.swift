@@ -86,7 +86,7 @@ extension SyncEngine {
         return String(decoding: data, as: UTF8.self)
     }
 
-    private struct NotificationDTO: Decodable, Sendable {
+    struct NotificationDTO: Decodable, Sendable {
         struct Subject: Decodable, Sendable {
             let url: String?
             let type: String
