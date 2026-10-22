@@ -41,7 +41,13 @@ enum CellFont {
 final class RunsCellView: NSTableCellView {
     enum Alignment { case leading, trailing }
 
-    var runs: [CellRun] = [] { didSet { needsDisplay = true; updateTruncationToolTip() } }
+    var runs: [CellRun] = [] {
+        didSet {
+            cachedNaturalWidths = nil
+            needsDisplay = true
+            updateTruncationToolTip()
+        }
+    }
     var alignment: Alignment = .leading { didSet { needsDisplay = true } }
     /// Shows the full text of runs cut short (e.g. a long title) as the tooltip.
     var showsTruncatedText = false { didSet { updateTruncationToolTip() } }
@@ -62,9 +68,18 @@ final class RunsCellView: NSTableCellView {
 
     private var emphasized: Bool { backgroundStyle == .emphasized }
 
+    /// Measured once per set of runs: drawing and live resizing ask again and again.
+    private var cachedNaturalWidths: [CGFloat]?
+    private var naturalWidths: [CGFloat] {
+        if let cachedNaturalWidths { return cachedNaturalWidths }
+        let widths = runs.map(naturalWidth)
+        cachedNaturalWidths = widths
+        return widths
+    }
+
     override func draw(_: NSRect) {
         guard !runs.isEmpty else { return }
-        let widths = layoutWidths(natural: runs.map(naturalWidth))
+        let widths = layoutWidths(natural: naturalWidths)
         let total = widths.reduce(0, +) + Self.spacing * CGFloat(runs.count - 1)
         var x = alignment == .trailing ? bounds.maxX - Self.inset - total : Self.inset
         for (run, width) in zip(runs, widths) {
@@ -100,7 +115,7 @@ final class RunsCellView: NSTableCellView {
 
     private func updateTruncationToolTip() {
         guard showsTruncatedText else { return }
-        let widths = layoutWidths(natural: runs.map(naturalWidth))
+        let widths = layoutWidths(natural: naturalWidths)
         let cut = zip(runs, widths).compactMap { run, width in
             run.fullWidth.map { $0 > width + 0.5 } == true ? run.fullText : nil
         }
@@ -179,11 +194,7 @@ final class RunsCellView: NSTableCellView {
             draw(run, in: NSRect(x: trailing ? rect.maxX - width : rect.minX, y: rect.minY, width: width, height: rect.height))
 
         case let .symbol(name, color, pointSize):
-            let config = NSImage.SymbolConfiguration(pointSize: pointSize, weight: pointSize < 11 ? .bold : .medium)
-                .applying(.init(paletteColors: [emphasized ? .alternateSelectedControlTextColor : color]))
-            guard let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
-                .withSymbolConfiguration(config)
-            else { return }
+            guard let image = Self.symbol(name, color: emphasized ? .alternateSelectedControlTextColor : color, pointSize: pointSize) else { return }
             let size = image.size
             image.draw(in: NSRect(
                 x: rect.minX + (rect.width - size.width) / 2,
@@ -246,6 +257,27 @@ final class RunsCellView: NSTableCellView {
         }
     }
 
+    private struct SymbolKey: Hashable {
+        var name: String
+        var color: NSColor
+        var pointSize: CGFloat
+    }
+
+    /// Configured symbol images, reused across cells and redraws. Dynamic colors resolve when
+    /// drawn, so one image serves both appearances.
+    private static var symbols: [SymbolKey: NSImage] = [:]
+
+    private static func symbol(_ name: String, color: NSColor, pointSize: CGFloat) -> NSImage? {
+        let key = SymbolKey(name: name, color: color, pointSize: pointSize)
+        if let image = symbols[key] { return image }
+        let config = NSImage.SymbolConfiguration(pointSize: pointSize, weight: pointSize < 11 ? .bold : .medium)
+            .applying(.init(paletteColors: [color]))
+        let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(config)
+        if symbols.count > 500 { symbols.removeAll() }
+        symbols[key] = image
+        return image
+    }
+
     private func drawImage(_ image: NSImage, in rect: NSRect) {
         let size = Self.imageSize
         let target = NSRect(x: rect.minX, y: rect.midY - size / 2, width: size, height: size)
@@ -255,13 +287,17 @@ final class RunsCellView: NSTableCellView {
         NSGraphicsContext.restoreGraphicsState()
     }
 
-    private func drawText(_ string: String, color: NSColor, font: NSFont, in rect: NSRect) {
+    private static let truncatingTail: NSParagraphStyle = {
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineBreakMode = .byTruncatingTail
+        return paragraph
+    }()
+
+    private func drawText(_ string: String, color: NSColor, font: NSFont, in rect: NSRect) {
         let attributed = NSAttributedString(string: string, attributes: [
             .font: font,
             .foregroundColor: color,
-            .paragraphStyle: paragraph,
+            .paragraphStyle: Self.truncatingTail,
         ])
         let lineHeight = ceil(font.ascender - font.descender)
         attributed.draw(
