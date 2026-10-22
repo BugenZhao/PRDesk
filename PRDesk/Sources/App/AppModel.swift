@@ -54,7 +54,16 @@ final class AppModel {
     var filterText = "" { didSet { rebuild() } }
     var sort: ItemSort { didSet { Defaults.set(sort, for: .sort); rebuild() } }
     var collapsed: Set<ListSection> { didSet { Defaults.set(collapsed, for: .collapsed); rebuild() } }
-    var selection: TableSelection? { didSet { selectionChanged(from: oldValue) } }
+    var selection: TableSelection? {
+        didSet {
+            if hasSelection != (selection != nil) { hasSelection.toggle() }
+            selectionChanged(from: oldValue)
+        }
+    }
+
+    /// Whether anything is selected. Observed apart from `selection`, so views that only care
+    /// about this (the menu commands) aren't rebuilt each time the selection moves.
+    private(set) var hasSelection = false
 
     enum ListMode: Hashable {
         case dashboard, inbox
@@ -452,8 +461,15 @@ final class AppModel {
     // MARK: History
 
     /// Items selected before the current one, for Back (⌘[), and those gone back over, for Forward.
-    private(set) var backHistory: [Item.ID] = []
-    private(set) var forwardHistory: [Item.ID] = []
+    @ObservationIgnored private var backHistory: [Item.ID] = [] {
+        didSet { if canGoBack == backHistory.isEmpty { canGoBack.toggle() } }
+    }
+    @ObservationIgnored private var forwardHistory: [Item.ID] = [] {
+        didSet { if canGoForward == forwardHistory.isEmpty { canGoForward.toggle() } }
+    }
+    /// Observed instead of the histories, which change on every selection.
+    private(set) var canGoBack = false
+    private(set) var canGoForward = false
     @ObservationIgnored private var isMovingInHistory = false
     @ObservationIgnored private var mouseMonitor: Any?
     private static let historyLimit = 100

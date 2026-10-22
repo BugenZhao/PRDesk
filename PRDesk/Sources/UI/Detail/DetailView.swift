@@ -39,30 +39,7 @@ struct DetailView: View {
                 page.openItem = { [model] number in model.openItem(number: number) }
             }
         }
-        .toolbar {
-            // In the inspector's part of the window toolbar, over the pane it switches, only for a
-            // PR. Otherwise an invisible spacer stands in: without an item of its own the inspector
-            // has no toolbar section, and the list's buttons jump to the window's far edge.
-            if isShown {
-                if let item = model.selectedItem, item.kind == .pullRequest {
-                    // Spacers on both sides center the tabs over the pane.
-                    ToolbarSpacer(.flexible)
-                    ToolbarItem {
-                        Picker("View", selection: $tab) {
-                            Text("Conversation").tag(DetailTab.conversation)
-                            Text("Checks").tag(DetailTab.checks)
-                            Text("Files").tag(DetailTab.files)
-                        }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
-                        .fixedSize()
-                    }
-                    ToolbarSpacer(.flexible)
-                } else {
-                    ToolbarSpacer(.flexible)
-                }
-            }
-        }
+        .modifier(DetailToolbar(isShown: isShown, showsTabs: model.selectedItem?.kind == .pullRequest, tab: $tab))
     }
 
     @ViewBuilder
@@ -90,6 +67,41 @@ struct DetailView: View {
             }
         } else {
             DelayedProgressView()
+        }
+    }
+}
+
+/// The Conversation / Checks / Files tabs in the inspector's part of the window toolbar. Its own
+/// modifier, so the toolbar is only rebuilt when the tabs come or go, not on every selection.
+private struct DetailToolbar: ViewModifier {
+    let isShown: Bool
+    let showsTabs: Bool
+    @Binding var tab: DetailView.DetailTab
+
+    func body(content: Content) -> some View {
+        content.toolbar {
+            // Over the pane it switches, only for a PR. Otherwise an invisible spacer stands in:
+            // without an item of its own the inspector has no toolbar section, and the list's
+            // buttons jump to the window's far edge.
+            if isShown {
+                if showsTabs {
+                    // Spacers on both sides center the tabs over the pane.
+                    ToolbarSpacer(.flexible)
+                    ToolbarItem {
+                        Picker("View", selection: $tab) {
+                            Text("Conversation").tag(DetailView.DetailTab.conversation)
+                            Text("Checks").tag(DetailView.DetailTab.checks)
+                            Text("Files").tag(DetailView.DetailTab.files)
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .fixedSize()
+                    }
+                    ToolbarSpacer(.flexible)
+                } else {
+                    ToolbarSpacer(.flexible)
+                }
+            }
         }
     }
 }
