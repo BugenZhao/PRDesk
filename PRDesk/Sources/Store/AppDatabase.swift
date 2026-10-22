@@ -135,6 +135,12 @@ final class AppDatabase: Sendable {
             // New `label:rust` search and mention events; fetch everything again.
             try db.execute(sql: "DELETE FROM meta WHERE key = 'lastSyncStartedAt'")
         }
+        migrator.registerMigration("v10") { db in
+            try db.alter(table: "userInfo") { t in
+                t.add(column: "mergedCount", .integer)
+                t.add(column: "mergedFetchedAt", .datetime)
+            }
+        }
         return migrator
     }
 }

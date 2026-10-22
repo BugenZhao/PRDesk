@@ -2,9 +2,10 @@ import Foundation
 
 /// A parsed filter string: free text plus `key:value` tokens.
 ///
-/// Supported tokens: `is:pr|issue|draft|open|closed|merged|unread|pinned`,
+/// Supported tokens: `is:pr|issue|draft|open|closed|merged|unread|pinned|first|regular`,
 /// `status:triage|working|backlog|skipped|muted`, `turn:me|them`, `author:x`, `label:x`,
-/// `ci:fail|pending|pass`, `p:h|m|l`, `org:x`, `vote:up|down|none`.
+/// `ci:fail|pending|pass`, `p:h|m|l`, `org:x`, `vote:up|down|none`, and `merged:N` / `merged:>=N`
+/// (also `>`, `<`, `<=`) on the author's merged PR count.
 /// A leading `-` negates a token.
 struct ItemFilter: Equatable {
     struct Token: Equatable {
@@ -13,7 +14,7 @@ struct ItemFilter: Equatable {
         var negated: Bool
     }
 
-    private static let keys: Set = ["is", "status", "turn", "author", "label", "ci", "p", "org", "vote"]
+    private static let keys: Set = ["is", "status", "turn", "author", "label", "ci", "p", "org", "vote", "merged"]
 
     var text: [String] = []
     var tokens: [Token] = []
@@ -32,7 +33,7 @@ struct ItemFilter: Equatable {
 
     var isEmpty: Bool { text.isEmpty && tokens.isEmpty }
 
-    func matches(_ row: ItemRow, orgs: (String) -> [Org]) -> Bool {
+    func matches(_ row: ItemRow, orgs: (String) -> [Org], contribution: (String) -> Contribution?) -> Bool {
         let item = row.item
         for word in text {
             let hit = item.title.lowercased().contains(word)
@@ -41,14 +42,15 @@ struct ItemFilter: Equatable {
             if !hit { return false }
         }
         for token in tokens where token.value.isEmpty == false {
-            if matches(token, row, orgs: orgs) == token.negated { return false }
+            if matches(token, row, orgs: orgs, contribution: contribution) == token.negated { return false }
         }
         return true
     }
 
-    private func matches(_ token: Token, _ row: ItemRow, orgs: (String) -> [Org]) -> Bool {
+    private func matches(_ token: Token, _ row: ItemRow, orgs: (String) -> [Org], contribution: (String) -> Contribution?) -> Bool {
         let item = row.item
         let value = token.value
+        let authorContribution = item.author.flatMap(contribution)
         switch token.key {
         case "is":
             return switch value {
@@ -60,6 +62,8 @@ struct ItemFilter: Equatable {
             case "merged": item.state == .merged
             case "unread": row.insight.isUnread
             case "pinned": row.state.isPinned
+            case "first": authorContribution?.isFirstTime ?? false
+            case "regular": authorContribution?.isRegular ?? false
             default: false
             }
         case "status":
@@ -90,11 +94,23 @@ struct ItemFilter: Equatable {
             case "none": row.authorVote == nil
             default: false
             }
+        case "merged":
+            guard let merged = authorContribution?.merged else { return false }
+            return Self.compare(merged, value)
         case "org":
             guard let author = item.author else { return false }
             return orgs(author).contains { $0.filterNames.contains(value) }
         default:
             return false
         }
+    }
+
+    /// `N`, `>=N`, `>N`, `<=N` or `<N`.
+    private static func compare(_ count: Int, _ value: String) -> Bool {
+        let tests: [(String, (Int, Int) -> Bool)] = [(">=", >=), ("<=", <=), (">", >), ("<", <)]
+        for (op, test) in tests {
+            if value.hasPrefix(op), let n = Int(value.dropFirst(op.count)) { return test(count, n) }
+        }
+        return Int(value).map { count == $0 } ?? false
     }
 }

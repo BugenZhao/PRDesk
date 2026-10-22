@@ -11,6 +11,9 @@ struct UserInfo: Codable, Hashable, Sendable {
     /// Domains of the user's commit emails in the repository.
     var emailDomains: [String]
     var fetchedAt: Date
+    /// PRs merged in the repository, refreshed on its own schedule.
+    var mergedCount: Int?
+    var mergedFetchedAt: Date?
 }
 
 extension UserInfo: FetchableRecord, PersistableRecord {
@@ -29,6 +32,21 @@ struct OrgOverride: Codable, Hashable, Sendable, Identifiable {
 
 extension OrgOverride: FetchableRecord, PersistableRecord {
     static let databaseTableName = "orgOverride"
+}
+
+/// An author's merged PR count in the repository, read against the threshold from Settings.
+struct Contribution: Hashable, Sendable {
+    var merged: Int
+    var threshold: Int
+
+    /// Has landed enough to count as a regular contributor.
+    var isRegular: Bool { merged >= threshold }
+    /// Nothing merged yet.
+    var isFirstTime: Bool { merged == 0 }
+
+    var summary: String {
+        isFirstTime ? "No PRs merged in vllm yet" : "\(merged) PR\(merged == 1 ? "" : "s") merged in vllm"
+    }
 }
 
 struct Badge: Hashable, Sendable {
@@ -128,6 +146,18 @@ extension Org {
 // MARK: - Database
 
 extension AppDatabase {
+    func saveMergedCounts(_ counts: [String: Int]) async throws {
+        let now = Date()
+        try await writer.write { db in
+            for (login, count) in counts {
+                try db.execute(
+                    sql: "UPDATE userInfo SET mergedCount = ?, mergedFetchedAt = ? WHERE login = ?",
+                    arguments: [count, now, login]
+                )
+            }
+        }
+    }
+
     func observeAffiliations() -> AsyncValueObservation<Affiliations> {
         ValueObservation
             .tracking { db in

@@ -9,6 +9,7 @@ struct ItemTableView: NSViewRepresentable {
     var sort: ItemSort
     var focusRequest: Int
     var badges: (String) -> [Badge]
+    var contribution: (String) -> Contribution?
     /// Changes when badge data or avatars change, which the rows themselves don't reflect.
     var badgeVersion: Int
     var onAction: (ItemAction, Item.ID) -> Void
@@ -345,7 +346,7 @@ struct ItemTableView: NSViewRepresentable {
                 guard let tableColumn, let column = ItemColumn(rawValue: tableColumn.identifier.rawValue) else { return nil }
                 let cell = reusableCell(tableView, id: column.rawValue)
                 cell.alignment = column.alignment
-                cell.runs = column.runs(for: itemRow, viewer: viewer, badges: parent.badges, now: Date())
+                cell.runs = column.runs(for: itemRow, viewer: viewer, badges: parent.badges, contribution: parent.contribution, now: Date())
                 cell.alphaValue = itemRow.item.isOpen ? 1 : 0.55
                 cell.toolTip = column == .author ? authorTooltip(itemRow.item.author) : nil
                 return cell
@@ -354,9 +355,10 @@ struct ItemTableView: NSViewRepresentable {
 
         private func authorTooltip(_ author: String?) -> String? {
             guard let author else { return nil }
-            let badges = parent.badges(author)
-            guard !badges.isEmpty else { return author }
-            return ([author] + badges.map { "\($0.org.displayName) — \($0.source)" }).joined(separator: "\n")
+            let lines = [author]
+                + (parent.contribution(author).map { [$0.summary] } ?? [])
+                + parent.badges(author).map { "\($0.org.displayName) — \($0.source)" }
+            return lines.joined(separator: "\n")
         }
 
         private func reusableCell(_ tableView: NSTableView, id: String) -> RunsCellView {

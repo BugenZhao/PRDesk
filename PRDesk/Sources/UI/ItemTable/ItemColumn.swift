@@ -82,7 +82,7 @@ enum ItemColumn: String, CaseIterable {
     }
 
     @MainActor
-    func runs(for row: ItemRow, viewer: String?, badges: (String) -> [Badge], now: Date) -> [CellRun] {
+    func runs(for row: ItemRow, viewer: String?, badges: (String) -> [Badge], contribution: (String) -> Contribution?, now: Date) -> [CellRun] {
         let item = row.item
         switch self {
         case .unread:
@@ -102,7 +102,15 @@ enum ItemColumn: String, CaseIterable {
         case .author:
             let name: CellRun = .text(item.author ?? "ghost", flexible: true)
             let vote: [CellRun] = row.authorVote.map { [.symbol($0.symbol, color: $0.nsColor)] } ?? []
-            return [name] + vote + (item.author.map(badges) ?? []).map(\.cellRun)
+            var mark: [CellRun] = []
+            if let contribution = item.author.flatMap(contribution) {
+                if contribution.isRegular {
+                    mark = [.symbol("checkmark.seal.fill", color: .systemBlue)]
+                } else if contribution.isFirstTime {
+                    mark = [.chip("1st", color: .secondaryLabelColor)]
+                }
+            }
+            return [name] + vote + mark + (item.author.map(badges) ?? []).map(\.cellRun)
 
         case .review:
             return reviewRuns(row, viewer: viewer)

@@ -129,6 +129,18 @@ private struct AffiliationSettingsView: View {
                 Text("Also matched: profile company, commit email domains and username suffixes such as -redhat.")
                     .foregroundStyle(.secondary)
             }
+
+            Section {
+                @Bindable var model = model
+                Stepper(value: $model.mergedThreshold, in: 1 ... 500) {
+                    LabeledContent("Regular contributor", value: "\(model.mergedThreshold)+ merged PRs")
+                }
+            } header: {
+                Text("Contributors")
+            } footer: {
+                Text("Regular contributors get a seal after their name; authors with nothing merged yet get \"1st\". Counts refresh weekly, or daily for first-timers. Filter with merged:>=N, is:regular or is:first.")
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
     }

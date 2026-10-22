@@ -6,12 +6,18 @@ import os
 /// Daily: the committers list and members of the relevant GitHub organizations (all members for
 /// orgs the viewer belongs to, such as Inferact; public members otherwise).
 /// Weekly per user: profile company and public org memberships, plus commit email
-/// domains for users that nothing else identifies.
+/// domains for users that nothing else identifies, and merged PR counts (daily for users with
+/// none, so the first-timer mark goes away soon after their first merge).
 actor AffiliationEngine {
     private static let listRefreshInterval: TimeInterval = 24 * 3600
     private static let userRefreshInterval: TimeInterval = 7 * 24 * 3600
     private static let committersFetchedKey = "committersFetchedAt"
     private static let membersFetchedKey = "orgMembersFetchedAt"
+    private static let firstTimerRefreshInterval: TimeInterval = 24 * 3600
+    /// Merged counts cost a search each, and bursts of searches trip GitHub's secondary rate
+    /// limit (which then blocks all GraphQL for a while), so only a few are fetched per round.
+    private static let mergedBatchSize = 10
+    private static let mergedPerRound = 20
     private static let userBatchSize = 40
     private static let emailBatchSize = 10
 
@@ -25,7 +31,8 @@ actor AffiliationEngine {
         self.db = db
     }
 
-    func refresh(logins: Set<String>, force: Bool = false) async throws {
+    /// Refreshes what badges need for `logins`, and merged PR counts for `authors`.
+    func refresh(logins: Set<String>, authors: Set<String> = [], force: Bool = false) async throws {
         guard !isRefreshing else { return }
         isRefreshing = true
         defer { isRefreshing = false }
@@ -41,18 +48,42 @@ actor AffiliationEngine {
             try await db.setMeta(Self.membersFetchedKey, SyncEngine.format(Date()))
         }
 
+        let people = logins.map { $0.lowercased() }.filter { !Item.Event.isBotLogin($0) }.sorted()
         let known = try await db.userInfos()
         let cutoff = Date().addingTimeInterval(-Self.userRefreshInterval)
-        let stale = logins
-            .map { $0.lowercased() }
-            .filter { !Item.Event.isBotLogin($0) }
-            .filter { force || (known[$0]?.fetchedAt ?? .distantPast) < cutoff }
-            .sorted()
-        guard !stale.isEmpty else { return }
-        logger.info("Refreshing \(stale.count) users")
+        let stale = people.filter { force || (known[$0]?.fetchedAt ?? .distantPast) < cutoff }
+        if !stale.isEmpty {
+            logger.info("Refreshing \(stale.count) users")
+            try await refreshUsers(stale, known: known)
+        }
 
+        let current = try await db.userInfos()
+        let now = Date()
+        // Missing counts first, then the oldest; the rest wait for later rounds.
+        let mergedStale = authors.map { $0.lowercased() }
+            .filter { !Item.Event.isBotLogin($0) }
+            .compactMap { login -> (String, Date)? in
+                guard let user = current[login] else { return nil }
+                guard let count = user.mergedCount, let at = user.mergedFetchedAt else { return (login, .distantPast) }
+                let interval = count == 0 ? Self.firstTimerRefreshInterval : Self.userRefreshInterval
+                return now.timeIntervalSince(at) > interval ? (login, at) : nil
+            }
+            .sorted { $0.1 < $1.1 }
+            .prefix(Self.mergedPerRound)
+            .map(\.0)
+        for batch in mergedStale.chunked(Self.mergedBatchSize) {
+            try await db.saveMergedCounts(fetchMergedCounts(batch))
+        }
+    }
+
+    private func refreshUsers(_ stale: [String], known: [String: UserInfo]) async throws {
         for batch in stale.chunked(Self.userBatchSize) {
             var users = try await fetchUsers(batch)
+            // Merged counts are refreshed separately; keep them.
+            for login in users.keys {
+                users[login]?.mergedCount = known[login]?.mergedCount
+                users[login]?.mergedFetchedAt = known[login]?.mergedFetchedAt
+            }
             // Commit emails cost a search each, so only look them up when nothing else matched.
             let unknown = users.values.filter { user in
                 user.company == nil && !user.orgs.contains { org in Org.allCases.contains { $0.githubOrgs.contains(org) } }
@@ -164,6 +195,26 @@ actor AffiliationEngine {
                 emailDomains: [],
                 fetchedAt: now
             )
+        }
+        return result
+    }
+
+    private struct Count: Decodable, Sendable {
+        let issueCount: Int
+    }
+
+    /// PRs each user has had merged in the repository.
+    private func fetchMergedCounts(_ logins: [String]) async throws -> [String: Int] {
+        let safe = logins.filter(Self.isSafeLogin)
+        guard !safe.isEmpty else { return [:] }
+        let fields = safe.enumerated().map { index, login in
+            "m\(index): search(query: \"repo:\(SyncEngine.repo) is:pr is:merged author:\(login)\", type: ISSUE, first: 0) { issueCount }"
+        }
+        let response = try await client.query("query { \(fields.joined(separator: "\n")) }", variables: [String: String](), as: [String: Count].self)
+        var result: [String: Int] = [:]
+        for (alias, count) in response {
+            guard let index = Int(alias.dropFirst()), safe.indices.contains(index) else { continue }
+            result[safe[index]] = count.issueCount
         }
         return result
     }

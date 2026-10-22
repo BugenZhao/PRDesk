@@ -19,6 +19,7 @@ struct MainView: View {
                 sort: model.sort,
                 focusRequest: model.tableFocusRequest,
                 badges: { model.affiliations.badges(for: $0) },
+                contribution: { model.contribution(for: $0) },
                 badgeVersion: model.affiliationsVersion + AvatarCache.shared.version,
                 onAction: { model.perform($0, on: $1) },
                 onSort: { model.sort = $0 },
@@ -102,7 +103,7 @@ struct MainView: View {
                     if model.filterText.isEmpty { model.requestTableFocus() } else { model.filterText = "" }
                     return .handled
                 }
-                .help("Text, or tokens like status:triage is:pr turn:me author:x label:x ci:fail p:h org:redhat vote:down")
+                .help("Text, or tokens like status:triage is:pr turn:me author:x label:x ci:fail p:h org:redhat vote:down merged:>=10 is:first")
             Text("\(model.visibleCount) items")
                 .font(.caption)
                 .monospacedDigit()

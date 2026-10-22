@@ -120,7 +120,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 ### 4.4 过滤
 
 - 自由文本匹配标题、编号、作者
-- 支持 token：`is:pr` `is:issue` `is:draft` `is:open` `is:unread` `is:pinned` `status:triage|working|backlog|skipped|muted` `turn:me` `author:x` `label:x` `ci:fail` `p:h` `org:redhat` `vote:down`；前面加 `-` 取反
+- 支持 token：`is:pr` `is:issue` `is:draft` `is:open` `is:unread` `is:pinned` `is:first` `is:regular` `status:triage|working|backlog|skipped|muted` `turn:me` `author:x` `label:x` `ci:fail` `p:h` `org:redhat` `vote:down` `merged:>=10`；前面加 `-` 取反
 
 ### 4.5 快捷键
 
@@ -161,6 +161,15 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 - upvote 目前只显示图标，没有其他效果
 - 操作：选中行按 `+` / `-`（再按一次取消），右键行或右键人名，设置 → Votes 管理
 - 过滤：`vote:up` / `vote:down` / `vote:none`
+
+## 5.2 贡献者标记
+
+- 统计每个作者在 vllm 合并过的 PR 数（GitHub search，每批 40 人，每周刷新；为 0 的每天刷新）
+- 合并数 ≥ 阈值（默认 10，设置 → Affiliations 可改）：作者名后显示蓝色 seal 图标
+- 合并数 = 0：显示灰色 "1st"
+- 悬停显示具体数字；列表、详情头部、时间线都显示
+- 过滤：`merged:N`、`merged:>=N`（也支持 `>`、`<`、`<=`）、`is:regular`、`is:first`
+- 只存本地，不写 board，也不影响分组
 
 ## 6. 详情面板
 

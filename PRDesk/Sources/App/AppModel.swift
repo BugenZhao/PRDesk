@@ -76,6 +76,20 @@ final class AppModel {
     private(set) var composerFocusRequest = 0
 
     private(set) var affiliations = Affiliations()
+
+    /// Authors with at least this many merged PRs get the regular-contributor mark.
+    var mergedThreshold: Int = Defaults.get(.mergedThreshold) ?? 10 {
+        didSet {
+            Defaults.set(mergedThreshold, for: .mergedThreshold)
+            affiliationsVersion += 1
+            rebuild()
+        }
+    }
+
+    func contribution(for login: String?) -> Contribution? {
+        guard let login, let merged = affiliations.users[login.lowercased()]?.mergedCount else { return nil }
+        return Contribution(merged: merged, threshold: mergedThreshold)
+    }
     /// Bumped when `affiliations` changes, for views that cache rendered badges.
     private(set) var affiliationsVersion = 0
 
@@ -185,7 +199,7 @@ final class AppModel {
                     guard let self else { return }
                     self.affiliations = affiliations
                     affiliationsVersion += 1
-                    if filterText.contains("org:") { rebuild() }
+                    if filterText.contains("org:") || filterText.contains("merged:") || filterText.contains("is:") { rebuild() }
                 }
             } catch {
                 self?.logger.error("Affiliation observation failed: \(String(describing: error), privacy: .public)")
@@ -396,9 +410,10 @@ final class AppModel {
 
     /// Updates affiliation data for everyone who appears in the list.
     func refreshAffiliations(force: Bool = false) async {
-        let logins = Set(snapshot.items.compactMap(\.author) + snapshot.items.flatMap { $0.events.compactMap(\.actor) })
+        let authors = Set(snapshot.items.compactMap(\.author))
+        let logins = authors.union(snapshot.items.flatMap { $0.events.compactMap(\.actor) })
         do {
-            try await affiliationEngine.refresh(logins: logins, force: force)
+            try await affiliationEngine.refresh(logins: logins, authors: authors, force: force)
         } catch {
             logger.error("Affiliation refresh failed: \(String(describing: error), privacy: .public)")
         }
@@ -512,6 +527,10 @@ final class AppModel {
         let filter = ItemFilter(filterText)
         let affiliations = affiliations
         let orgs = { (login: String) in affiliations.badges(for: login).map(\.org) }
+        let threshold = mergedThreshold
+        let contribution = { (login: String) in
+            affiliations.users[login.lowercased()]?.mergedCount.map { Contribution(merged: $0, threshold: threshold) }
+        }
 
         let candidates: [ItemRow] = snapshot.items.compactMap { item in
             let row = row(for: item)
@@ -523,7 +542,7 @@ final class AppModel {
         workingItems = Self.yourMoveFirst(candidates
             .filter { [.working, .good].contains(ListSection.triageSection(of: $0)) }
             .sorted { $0.item.updatedAt > $1.item.updatedAt })
-        let visible = filter.isEmpty ? candidates : candidates.filter { filter.matches($0, orgs: orgs) }
+        let visible = filter.isEmpty ? candidates : candidates.filter { filter.matches($0, orgs: orgs, contribution: contribution) }
 
         visibleCount = visible.count
 
@@ -534,7 +553,7 @@ final class AppModel {
                 var row = row(for: item)
                 if row.triage == .muted { return nil }
                 row.note = note
-                return filter.matches(row, orgs: orgs) ? row : nil
+                return filter.matches(row, orgs: orgs, contribution: contribution) ? row : nil
             }
             visibleCount = rows.count
             self.rows = [.header(.inbox, count: rows.count, collapsed: false)] + rows.map { .item(.inbox, $0) }
@@ -579,7 +598,7 @@ final class AppModel {
 /// Small typed wrapper over UserDefaults for UI preferences.
 enum Defaults {
     enum Key: String {
-        case sort, collapsed, drafts
+        case sort, collapsed, drafts, mergedThreshold
     }
 
     static func get<T: Decodable>(_ key: Key) -> T? {

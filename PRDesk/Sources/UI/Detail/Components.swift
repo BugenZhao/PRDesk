@@ -35,7 +35,7 @@ struct LoginText: View {
                 Image(systemName: vote.symbol)
                     .font(.caption2)
                     .foregroundStyle(Color(nsColor: vote.nsColor))
-                    .help(vote == .up ? "Upvoted" : "Downvoted: never puts items in Focus")
+                    .help(vote == .up ? "Upvoted" : "Downvoted: sinks to the bottom of Triage")
             }
         }
         .contextMenu {
@@ -72,6 +72,17 @@ struct BadgeIcons: View {
         let cache = AvatarCache.shared
         _ = cache.version
         return HStack(spacing: 3) {
+            if let contribution = model.contribution(for: login) {
+                if contribution.isRegular {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: size - 2))
+                        .foregroundStyle(.blue)
+                        .help(contribution.summary)
+                } else if contribution.isFirstTime {
+                    Chip(text: "1st")
+                        .help(contribution.summary)
+                }
+            }
             ForEach(login.map(model.affiliations.badges(for:)) ?? [], id: \.org) { badge in
                 Group {
                     if let image = cache.image(for: badge.org.avatarLogin) {
