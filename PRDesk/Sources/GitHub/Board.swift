@@ -142,12 +142,17 @@ enum BoardError: LocalizedError {
     case missingProject
     case missingField(String)
     case missingOption(field: String, option: String)
+    /// The Status was written, but the subscription that goes with it was not.
+    case subscription(status: String, underlying: String)
 
     var errorDescription: String? {
         switch self {
         case .missingProject: "Project #\(BoardQuery.number) of \(BoardQuery.owner) was not found."
         case let .missingField(field): "The board has no \(field) field."
         case let .missingOption(field, option): "The board's \(field) field has no \"\(option)\" option."
+        case let .subscription(status, underlying):
+            "The board now says \(status), but GitHub notifications weren't changed: \(underlying)"
+                + (underlying.contains("notifications") ? "\n\nAdd the scope with `gh auth refresh -h github.com -s notifications`, then relaunch." : "")
         }
     }
 }
@@ -283,7 +288,11 @@ extension SyncEngine {
         }
         let subscription = status?.subscription ?? (previous?.isQuiet == true ? "SUBSCRIBED" : nil)
         if let subscription, subscription != previous?.subscription {
-            try await setSubscription(subscription, subjectID: contentID)
+            do {
+                try await setSubscription(subscription, subjectID: contentID)
+            } catch {
+                throw BoardError.subscription(status: status?.rawValue ?? "untriaged", underlying: error.localizedDescription)
+            }
         }
     }
 

@@ -72,7 +72,7 @@ struct MainView: View {
         }
         .onChange(of: model.filterFocusRequest) { filterFocused = true }
         .alert(
-            "Board not updated",
+            "GitHub not updated",
             isPresented: Binding(get: { model.writeError != nil }, set: { if !$0 { model.writeError = nil } }),
             actions: { Button("OK") {} },
             message: { Text(model.writeError ?? "") }

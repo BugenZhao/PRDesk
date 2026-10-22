@@ -134,8 +134,11 @@ final class AppModel {
         snapshot.states[item.number] ?? ItemState(number: item.number)
     }
 
+    /// The triage board by item number; observed (unlike `snapshot`) so the detail pane follows it.
+    private(set) var board: [Int: BoardEntry] = [:]
+
     func board(for item: Item) -> BoardEntry? {
-        snapshot.board[item.number]
+        board[item.number]
     }
 
     private func row(for item: Item) -> ItemRow {
@@ -158,6 +161,7 @@ final class AppModel {
                     guard let self else { return }
                     self.snapshot = snapshot
                     if votes != snapshot.votes { votes = snapshot.votes }
+                    if board != snapshot.board { board = snapshot.board }
                     rebuild()
                     if let item = selectedItem, let detail, detail.number == item.number, detail.itemUpdatedAt < item.updatedAt {
                         loadDetail()
@@ -356,7 +360,11 @@ final class AppModel {
                 try await write(engine)
             } catch {
                 logger.error("Failed to \(what, privacy: .public): \(String(describing: error), privacy: .public)")
-                self.writeError = "Couldn't \(what): \(error.localizedDescription)"
+                self.writeError = if case BoardError.subscription = error {
+                    error.localizedDescription
+                } else {
+                    "Couldn't \(what): \(error.localizedDescription)"
+                }
             }
         }
     }
