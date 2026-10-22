@@ -339,28 +339,38 @@ struct ItemTableView: NSViewRepresentable {
 
         // MARK: Context menu
 
-        private static let menuActions: [(String, ItemAction)] = [
-            ("Open in Browser", .openInBrowser),
-            ("Working", .triage(.working)),
-            ("Backlog", .triage(.backlog)),
-            ("Skipped", .triage(.skipped)),
-            ("Muted", .triage(.muted)),
-            ("High Priority", .priority(.high)),
-            ("Medium Priority", .priority(.medium)),
-            ("Low Priority", .priority(.low)),
-            ("Clear Priority", .priority(nil)),
-            ("Pin / Unpin", .togglePin),
-            ("Mark as Read", .markRead),
-            ("Upvote Author", .voteAuthor(.up)),
-            ("Downvote Author", .voteAuthor(.down)),
+        private struct MenuAction {
+            var title: String
+            var action: ItemAction
+            var symbol: String
+            /// The list's single-key shortcut, shown beside the item.
+            var key: String
+        }
+
+        private static let menuActions: [MenuAction] = [
+            MenuAction(title: "Open in Browser", action: .openInBrowser, symbol: "safari", key: "o"),
+            MenuAction(title: "Working", action: .triage(.working), symbol: "hammer", key: "w"),
+            MenuAction(title: "Backlog", action: .triage(.backlog), symbol: "tray", key: "b"),
+            MenuAction(title: "Skipped", action: .triage(.skipped), symbol: "forward", key: "s"),
+            MenuAction(title: "Muted", action: .triage(.muted), symbol: "bell.slash", key: "m"),
+            MenuAction(title: "High Priority", action: .priority(.high), symbol: Priority.high.symbol, key: "1"),
+            MenuAction(title: "Medium Priority", action: .priority(.medium), symbol: Priority.medium.symbol, key: "2"),
+            MenuAction(title: "Low Priority", action: .priority(.low), symbol: Priority.low.symbol, key: "3"),
+            MenuAction(title: "Clear Priority", action: .priority(nil), symbol: "xmark", key: "0"),
+            MenuAction(title: "Pin / Unpin", action: .togglePin, symbol: "pin", key: "p"),
+            MenuAction(title: "Mark as Read", action: .markRead, symbol: "envelope.open", key: "n"),
+            MenuAction(title: "Upvote Author", action: .voteAuthor(.up), symbol: "hand.thumbsup", key: "+"),
+            MenuAction(title: "Downvote Author", action: .voteAuthor(.down), symbol: "hand.thumbsdown", key: "-"),
         ]
         /// Indices of `menuActions` after which a separator goes.
         private static let menuSeparatorsAfter: Set = [0, 4, 8, 10]
 
         func makeContextMenu() -> NSMenu {
             let menu = NSMenu()
-            for (index, (title, _)) in Self.menuActions.enumerated() {
-                let item = NSMenuItem(title: title, action: #selector(performMenuAction(_:)), keyEquivalent: "")
+            for (index, entry) in Self.menuActions.enumerated() {
+                let item = NSMenuItem(title: entry.title, action: #selector(performMenuAction(_:)), keyEquivalent: entry.key)
+                item.keyEquivalentModifierMask = []
+                item.image = NSImage(systemSymbolName: entry.symbol, accessibilityDescription: nil)
                 item.tag = index
                 item.target = self
                 menu.addItem(item)
@@ -369,6 +379,7 @@ struct ItemTableView: NSViewRepresentable {
             menu.addItem(.separator())
             let copy = NSMenuItem(title: "Copy Link", action: #selector(copyClickedLinks), keyEquivalent: "c")
             copy.keyEquivalentModifierMask = [.command, .shift]
+            copy.image = NSImage(systemSymbolName: "link", accessibilityDescription: nil)
             copy.target = self
             menu.addItem(copy)
             menu.delegate = self
@@ -396,7 +407,7 @@ struct ItemTableView: NSViewRepresentable {
                 return count == 0 ? .off : count == targets.count ? .on : .mixed
             }
             for item in menu.items where item.action == #selector(performMenuAction(_:)) {
-                item.state = switch Self.menuActions[item.tag].1 {
+                item.state = switch Self.menuActions[item.tag].action {
                 case let .triage(status): state { $0.listedTriage == status }
                 case let .priority(priority?): state { $0.priority == priority }
                 case let .voteAuthor(vote): state { $0.authorVote == vote }
@@ -408,7 +419,7 @@ struct ItemTableView: NSViewRepresentable {
         @objc private func performMenuAction(_ sender: NSMenuItem) {
             let ids = menuTargets.map(\.item.id)
             guard !ids.isEmpty else { return }
-            parent.onAction(Self.menuActions[sender.tag].1, ids)
+            parent.onAction(Self.menuActions[sender.tag].action, ids)
         }
 
         @objc private func copyClickedLinks() {
