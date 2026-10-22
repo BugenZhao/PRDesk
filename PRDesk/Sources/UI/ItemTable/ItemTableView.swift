@@ -183,6 +183,10 @@ struct ItemTableView: NSViewRepresentable {
                   let key = event.charactersIgnoringModifiers
             else { return false }
             switch key {
+            case "\u{1b}":
+                // Escape clears the selection, returning the detail pane to its empty state.
+                guard let table, table.selectedRow != -1 else { return false }
+                table.deselectAll(nil)
             case "j": move(by: 1)
             case "k": move(by: -1)
             case "/": parent.onFocusFilter()
