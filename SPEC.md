@@ -32,7 +32,8 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
   - 在 board 上（包括在网页上手动加的）
   - 首次同步回溯 90 天；closed/merged 的保留 14 天后淡出
 - **手动**：在 GitHub 上把条目加到 board（不设 Status 即为未分诊），下次同步就会跟踪
-- **增量**：定时（默认每 5 分钟，设置 → General 可改，前后台一样）用一次 advanced search 拉增量：`(involves:@me OR review-requested:@me OR reviewed-by:@me OR label:rust) updated:>=上次同步时间`，增量每页 20 条（首次同步每页 50 条、分时间窗并行）；选中条目时实时拉详情；⌘R 立即同步
+- **增量**：定时（默认每 5 分钟，设置 → General 可改，前后台一样）用一次 advanced search 拉增量：`(involves:@me OR review-requested:@me OR reviewed-by:@me OR label:rust) updated:>=上次同步时间`，增量每页 20 条（首次同步每页 50 条、分时间窗并行）；⌘R 立即同步
+- **详情**：每次同步后在后台预取 Working、Good、Triage、Inbox、Pinned、Recently viewed 里条目的详情，只取缓存缺失或比条目旧的，并发 2；选中条目时先显示缓存，缓存比条目旧或超过 2 分钟再实时拉一次。一次详情是两个并行的 GraphQL 查询：正文和时间线一个，PR 的 checks 一个
 - **限流**：底部状态栏显示 GraphQL 剩余额度；低于 500 时自动降低轮询频率
 - **Board**：最多每 3 分钟拉一次 board 的全部条目（Status、Priority、Comment），⌘R 时必拉；board 上不在本地的条目按 id 补拉
 - **Inbox**：GitHub Notifications（仅本仓库、仅 participating，不含 watching），未读数显示在 tab、Dock 和菜单栏上；打开条目或按 `n` 即在 GitHub 上标记已读
@@ -207,7 +208,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 - `board_item`：board 条目的缓存（item id、Status 及其设置时间、Priority、Comment）
 - `users`：login、头像、company、orgs、邮箱域名、committer 领域、来源、fetched_at
 - `org_overrides`：手动设置的映射
-- `timeline_cache`：详情缓存
+- `timeline_cache`：详情缓存（附条目的更新时间，预取据此判断是否过期）
 - `sync_meta`：同步元数据
 
 ## 8. Turn 规则（`me` / `them`）

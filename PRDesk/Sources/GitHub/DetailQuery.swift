@@ -1,6 +1,7 @@
 import Foundation
 
-/// The query behind the detail pane: body, full timeline and checks of one item.
+/// The queries behind the detail pane: body and full timeline of one item, and separately its checks,
+/// so the two run side by side (GitHub takes a second or two on each).
 enum DetailQuery {
     private static let actor = "{ __typename login }"
 
@@ -42,18 +43,6 @@ enum DetailQuery {
           __typename
           ... on PullRequest {
             id bodyHTML bodyText headRefName baseRefName updatedAt
-            commits(last: 1) {
-              nodes {
-                commit {
-                  statusCheckRollup {
-                    contexts(first: 100) {
-                      pageInfo { hasNextPage endCursor }
-                      nodes { ...ContextFields }
-                    }
-                  }
-                }
-              }
-            }
             timelineItems(first: 100, after: $after, itemTypes: \(prTypes)) {
               pageInfo { hasNextPage endCursor }
               nodes { ...TimelineFields }
@@ -70,7 +59,6 @@ enum DetailQuery {
       }
     }
     \(timelineFragment)
-    \(contextFragment)
     """
 
     private static let contextFragment = """
@@ -81,8 +69,8 @@ enum DetailQuery {
     }
     """
 
-    /// Further pages of checks, for PRs with more than 100.
-    static let moreChecks = """
+    /// A page of the checks on a PR's latest commit.
+    static let checks = """
     query($owner: String!, $name: String!, $number: Int!, $after: String) {
       repository(owner: $owner, name: $name) {
         pullRequest(number: $number) {
@@ -104,7 +92,7 @@ enum DetailQuery {
     \(contextFragment)
     """
 
-    struct MoreChecksResponse: Decodable, Sendable {
+    struct ChecksResponse: Decodable, Sendable {
         struct Repository: Decodable, Sendable {
             struct PullRequest: Decodable, Sendable { let commits: Nodes<Subject.Commit> }
             let pullRequest: PullRequest?
@@ -152,12 +140,7 @@ enum DetailQuery {
         let headRefName: String?
         let baseRefName: String?
         let updatedAt: Date
-        let commits: Nodes<Commit>?
         let timelineItems: Timeline
-
-        var contexts: Contexts? {
-            commits?.values.last?.commit.statusCheckRollup?.contexts
-        }
     }
 
     struct Contexts: Decodable, Sendable {
@@ -354,8 +337,10 @@ enum DetailQuery {
 }
 
 extension SyncEngine {
-    /// Fetches the full detail of one item, following timeline pages.
-    func fetchDetail(number: Int) async throws -> ItemDetail {
+    /// Fetches the full detail of one item, following timeline pages. A PR's checks are fetched
+    /// alongside the timeline rather than after it.
+    func fetchDetail(number: Int, isPullRequest: Bool) async throws -> ItemDetail {
+        async let checks = isPullRequest ? fetchChecks(number: number) : []
         var after: String?
         var entries: [TimelineEntry] = []
         var first: DetailQuery.Subject?
@@ -372,19 +357,7 @@ extension SyncEngine {
         } while after != nil && entries.count < 2000
 
         let subject = first!
-        var checks = subject.contexts?.checks ?? []
-        var checksCursor = subject.contexts.flatMap { $0.pageInfo.hasNextPage ? $0.pageInfo.endCursor : nil }
-        while let cursor = checksCursor, checks.count < 1000 {
-            let response = try await client.query(
-                DetailQuery.moreChecks,
-                variables: DetailQuery.Variables(owner: Self.owner, name: Self.name, number: number, after: cursor),
-                as: DetailQuery.MoreChecksResponse.self
-            )
-            let contexts = response.repository?.pullRequest?.commits.values.last?.commit.statusCheckRollup?.contexts
-            checks += contexts?.checks ?? []
-            checksCursor = contexts.flatMap { $0.pageInfo.hasNextPage ? $0.pageInfo.endCursor : nil }
-        }
-        return ItemDetail(
+        return try await ItemDetail(
             number: number,
             id: subject.id,
             bodyHTML: subject.bodyHTML,
@@ -396,5 +369,22 @@ extension SyncEngine {
             itemUpdatedAt: subject.updatedAt,
             fetchedAt: Date()
         )
+    }
+
+    /// The checks on a PR's latest commit, following pages.
+    private func fetchChecks(number: Int) async throws -> [Check] {
+        var checks: [Check] = []
+        var after: String?
+        repeat {
+            let response = try await client.query(
+                DetailQuery.checks,
+                variables: DetailQuery.Variables(owner: Self.owner, name: Self.name, number: number, after: after),
+                as: DetailQuery.ChecksResponse.self
+            )
+            let contexts = response.repository?.pullRequest?.commits.values.last?.commit.statusCheckRollup?.contexts
+            checks += contexts?.checks ?? []
+            after = contexts.flatMap { $0.pageInfo.hasNextPage ? $0.pageInfo.endCursor : nil }
+        } while after != nil && checks.count < 1000
+        return checks
     }
 }

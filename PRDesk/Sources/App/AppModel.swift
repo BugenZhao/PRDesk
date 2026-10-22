@@ -252,6 +252,7 @@ final class AppModel {
             syncState = .idle
             await syncInbox()
             Task { await refreshAffiliations() }
+            prefetchDetails()
         } catch {
             logger.error("Sync failed: \(String(describing: error), privacy: .public)")
             syncState = .failed(error.localizedDescription)
@@ -485,7 +486,7 @@ final class AppModel {
             }
             self?.detailState = .loading
             do {
-                let fresh = try await engine.fetchDetail(number: item.number)
+                let fresh = try await engine.fetchDetail(number: item.number, isPullRequest: item.kind == .pullRequest)
                 try? await db.saveDetail(fresh)
                 guard !Task.isCancelled, let self else { return }
                 detail = fresh
@@ -498,6 +499,57 @@ final class AppModel {
                 self?.logger.error("Detail of #\(item.number) failed: \(String(describing: error), privacy: .public)")
                 self?.detailState = .failed(error.localizedDescription)
             }
+        }
+    }
+
+    @ObservationIgnored private var prefetchTask: Task<Void, Never>?
+    private static let prefetchConcurrency = 2
+
+    /// Fetches ahead the details of items likely to be opened (Working, Good, Triage, the Inbox,
+    /// Pinned and Recently viewed) whose cache is missing or older than the item, so opening one
+    /// shows its cache at once. A round still running skips the next; the sync after picks it up.
+    private func prefetchDetails() {
+        guard prefetchTask == nil else { return }
+        let inboxNumbers = Set(inbox.filter { board[$0.number]?.triage != .muted }.map(\.number))
+        let recent = Set(snapshot.items
+            .filter { state(for: $0).viewedAt != nil }
+            .sorted { state(for: $0).viewedAt! > state(for: $1).viewedAt! }
+            .prefix(ListSection.recentLimit)
+            .map(\.number))
+        let candidates = snapshot.items.filter { item in
+            let row = row(for: item)
+            if row.board?.isForeign == true { return false }
+            if let section = ListSection.triageSection(of: row), [.working, .good, .triage].contains(section) { return true }
+            return row.state.isPinned || inboxNumbers.contains(item.number) || recent.contains(item.number)
+        }
+        prefetchTask = Task { [weak self, db, engine, logger] in
+            defer { self?.prefetchTask = nil }
+            let cached = (try? await db.cachedDetailTimes()) ?? [:]
+            let stale = candidates.filter { item in cached[item.number].map { $0 < item.updatedAt } ?? true }
+            guard !stale.isEmpty else { return }
+            logger.info("Prefetching \(stale.count) details")
+            var actors: Set<String> = []
+            await withTaskGroup(of: Set<String>.self) { group in
+                var queue = stale.makeIterator()
+                let fetch = { @Sendable (item: Item) async -> Set<String> in
+                    do {
+                        let detail = try await engine.fetchDetail(number: item.number, isPullRequest: item.kind == .pullRequest)
+                        try await db.saveDetail(detail)
+                        return Set(detail.entries.compactMap(\.actor))
+                    } catch {
+                        logger.error("Prefetching the detail of #\(item.number) failed: \(String(describing: error), privacy: .public)")
+                        return []
+                    }
+                }
+                for _ in 0 ..< Self.prefetchConcurrency {
+                    if let item = queue.next() { group.addTask { await fetch(item) } }
+                }
+                for await found in group {
+                    actors.formUnion(found)
+                    if let item = queue.next() { group.addTask { await fetch(item) } }
+                }
+            }
+            try? await self?.affiliationEngine.refresh(logins: actors)
         }
     }
 

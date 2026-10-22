@@ -148,6 +148,13 @@ final class AppDatabase: Sendable {
             try db.execute(sql: "DELETE FROM detailCache")
             try db.execute(sql: "DELETE FROM meta WHERE key = 'lastSyncStartedAt'")
         }
+        migrator.registerMigration("v12") { db in
+            // Prefetching compares each cached detail's item time without decoding the JSON; rows from
+            // before have none and count as stale.
+            try db.alter(table: "detailCache") { t in
+                t.add(column: "itemUpdatedAt", .datetime)
+            }
+        }
         return migrator
     }
 }
@@ -192,7 +199,18 @@ extension AppDatabase {
     func saveDetail(_ detail: ItemDetail) async throws {
         let data = try JSONEncoder().encode(detail)
         try await writer.write { db in
-            try db.execute(sql: "INSERT OR REPLACE INTO detailCache (number, json) VALUES (?, ?)", arguments: [detail.number, data])
+            try db.execute(
+                sql: "INSERT OR REPLACE INTO detailCache (number, json, itemUpdatedAt) VALUES (?, ?, ?)",
+                arguments: [detail.number, data, detail.itemUpdatedAt]
+            )
+        }
+    }
+
+    /// When each cached detail's item was last updated, by number.
+    func cachedDetailTimes() async throws -> [Int: Date] {
+        try await reader.read { db in
+            let rows = try Row.fetchAll(db, sql: "SELECT number, itemUpdatedAt FROM detailCache WHERE itemUpdatedAt IS NOT NULL")
+            return Dictionary(rows.map { ($0["number"], $0["itemUpdatedAt"]) }, uniquingKeysWith: { a, _ in a })
         }
     }
 }
