@@ -89,6 +89,11 @@ are used off the main actor); no glass on content (cards, chips, rows).
 
 ## Gotchas learned here
 
+- The detail pages live at `prdesk-local://page/` with a `<base href="https://github.com/">`, not on
+  github.com: WebKit won't let web content use fonts the user installed (`local()` included), so
+  the chosen monospaced font is served by `LocalResourceHandler`, rebuilt from its CoreText tables
+  (`SFNT`), and a font may only load from the page's own origin.
+
 - Never give views in the window a vertical `fixedSize` or a layout that grows tall at tiny widths:
   the window measures its minimum size with a very narrow proposal, and the result can force the
   window taller than the screen. `NSViewRepresentable`s should implement `sizeThatFits`.

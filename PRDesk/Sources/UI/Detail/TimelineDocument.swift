@@ -246,7 +246,7 @@ struct TimelineDocument {
         private func avatar(_ login: String?, small: Bool = false) -> String {
             let cls = small ? "avatar small" : "avatar"
             guard let login else { return #"<span class="\#(cls)"></span>"# }
-            return #"<img class="\#(cls)" src="\#(AvatarSchemeHandler.url(for: login).htmlEscaped)" alt="">"#
+            return #"<img class="\#(cls)" src="\#(LocalResourceHandler.url(for: login).htmlEscaped)" alt="">"#
         }
 
         /// The login with the viewer's vote and affiliation badges, as `LoginText` and `BadgeIcons`.
@@ -269,7 +269,7 @@ struct TimelineDocument {
             }
             for badge in badges {
                 let title = "\(badge.name) — \(badge.source)".htmlEscaped
-                html += #"<img class="badge" src="\#(AvatarSchemeHandler.url(for: badge).htmlEscaped)" title="\#(title)" alt="\#(badge.org.shortLabel.htmlEscaped)">"#
+                html += #"<img class="badge" src="\#(LocalResourceHandler.url(for: badge).htmlEscaped)" title="\#(title)" alt="\#(badge.org.shortLabel.htmlEscaped)">"#
             }
             return html + "</span>"
         }

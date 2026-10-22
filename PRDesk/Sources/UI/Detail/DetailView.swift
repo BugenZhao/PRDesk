@@ -9,6 +9,7 @@ struct DetailView: View {
     /// The pages live as long as the pane, so switching items or tabs doesn't reload them.
     @State private var timelinePage = WebDocument(kind: .timeline)
     @State private var filesPage = WebDocument(kind: .files)
+    @AppStorage(MonospaceFont.key) private var monospaceFont = ""
 
     enum DetailTab: Hashable {
         case conversation, checks, files
@@ -37,6 +38,11 @@ struct DetailView: View {
             // Links to this repository's issues and PRs open here, not in the browser.
             for page in [timelinePage, filesPage] {
                 page.openItem = { [model] number in model.openItem(number: number) }
+            }
+        }
+        .onChange(of: monospaceFont, initial: true) {
+            for page in [timelinePage, filesPage] {
+                page.setStyle("monospace-font", MonospaceFont.css(family: monospaceFont))
             }
         }
         .toolbar {
@@ -112,6 +118,7 @@ struct DelayedProgressView: View {
 
 private struct DetailHeader: View {
     @Environment(AppModel.self) private var model
+    @AppStorage(MonospaceFont.key) private var monospaceFont = ""
     let item: Item
     let state: ItemState
     @Binding var tab: DetailView.DetailTab
@@ -150,7 +157,7 @@ private struct DetailHeader: View {
                 if let detail = model.detail, detail.number == item.number, let head = detail.headRef, let base = detail.baseRef {
                     Text("·")
                     Text("\(head) → \(base)")
-                        .font(.caption.monospaced())
+                        .font(MonospaceFont.font(family: monospaceFont, size: 10))
                         .lineLimit(1)
                         .truncationMode(.middle)
                         .textSelection(.enabled)

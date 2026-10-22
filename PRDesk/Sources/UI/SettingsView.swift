@@ -22,6 +22,8 @@ private struct TokenSettingsView: View {
     @State private var token = ""
     /// Loaded in `.task`: a keychain read is too slow to repeat on every view rebuild.
     @State private var hasSavedToken = false
+    @AppStorage(MonospaceFont.key) private var monospaceFont = ""
+    @State private var monospacedFamilies: [String] = []
 
     var body: some View {
         Form {
@@ -61,9 +63,28 @@ private struct TokenSettingsView: View {
                 Text("Each round costs a few of GitHub's 5,000 hourly API points; the triage board is read at most every 3 minutes. ⌘R syncs everything at once.")
                     .foregroundStyle(.secondary)
             }
+
+            Section {
+                Picker("Monospaced font", selection: $monospaceFont) {
+                    Text("System (SF Mono)").tag("")
+                    Divider()
+                    // A family set before but no longer installed stays listed, so the choice shows.
+                    ForEach(monospacedFamilies.contains(monospaceFont) || monospaceFont.isEmpty ? monospacedFamilies : [monospaceFont] + monospacedFamilies, id: \.self) { family in
+                        Text(family).font(.custom(family, size: 13)).tag(family)
+                    }
+                }
+            } header: {
+                Text("Fonts")
+            } footer: {
+                Text("For code, diffs, commits, paths and branch names.")
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
-        .task { hasSavedToken = Keychain.readToken() != nil }
+        .task {
+            hasSavedToken = Keychain.readToken() != nil
+            monospacedFamilies = MonospaceFont.installedFamilies()
+        }
     }
 }
 

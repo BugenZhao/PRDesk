@@ -16,6 +16,7 @@ enum WebResources {
         """
         <!doctype html>
         <html data-page="\(kind.rawValue)" data-repo="\(SyncEngine.repo)"><head><meta charset="utf-8"><meta name="color-scheme" content="light dark">
+        <base href="https://github.com/">
         <style>\(markdownCSS)
         \(detailCSS)
         \(WebSymbols.css)</style></head>
