@@ -191,17 +191,16 @@ enum ItemColumn: String, CaseIterable {
     /// One size for the review check and the CI dot, both SF Symbol circles, so they match.
     private static let markPointSize: CGFloat = 10
 
-    /// Approvals as a circled check and a count, the circle filled when one of them is the viewer's; a red
-    /// cross after them when the viewer requested changes.
+    /// Approvals as a bare check and a count: green when the viewer approved, gray when only others
+    /// did. A red cross after them when the viewer requested changes.
     private func reviewRuns(_ row: ItemRow, viewer: String?) -> [CellRun] {
         let item = row.item
         guard item.kind == .pullRequest else { return [] }
         let mine = viewer.flatMap(item.review(by:))?.state
         let count = item.approvalCount
-        let check: CellRun? = count > 0
-            ? .symbol(mine == "APPROVED" ? "checkmark.circle.fill" : "checkmark.circle", color: .systemGreen, pointSize: Self.markPointSize)
-            : nil
-        let approvals: CellRun? = count > 0 ? .text(String(count), color: .systemGreen, font: CellFont.digits) : nil
+        let color: NSColor = mine == "APPROVED" ? .systemGreen : .secondaryLabelColor
+        let check: CellRun? = count > 0 ? .symbol("checkmark", color: color, pointSize: Self.markPointSize) : nil
+        let approvals: CellRun? = count > 0 ? .text(String(count), color: color, font: CellFont.digits) : nil
         var runs: [CellRun] = [.slot(check, width: Self.markSlot), .slot(approvals, width: Self.countSlot)]
         if mine == "CHANGES_REQUESTED" {
             runs.append(.symbol("xmark", color: .systemRed, pointSize: Self.markPointSize))
