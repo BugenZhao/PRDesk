@@ -99,7 +99,7 @@ struct MainView: View {
                 }
                 .help("Text, or tokens like status:triage is:pr turn:me author:x label:x ci:fail p:h org:redhat vote:down merged:>=10 is:first")
             Spacer(minLength: 8)
-            Text("j/k Move · w/b/s/m Working/Backlog/Skip/Mute · 1/2/3 Priority · p Pin · n Mark read · c Comment · o Open · +/- Vote author · esc Deselect")
+            Text("j/k move · w/b/s/m working/backlog/skip/mute · 1/2/3 priority · p pin · n mark read · c comment · o open · +/- vote author · esc deselect")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
                 .lineLimit(1)
