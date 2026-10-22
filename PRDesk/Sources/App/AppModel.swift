@@ -53,6 +53,16 @@ final class AppModel {
     /// Bumped when `affiliations` changes, for views that cache rendered badges.
     private(set) var affiliationsVersion = 0
 
+    enum DetailState: Equatable {
+        case idle
+        case loading
+        case failed(String)
+    }
+
+    /// Detail of the selected item; may briefly be a cached copy while a fresh one loads.
+    private(set) var detail: ItemDetail?
+    private(set) var detailState: DetailState = .idle
+
     /// `seenAt` of the selected item when it was opened, before opening moved it forward.
     private(set) var selectedItemPreviousSeenAt: Date?
 
@@ -63,6 +73,9 @@ final class AppModel {
     @ObservationIgnored let affiliationEngine: AffiliationEngine
     @ObservationIgnored private var tasks: [Task<Void, Never>] = []
     @ObservationIgnored private var dwellTask: Task<Void, Never>?
+    @ObservationIgnored private var detailTask: Task<Void, Never>?
+    /// Cached details older than this are refreshed when shown, even if the item looks unchanged.
+    private static let detailMaxAge: TimeInterval = 120
     @ObservationIgnored private let logger = Logger(subsystem: "com.bugenzhao.PRDesk", category: "App")
 
     init(db: AppDatabase) {
@@ -92,6 +105,9 @@ final class AppModel {
                     guard let self else { return }
                     self.snapshot = snapshot
                     rebuild()
+                    if let item = selectedItem, let detail, detail.number == item.number, detail.itemUpdatedAt < item.updatedAt {
+                        loadDetail()
+                    }
                 }
             } catch {
                 self?.logger.error("Observation failed: \(String(describing: error), privacy: .public)")
@@ -218,9 +234,51 @@ final class AppModel {
         }
     }
 
+    /// Shows the cached detail of the selected item at once, then fetches a fresh one if needed.
+    func loadDetail(force: Bool = false) {
+        detailTask?.cancel()
+        guard let item = selectedItem else {
+            detail = nil
+            detailState = .idle
+            return
+        }
+        if detail?.number != item.number {
+            detail = nil
+        }
+        detailState = .idle
+        detailTask = Task { [weak self, db, engine] in
+            if self?.detail == nil, let cached = try? await db.cachedDetail(number: item.number) {
+                guard !Task.isCancelled else { return }
+                self?.detail = cached
+            }
+            if !force, let current = self?.detail,
+               current.itemUpdatedAt >= item.updatedAt,
+               Date().timeIntervalSince(current.fetchedAt) < Self.detailMaxAge
+            {
+                return
+            }
+            self?.detailState = .loading
+            do {
+                let fresh = try await engine.fetchDetail(number: item.number)
+                try? await db.saveDetail(fresh)
+                guard !Task.isCancelled, let self else { return }
+                detail = fresh
+                detailState = .idle
+                let actors = Set(fresh.entries.compactMap(\.actor))
+                Task { try? await self.affiliationEngine.refresh(logins: actors) }
+            } catch is CancellationError {
+            } catch {
+                guard !Task.isCancelled else { return }
+                self?.logger.error("Detail of #\(item.number) failed: \(String(describing: error), privacy: .public)")
+                self?.detailState = .failed(error.localizedDescription)
+            }
+        }
+    }
+
     private func selectionChanged(from old: TableSelection?) {
         guard selection?.itemID != old?.itemID else { return }
         dwellTask?.cancel()
+        loadDetail()
         guard let item = selectedItem else {
             selectedItemPreviousSeenAt = nil
             return

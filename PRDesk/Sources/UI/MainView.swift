@@ -28,7 +28,7 @@ struct MainView: View {
         }
         .frame(minWidth: 640, maxHeight: .infinity)
         .inspector(isPresented: $showsDetail) {
-            DetailView(item: model.selectedItem)
+            DetailView()
                 .inspectorColumnWidth(min: 360, ideal: 520, max: 1000)
         }
         .toolbar {

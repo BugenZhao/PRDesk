@@ -87,6 +87,12 @@ final class AppDatabase: Sendable {
                 t.primaryKey(["login", "org"])
             }
         }
+        migrator.registerMigration("v4") { db in
+            try db.create(table: "detailCache") { t in
+                t.primaryKey("number", .integer)
+                t.column("json", .blob).notNull()
+            }
+        }
         return migrator
     }
 }
@@ -106,6 +112,24 @@ extension AppDatabase {
     func items(numbers: [Int]) async throws -> [Item] {
         try await reader.read { db in
             try Item.filter(numbers.contains(Item.Columns.number)).fetchAll(db)
+        }
+    }
+}
+
+// MARK: - Detail cache
+
+extension AppDatabase {
+    func cachedDetail(number: Int) async throws -> ItemDetail? {
+        let data = try await reader.read { db in
+            try Data.fetchOne(db, sql: "SELECT json FROM detailCache WHERE number = ?", arguments: [number])
+        }
+        return data.flatMap { try? JSONDecoder().decode(ItemDetail.self, from: $0) }
+    }
+
+    func saveDetail(_ detail: ItemDetail) async throws {
+        let data = try JSONEncoder().encode(detail)
+        try await writer.write { db in
+            try db.execute(sql: "INSERT OR REPLACE INTO detailCache (number, json) VALUES (?, ?)", arguments: [detail.number, data])
         }
     }
 }
