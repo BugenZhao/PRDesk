@@ -39,7 +39,14 @@ struct DetailView: View {
                 page.openItem = { [model] number in model.openItem(number: number) }
             }
         }
-        .modifier(DetailToolbar(isShown: isShown, showsTabs: model.selectedItem?.kind == .pullRequest, tab: $tab))
+        .modifier(DetailToolbar(isShown: isShown, showsTabs: showsTabs, tab: $tab))
+        // For View > Conversation / Checks / Files (⌥⌘1–3).
+        .focusedSceneValue(\.detailTab, showsTabs ? $tab : nil)
+    }
+
+    /// Only PRs have Checks and Files.
+    private var showsTabs: Bool {
+        isShown && model.selectedItem?.kind == .pullRequest
     }
 
     @ViewBuilder
@@ -69,6 +76,11 @@ struct DetailView: View {
             DelayedProgressView()
         }
     }
+}
+
+extension FocusedValues {
+    /// The detail pane's tab, while it shows a PR.
+    @Entry var detailTab: Binding<DetailView.DetailTab>?
 }
 
 /// The Conversation / Checks / Files tabs in the inspector's part of the window toolbar. Its own
