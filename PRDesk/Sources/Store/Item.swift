@@ -52,6 +52,12 @@ struct Item: Codable, Hashable, Identifiable, Sendable {
         static func isBotLogin(_ login: String) -> Bool {
             login.hasSuffix("[bot]") || knownBots.contains(login.lowercased())
         }
+
+        /// Comments like "[AUTOMATED] @codex review" are posted by tooling on someone's behalf,
+        /// so they count as bot activity rather than participation.
+        static func isAutomatedBody(_ text: String?) -> Bool {
+            text?.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("[AUTOMATED]") ?? false
+        }
     }
 
     /// GraphQL node id.

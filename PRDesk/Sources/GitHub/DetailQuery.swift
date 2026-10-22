@@ -304,7 +304,9 @@ enum DetailQuery {
             }
             switch typename {
             case "IssueComment":
-                return make(.comment, at: createdAt)
+                var entry = make(.comment, at: createdAt)
+                if Item.Event.isAutomatedBody(bodyText) { entry?.isBot = true }
+                return entry
             case "PullRequestReview":
                 guard state != "PENDING" else { return nil }
                 let kind: TimelineEntry.Kind = switch state {

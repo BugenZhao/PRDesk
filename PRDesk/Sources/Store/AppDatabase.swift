@@ -93,6 +93,11 @@ final class AppDatabase: Sendable {
                 t.column("json", .blob).notNull()
             }
         }
+        migrator.registerMigration("v5") { db in
+            // Comment bodies are now checked for "[AUTOMATED]"; refetch events and details.
+            try db.execute(sql: "DELETE FROM meta WHERE key = 'lastSyncStartedAt'")
+            try db.execute(sql: "DELETE FROM detailCache")
+        }
         return migrator
     }
 }

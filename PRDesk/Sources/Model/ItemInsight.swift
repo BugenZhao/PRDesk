@@ -15,6 +15,10 @@ struct ItemInsight: Hashable, Sendable {
     var summary: String?
     var summaryAt: Date?
     var isReviewRequestedFromMe: Bool
+    /// The pending request looks deliberate rather than automatic (e.g. CODEOWNERS on open or push).
+    var isManualRequest: Bool
+    /// The viewer has commented on, reviewed or pushed to the item (bots and "[AUTOMATED]" excluded).
+    var hasParticipated: Bool
     /// An untracked item comes back when it is requested for review again afterwards.
     var isTracked: Bool
 
@@ -33,6 +37,11 @@ struct ItemInsight: Hashable, Sendable {
         isUnread = (othersActivityAt ?? .distantPast) > seen
 
         isReviewRequestedFromMe = viewer.map(item.isReviewRequested(from:)) ?? false
+        isManualRequest = isReviewRequestedFromMe && Self.isManualRequest(item: item, isMe: isMe)
+        // Opinionated reviews are known for the whole PR; other activity only from recent events.
+        let myReview = viewer.flatMap(item.review(by:))
+        let myLast = ([myReview?.submittedAt] + human.filter { isMe($0.actor) }.map(\.at)).compactMap(\.self).max()
+        hasParticipated = myLast != nil || myReview != nil
 
         if let untrackedAt = state?.untrackedAt {
             isTracked = human.contains { $0.kind == .reviewRequested && isMe($0.target) && $0.at > untrackedAt }
@@ -44,12 +53,34 @@ struct ItemInsight: Hashable, Sendable {
         summary = latest.map { Self.describe($0, isMe: isMe($0.actor)) }
         summaryAt = latest?.at
 
-        turn = item.isOpen ? Self.turn(item: item, viewer: viewer, human: human, isMe: isMe, requested: isReviewRequestedFromMe) : nil
+        turn = item.isOpen ? Self.turn(item: item, human: human, myLast: myLast, isMe: isMe,
+                                        requested: isReviewRequestedFromMe, manualRequest: isManualRequest) : nil
     }
 
-    private static func turn(item: Item, viewer: String?, human: [Item.Event], isMe: (String?) -> Bool, requested: Bool) -> Turn {
+    /// Requests made by the author right when the PR was opened, marked ready or pushed to are
+    /// almost always CODEOWNERS; anything else (another person, or a later request) is deliberate.
+    private static let automaticWindow: TimeInterval = 120
+    private static let pushWindow: TimeInterval = 300
+
+    private static func isManualRequest(item: Item, isMe: (String?) -> Bool) -> Bool {
+        guard let request = item.events.last(where: { $0.kind == .reviewRequested && isMe($0.target) }) else {
+            // The request event fell out of the recent window; assume the common, automatic case.
+            return false
+        }
+        if isMe(request.actor) { return false }
+        if !sameLogin(request.actor, item.author) { return true }
+        if abs(request.at.timeIntervalSince(item.createdAt)) < automaticWindow { return false }
+        let nearPush = item.events.contains { event in
+            [.readyForReview, .forcePush, .commit].contains(event.kind) && abs(event.at.timeIntervalSince(request.at)) < pushWindow
+        }
+        return !nearPush
+    }
+
+    private static func turn(
+        item: Item, human: [Item.Event], myLast: Date?, isMe: (String?) -> Bool,
+        requested: Bool, manualRequest: Bool
+    ) -> Turn? {
         let mine = human.filter { isMe($0.actor) }
-        let myLast = mine.map(\.at).max()
         /// Conversation by others (comments and reviews), ignoring pushes and bookkeeping.
         let othersTalk = human.filter { !isMe($0.actor) && [.comment, .approved, .changesRequested, .reviewed].contains($0.kind) }
         let othersTalkLast = othersTalk.map(\.at).max()
@@ -68,7 +99,10 @@ struct ItemInsight: Hashable, Sendable {
             return .them
 
         case .pullRequest:
-            if requested, !item.isDraft { return .me }
+            if requested, !item.isDraft {
+                // An automatic request on a PR I've never touched is a queue entry, not my move yet.
+                return manualRequest || myLast != nil ? .me : nil
+            }
             guard let myLast else { return .them }
             // After my review or comment, the ball is back with me once the author or others respond.
             let responses = human.filter { !isMe($0.actor) && $0.kind != .reviewRequested }

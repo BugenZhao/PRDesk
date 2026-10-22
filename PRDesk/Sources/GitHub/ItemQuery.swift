@@ -2,7 +2,8 @@ import Foundation
 
 /// GraphQL queries that fetch list-level item data, and the response shapes they decode into.
 enum ItemQuery {
-    static let pageSize = 50
+    /// Pages with timeline comment text are slow to compute; larger pages risk GitHub timeouts.
+    static let pageSize = 25
     /// GitHub search never returns more than this many results for one query.
     static let resultCap = 1000
 
@@ -13,7 +14,7 @@ enum ItemQuery {
     timelineItems(last: 12, itemTypes: [ISSUE_COMMENT, PULL_REQUEST_REVIEW, PULL_REQUEST_COMMIT, HEAD_REF_FORCE_PUSHED_EVENT, MERGED_EVENT, CLOSED_EVENT, REOPENED_EVENT, READY_FOR_REVIEW_EVENT, REVIEW_REQUESTED_EVENT]) {
       nodes {
         __typename
-        ... on IssueComment { author \(actor) createdAt }
+        ... on IssueComment { author \(actor) createdAt bodyText }
         ... on PullRequestReview { author \(actor) state submittedAt createdAt }
         ... on PullRequestCommit { commit { committedDate author { user { login } } } }
         ... on HeadRefForcePushedEvent { actor \(actor) createdAt }
@@ -30,7 +31,7 @@ enum ItemQuery {
     timelineItems(last: 12, itemTypes: [ISSUE_COMMENT, CLOSED_EVENT, REOPENED_EVENT]) {
       nodes {
         __typename
-        ... on IssueComment { author \(actor) createdAt }
+        ... on IssueComment { author \(actor) createdAt bodyText }
         ... on ClosedEvent { actor \(actor) createdAt }
         ... on ReopenedEvent { actor \(actor) createdAt }
       }
@@ -285,10 +286,11 @@ enum ItemQuery {
         let commit: CommitInfo?
         /// Empty for team requests.
         let requestedReviewer: ReviewRequest.Reviewer?
+        let bodyText: String?
 
         private enum CodingKeys: String, CodingKey {
             case typename = "__typename"
-            case author, actor, createdAt, submittedAt, state, commit, requestedReviewer
+            case author, actor, createdAt, submittedAt, state, commit, requestedReviewer, bodyText
         }
 
         var event: Item.Event? {
@@ -298,7 +300,9 @@ enum ItemQuery {
             }
             switch typename {
             case "IssueComment":
-                return make(.comment, at: createdAt)
+                var event = make(.comment, at: createdAt)
+                if Item.Event.isAutomatedBody(bodyText) { event?.isBot = true }
+                return event
             case "PullRequestReview":
                 // A pending review is the viewer's unsubmitted draft.
                 guard state != "PENDING" else { return nil }

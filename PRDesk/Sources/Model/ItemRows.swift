@@ -10,19 +10,20 @@ struct ItemRow: Hashable, Sendable {
 }
 
 enum ListSection: String, CaseIterable, Codable, Sendable {
-    case recent, pinned, focus, all, inbox
+    case recent, pinned, focus, requests, all, inbox
 
     var title: String {
         switch self {
         case .recent: "Recently viewed"
         case .pinned: "Pinned"
         case .focus: "Focus"
+        case .requests: "Review requests"
         case .all: "All tracked"
         case .inbox: "Inbox"
         }
     }
 
-    static let dashboard: [ListSection] = [.recent, .pinned, .focus, .all]
+    static let dashboard: [ListSection] = [.recent, .pinned, .focus, .requests, .all]
 }
 
 /// A row of the table: a section header or an item within a section.

@@ -431,10 +431,12 @@ final class AppModel {
             .prefix(Self.recentLimit)
         let pinned = ordered.filter(\.state.isPinned)
         let focus = ordered.filter(Self.isFocus)
-        let rest = ordered.filter { !$0.state.isPinned && !Self.isFocus($0) }
+        let requests = ordered.filter { !$0.state.isPinned && Self.isQueuedRequest($0) }
+        let rest = ordered.filter { !$0.state.isPinned && !Self.isFocus($0) && !Self.isQueuedRequest($0) }
 
         var rows: [TableRow] = []
-        for (section, members) in [(ListSection.recent, Array(recent)), (.pinned, pinned), (.focus, focus), (.all, rest)] {
+        let sections = [(ListSection.recent, Array(recent)), (.pinned, pinned), (.focus, focus), (.requests, requests), (.all, rest)]
+        for (section, members) in sections {
             guard !members.isEmpty || section == .focus else { continue }
             // While filtering, show every match rather than hiding some in collapsed sections.
             let isCollapsed = filter.isEmpty && collapsed.contains(section)
@@ -446,16 +448,28 @@ final class AppModel {
         self.rows = rows
     }
 
+    /// Items that need the viewer: their turn (which includes deliberate review requests and
+    /// follow-ups on things they took part in), or marked high priority.
     private static func isFocus(_ row: ItemRow) -> Bool {
-        guard row.item.isOpen, row.insight.isTracked else { return false }
-        // Review requests on drafts (often automatic, via CODEOWNERS) wait until the PR is ready.
-        let requested = row.insight.isReviewRequestedFromMe && !row.item.isDraft
-        let wanted = row.insight.turn == .me || row.state.priority == .high || requested
-        guard wanted else { return false }
-        if let dismissed = row.state.focusDismissedAt {
-            return (row.insight.othersActivityAt ?? .distantPast) > dismissed
-        }
-        return true
+        guard row.item.isOpen, row.insight.isTracked, !isDismissed(row) else { return false }
+        return row.insight.turn == .me || row.state.priority == .high
+    }
+
+    /// Requests in queue for later: automatic (CODEOWNERS-style) review requests on ready PRs the
+    /// viewer hasn't touched, until they go quiet for `requestStaleAfter`.
+    private static func isQueuedRequest(_ row: ItemRow) -> Bool {
+        guard row.item.isOpen, row.insight.isTracked, !isDismissed(row), !isFocus(row) else { return false }
+        let insight = row.insight
+        guard insight.isReviewRequestedFromMe, !insight.isManualRequest, !insight.hasParticipated, !row.item.isDraft else { return false }
+        return Date().timeIntervalSince(row.item.updatedAt) < requestStaleAfter
+    }
+
+    private static let requestStaleAfter: TimeInterval = 14 * 24 * 3600
+
+    /// `d` hides an item from Focus and Review requests until someone else acts on it.
+    private static func isDismissed(_ row: ItemRow) -> Bool {
+        guard let dismissed = row.state.focusDismissedAt else { return false }
+        return (row.insight.othersActivityAt ?? .distantPast) <= dismissed
     }
 }
 

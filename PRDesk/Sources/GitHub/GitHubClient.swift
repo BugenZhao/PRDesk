@@ -56,8 +56,20 @@ actor GitHubClient {
         strict: Bool = false
     ) async throws -> Response {
         let body = try JSONEncoder().encode(Body(query: query, variables: variables))
-        let data = try await perform(method: "POST", url: Self.endpoint, body: body)
-        let envelope = try Self.decoder.decode(Envelope<Response>.self, from: data)
+        var attempt = 0
+        var envelope: Envelope<Response>
+        while true {
+            attempt += 1
+            let data = try await perform(method: "POST", url: Self.endpoint, body: body)
+            do {
+                envelope = try Self.decoder.decode(Envelope<Response>.self, from: data)
+                break
+            } catch DecodingError.dataCorrupted where attempt < 3 {
+                // GitHub sometimes cuts off a slow response mid-body; treat it like a 502.
+                logger.info("Truncated GraphQL response, retrying")
+                try await Task.sleep(for: .seconds(attempt * 2))
+            }
+        }
         if let errors = envelope.errors, !errors.isEmpty {
             if strict { throw GraphQLClientError.emptyData(errors) }
             logger.warning("GraphQL errors: \(errors.map(\.message).joined(separator: "; "), privacy: .public)")
