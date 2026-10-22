@@ -104,6 +104,13 @@ are used off the main actor); no glass on content (cards, chips, rows).
   and Comment (SPEC §3.1). The app writes them only on an explicit user action, never from a rule;
   it also shares the board with another tracker (`Python Parity Backlog`), whose items it must
   leave alone.
+- Menu commands live in `AppCommands`, apart from the scenes, and read only observed flags that
+  change when they flip (`hasSelection`, `canGoBack`, `selectionIsPullRequest`): reading the
+  selection there rebuilds the menus and redraws the menu bar extra on every move. Don't use
+  `focusedSceneValue` for them either; publishing the detail tab that way left the web pages blank.
+- List rows draw their cells into the row's layer (`canDrawSubviewsIntoLayer`). Never fade a cell
+  with `alphaValue` (AppKit then renders it offscreen, ~50 ms a row; use `RunsCellView.opacity`),
+  and don't set per-cell tooltips (the table shows one for the hovered cell, worked out lazily).
 - Only user-initiated selection counts as opening an item (viewed, unread cleared, notification
   marked read). Selections the table makes itself go through `AppModel.autoSelect`; otherwise a
   row leaving the list selects its neighbor, which gets read and leaves too, in a chain.
