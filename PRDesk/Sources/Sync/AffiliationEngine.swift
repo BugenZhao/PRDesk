@@ -3,8 +3,9 @@ import os
 
 /// Collects the public data that affiliation badges are inferred from.
 ///
-/// Daily: the committers list and members of the relevant GitHub organizations (all members for
-/// orgs the viewer belongs to, such as Inferact; public members otherwise).
+/// Daily: the committers list, members of the relevant GitHub organizations (all members for
+/// orgs the viewer belongs to, such as Inferact; public members otherwise), and the repository's
+/// collaborators (listing them needs push access, so without it they're skipped).
 /// Weekly per user: profile company and public org memberships, plus commit email
 /// domains for users that nothing else identifies, and merged PR counts (daily for users with
 /// none, so the first-timer mark goes away soon after their first merge).
@@ -43,8 +44,16 @@ actor AffiliationEngine {
             try await db.setMeta(Self.committersFetchedKey, SyncEngine.format(Date()))
         }
         let membersStale = try await isStale(Self.membersFetchedKey, Self.listRefreshInterval)
-        if force || membersStale {
+        // No collaborators entry means the lists predate the vLLM member tier; fetch them now.
+        let predatesTier = try await db.meta(Affiliations.collaboratorsKey) == nil
+        if force || membersStale || predatesTier {
             try await db.setMetaJSON(Affiliations.membersKey, fetchMembers())
+            do {
+                try await db.setMetaJSON(Affiliations.collaboratorsKey, fetchCollaborators())
+            } catch {
+                logger.error("Collaborators unavailable: \(error.localizedDescription)")
+                if predatesTier { try await db.setMetaJSON(Affiliations.collaboratorsKey, [String: String]()) }
+            }
             try await db.setMeta(Self.membersFetchedKey, SyncEngine.format(Date()))
         }
 
@@ -85,8 +94,10 @@ actor AffiliationEngine {
                 users[login]?.mergedFetchedAt = known[login]?.mergedFetchedAt
             }
             // Commit emails cost a search each, so only look them up when nothing else matched.
+            // Being in vllm-project says nothing about an employer.
+            let employers = Org.allCases.filter { $0 != .vllm }
             let unknown = users.values.filter { user in
-                user.company == nil && !user.orgs.contains { org in Org.allCases.contains { $0.githubOrgs.contains(org) } }
+                user.company == nil && !user.orgs.contains { org in employers.contains { $0.githubOrgs.contains(org) } }
             }
             for emailBatch in unknown.map(\.login).chunked(Self.emailBatchSize) {
                 for (login, domains) in try await fetchEmailDomains(emailBatch) {
@@ -151,6 +162,40 @@ actor AffiliationEngine {
             }
             result[org.rawValue] = logins
         }
+        return result
+    }
+
+    private struct Collaborator: Decodable, Sendable {
+        let login: String
+        let roleName: String
+
+        enum CodingKeys: String, CodingKey {
+            case login
+            case roleName = "role_name"
+        }
+    }
+
+    /// Collaborators with triage access or more, including those through org teams.
+    private func fetchCollaborators() async throws -> [String: String] {
+        var result: [String: String] = [:]
+        var page = 1
+        while true {
+            let collaborators = try await client.rest(
+                "GET", "/repos/\(SyncEngine.repo)/collaborators",
+                query: [
+                    URLQueryItem(name: "affiliation", value: "all"),
+                    URLQueryItem(name: "per_page", value: "100"),
+                    URLQueryItem(name: "page", value: String(page)),
+                ],
+                as: [Collaborator].self
+            )
+            for collaborator in collaborators where collaborator.roleName != "read" {
+                result[collaborator.login.lowercased()] = collaborator.roleName
+            }
+            guard collaborators.count == 100 else { break }
+            page += 1
+        }
+        logger.info("Fetched \(result.count) collaborators")
         return result
     }
 

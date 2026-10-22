@@ -653,7 +653,7 @@ final class AppModel {
         let cutoff = Date().addingTimeInterval(-ListSection.closedRetention)
         let filter = ItemFilter(filterText)
         let affiliations = affiliations
-        let orgs = { (login: String) in affiliations.badges(for: login).map(\.org) }
+        let badges = { (login: String) in affiliations.badges(for: login) }
         let threshold = mergedThreshold
         let contribution = { (login: String) in
             affiliations.users[login.lowercased()]?.mergedCount.map { Contribution(merged: $0, threshold: threshold) }
@@ -669,7 +669,7 @@ final class AppModel {
         workingItems = Self.mineFirst(Self.yourMoveFirst(candidates
             .filter { [.working, .good].contains(ListSection.triageSection(of: $0)) }
             .sorted { $0.item.updatedAt > $1.item.updatedAt }))
-        let visible = filter.isEmpty ? candidates : candidates.filter { filter.matches($0, orgs: orgs, contribution: contribution) }
+        let visible = filter.isEmpty ? candidates : candidates.filter { filter.matches($0, badges: badges, contribution: contribution) }
 
         visibleCount = visible.count
 
@@ -680,7 +680,7 @@ final class AppModel {
                 var row = row(for: item)
                 if row.triage == .muted { return nil }
                 row.note = note
-                return filter.matches(row, orgs: orgs, contribution: contribution) ? row : nil
+                return filter.matches(row, badges: badges, contribution: contribution) ? row : nil
             }
             visibleCount = rows.count
             self.rows = [.header(.inbox, count: rows.count, collapsed: false)] + rows.map { .item(.inbox, $0) }

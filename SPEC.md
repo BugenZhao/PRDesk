@@ -152,18 +152,20 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 
 ## 5. 组织徽章
 
-显示四种：**vLLM committer**、**Inferact**、**Red Hat**、**NVIDIA**。图标用对应 GitHub 组织的头像（缓存到本地）。
+显示四种：**vLLM committer**、**Inferact**、**Red Hat**、**NVIDIA**。图标用对应 GitHub 组织的头像（缓存到本地）。vLLM 另有低一档的灰色徽章（头像去色），给不是 committer 的 `vllm-project` 组织成员和仓库 collaborator（triage 及以上权限）。
 
 判定来源按优先级从高到低，命中即生效，悬停显示命中来源：
 
 1. 手动设置：设置页里的"用户 → 组织"表，可添加，也可强制排除
-2. vLLM committer：解析仓库里的 `docs/governance/committers.md`，悬停时显示负责领域（如 "Rust frontend"）。不用 `author_association`，因为 vllm-project 的 MEMBER 范围太广
+2. vLLM committer：解析仓库里的 `docs/governance/committers.md`，悬停时显示负责领域（如 "Rust frontend"）。其次是灰色档：`vllm-project` 组织成员，再其次是仓库 collaborator（列 collaborator 需要 push 权限，没有就跳过）。不用 `author_association`：它挂在单个条目上，不按人，也随查看者权限变化
 3. GitHub 组织成员：`Inferact`、`NVIDIA`、`RedHatOfficial` / `redhat-et` / `neuralmagic`（你所在的组织如 Inferact 能看到全部成员，其余只能看到公开成员）
 4. 个人资料的 company 字段，例如 `@Inferact`、`Red Hat`、`NVIDIA`
 5. 该用户 PR commit 的作者邮箱域名：`redhat.com`、`nvidia.com`、`inferact.ai`
 6. 用户名后缀，例如 `-redhat`、`-nv`
 
-用户信息缓存 7 天；committers.md 每天刷新一次。
+用户信息缓存 7 天；committers.md、组织成员和 collaborator 每天刷新一次。
+
+过滤：`org:vllm` 匹配两档，`org:committer` 只匹配 committer，`org:member` 只匹配灰色档。
 
 ## 5.1 对人投票
 
@@ -178,7 +180,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 
 - 统计每个作者在 vllm 合并过的 PR 数（GitHub search，每批 40 人，每周刷新；为 0 的每天刷新）
 - 合并数 ≥ 阈值（默认 10，设置 → Affiliations 可改）：作者名后显示绿色描边 seal 图标；已有组织徽章的作者不显示
-- 合并数 = 0：显示灰色 "1st"
+- 合并数 = 0：显示 "1st" 小方块（青色底白字，大小形状同组织徽章）
 - 悬停显示具体数字；列表、详情头部、时间线都显示
 - 过滤：`merged:N`、`merged:>=N`（也支持 `>`、`<`、`<=`）、`is:regular`、`is:first`
 - 只存本地，不写 board，也不影响分组

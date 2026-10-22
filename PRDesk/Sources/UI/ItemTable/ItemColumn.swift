@@ -298,7 +298,9 @@ extension Vote {
 extension Badge {
     @MainActor
     var cellRun: CellRun {
-        if let image = AvatarCache.shared.image(for: org.avatarLogin) { .image(image) } else { .tile(org.shortLabel, color: .tertiaryLabelColor) }
+        let cache = AvatarCache.shared
+        let image = isSecondary ? cache.grayscaleImage(for: org.avatarLogin) : cache.image(for: org.avatarLogin)
+        return if let image { .image(image) } else { .tile(org.shortLabel, color: .tertiaryLabelColor) }
     }
 }
 

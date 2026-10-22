@@ -1,4 +1,6 @@
 import AppKit
+import CoreImage
+import CoreImage.CIFilterBuiltins
 import Observation
 
 /// Loads GitHub avatars (users and orgs) once, keeping them in memory and on disk.
@@ -11,6 +13,7 @@ final class AvatarCache {
     private(set) var version = 0
 
     @ObservationIgnored private var images: [String: NSImage] = [:]
+    @ObservationIgnored private var grayscaleImages: [String: NSImage] = [:]
     @ObservationIgnored private var loading: Set<String> = []
     nonisolated private static let directory: URL = {
         let dir = AppDatabase.directory.appending(path: "avatars", directoryHint: .isDirectory)
@@ -28,10 +31,34 @@ final class AvatarCache {
         return nil
     }
 
+    /// The avatar without color, for a lesser badge; nil while it loads.
+    func grayscaleImage(for login: String) -> NSImage? {
+        let key = login.lowercased()
+        if let image = grayscaleImages[key] { return image }
+        guard let image = image(for: key),
+              let data = image.tiffRepresentation,
+              let input = CIImage(data: data)
+        else { return nil }
+        let filter = CIFilter.colorControls()
+        filter.inputImage = input
+        filter.saturation = 0
+        guard let output = filter.outputImage,
+              let cgImage = CIContext().createCGImage(output, from: input.extent)
+        else { return nil }
+        let gray = NSImage(cgImage: cgImage, size: image.size)
+        grayscaleImages[key] = gray
+        return gray
+    }
+
     private func load(_ key: String) async {
         guard let data = await Self.fetch(key), let image = NSImage(data: data) else { return }
         images[key] = image
         version += 1
+    }
+
+    /// An avatar's image data, from disk or GitHub, for web pages.
+    nonisolated static func data(for login: String) async -> Data? {
+        await fetch(login.lowercased())
     }
 
     /// Disk and network I/O, off the main thread: this is reached while the table builds cells.

@@ -53,6 +53,16 @@ struct Badge: Hashable, Sendable {
     var org: Org
     /// Why the badge applies, shown as a tooltip.
     var source: String
+    /// Set for a lesser tie to the org, drawn in gray: a vLLM org member or collaborator who isn't
+    /// a committer.
+    var secondaryName: String?
+
+    var isSecondary: Bool { secondaryName != nil }
+    var name: String { secondaryName ?? org.displayName }
+
+    /// Names accepted by the `org:` filter token: `org:vllm` matches both vLLM tiers,
+    /// `org:committer` and `org:member` one each.
+    var filterNames: [String] { isSecondary ? [org.rawValue, "member"] : org.filterNames }
 }
 
 /// Everything known about affiliations, and the rules that turn it into badges.
@@ -61,11 +71,14 @@ struct Affiliations: Equatable, Sendable {
     var committers: [String: String] = [:]
     /// Lowercased members of each org's GitHub organizations, as visible to the viewer.
     var members: [Org: Set<String>] = [:]
+    /// Lowercased login → role (triage and up), for collaborators on the repository.
+    var collaborators: [String: String] = [:]
     var users: [String: UserInfo] = [:]
     var overrides: [OrgOverride] = []
 
     static let committersKey = "committers"
     static let membersKey = "orgMembers"
+    static let collaboratorsKey = "collaborators"
 
     /// Sources in priority order: manual, committers.md, org membership, profile company,
     /// commit email domain, username suffix.
@@ -75,14 +88,26 @@ struct Affiliations: Equatable, Sendable {
             if let override = overrides.first(where: { $0.login == key && $0.org == org }) {
                 return override.include ? Badge(org: org, source: "added manually") : nil
             }
+            if org == .vllm { return vllmBadge(for: key) }
             return source(of: org, for: key).map { Badge(org: org, source: $0) }
         }
     }
 
-    private func source(of org: Org, for key: String) -> String? {
-        if org == .vllm {
-            return committers[key].map { "committers.md: \($0)" }
+    /// Committers get the full badge; other org members and collaborators a gray one.
+    private func vllmBadge(for key: String) -> Badge? {
+        if let area = committers[key] {
+            return Badge(org: .vllm, source: "committers.md: \(area)")
         }
+        if members[.vllm]?.contains(key) == true || users[key]?.orgs.contains(where: { sameLogin($0, "vllm-project") }) == true {
+            return Badge(org: .vllm, source: "member of vllm-project", secondaryName: "vLLM member")
+        }
+        if let role = collaborators[key] {
+            return Badge(org: .vllm, source: "\(role) access to \(SyncEngine.repo)", secondaryName: "vLLM collaborator")
+        }
+        return nil
+    }
+
+    private func source(of org: Org, for key: String) -> String? {
         if members[org]?.contains(key) == true {
             return "member of \(org.githubOrgs.joined(separator: " / "))"
         }
@@ -108,7 +133,7 @@ extension Org {
     /// GitHub organizations whose members get this badge.
     var githubOrgs: [String] {
         switch self {
-        case .vllm: []
+        case .vllm: ["vllm-project"]
         case .inferact: ["Inferact"]
         case .redhat: ["RedHatOfficial", "redhat-et", "neuralmagic"]
         case .nvidia: ["NVIDIA"]
@@ -172,6 +197,7 @@ extension AppDatabase {
                     members: Dictionary(uniqueKeysWithValues: members.compactMap { key, logins in
                         Org(rawValue: key).map { ($0, Set(logins)) }
                     }),
+                    collaborators: meta(Affiliations.collaboratorsKey) ?? [:],
                     users: Dictionary(uniqueKeysWithValues: UserInfo.fetchAll(db).map { ($0.login, $0) }),
                     overrides: OrgOverride.order(Column("login")).fetchAll(db)
                 )

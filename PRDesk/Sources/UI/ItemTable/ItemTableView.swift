@@ -451,7 +451,7 @@ struct ItemTableView: NSViewRepresentable {
             guard let author else { return nil }
             let lines = [author]
                 + (parent.contribution(author).map { [$0.summary] } ?? [])
-                + parent.badges(author).map { "\($0.org.displayName) — \($0.source)" }
+                + parent.badges(author).map { "\($0.name) — \($0.source)" }
             return lines.joined(separator: "\n")
         }
 

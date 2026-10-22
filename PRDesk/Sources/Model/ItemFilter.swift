@@ -33,7 +33,7 @@ struct ItemFilter: Equatable {
 
     var isEmpty: Bool { text.isEmpty && tokens.isEmpty }
 
-    func matches(_ row: ItemRow, orgs: (String) -> [Org], contribution: (String) -> Contribution?) -> Bool {
+    func matches(_ row: ItemRow, badges: (String) -> [Badge], contribution: (String) -> Contribution?) -> Bool {
         let item = row.item
         for word in text {
             let hit = item.title.lowercased().contains(word)
@@ -42,12 +42,12 @@ struct ItemFilter: Equatable {
             if !hit { return false }
         }
         for token in tokens where token.value.isEmpty == false {
-            if matches(token, row, orgs: orgs, contribution: contribution) == token.negated { return false }
+            if matches(token, row, badges: badges, contribution: contribution) == token.negated { return false }
         }
         return true
     }
 
-    private func matches(_ token: Token, _ row: ItemRow, orgs: (String) -> [Org], contribution: (String) -> Contribution?) -> Bool {
+    private func matches(_ token: Token, _ row: ItemRow, badges: (String) -> [Badge], contribution: (String) -> Contribution?) -> Bool {
         let item = row.item
         let value = token.value
         let authorContribution = item.author.flatMap(contribution)
@@ -100,7 +100,7 @@ struct ItemFilter: Equatable {
             return Self.compare(merged, value)
         case "org":
             guard let author = item.author else { return false }
-            return orgs(author).contains { $0.filterNames.contains(value) }
+            return badges(author).contains { $0.filterNames.contains(value) }
         default:
             return false
         }
