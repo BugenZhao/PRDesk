@@ -10,6 +10,8 @@ enum ItemAction {
     case markRead
     case toggleUntrack
     case openInBrowser
+    /// Vote on the item's author; voting the same way again clears the vote.
+    case voteAuthor(Vote)
 }
 
 @MainActor
@@ -104,6 +106,24 @@ final class AppModel {
         selection.flatMap { itemsByID[$0.itemID] }
     }
 
+    /// Votes on people, by lowercased login.
+    private(set) var votes: [String: Vote] = [:]
+
+    func vote(for login: String?) -> Vote? {
+        login.flatMap { votes[$0.lowercased()] }
+    }
+
+    /// Sets or (with nil) clears the vote on `login`.
+    func setVote(_ vote: Vote?, for login: String) {
+        Task {
+            do {
+                try await db.setVote(vote, for: login)
+            } catch {
+                logger.error("Failed to vote on \(login): \(error)")
+            }
+        }
+    }
+
     func state(for item: Item) -> ItemState {
         snapshot.states[item.number] ?? ItemState(number: item.number)
     }
@@ -117,6 +137,7 @@ final class AppModel {
                 for try await snapshot in db.observeSnapshot() {
                     guard let self else { return }
                     self.snapshot = snapshot
+                    if votes != snapshot.votes { votes = snapshot.votes }
                     rebuild()
                     if let item = selectedItem, let detail, detail.number == item.number, detail.itemUpdatedAt < item.updatedAt {
                         loadDetail()
@@ -284,6 +305,9 @@ final class AppModel {
             updateState(item) { $0.untrackedAt = $0.untrackedAt == nil ? now : nil }
         case .openInBrowser:
             if let url = URL(string: item.url) { NSWorkspace.shared.open(url) }
+        case let .voteAuthor(vote):
+            guard let author = item.author else { return }
+            setVote(self.vote(for: author) == vote ? nil : vote, for: author)
         }
     }
 
@@ -411,7 +435,7 @@ final class AppModel {
             let insight = ItemInsight(item: item, state: state, viewer: viewer, baseline: snapshot.baseline)
             if !insight.isTracked, !filter.showsUntracked { return nil }
             if !item.isOpen, (item.closedAt ?? item.updatedAt) < cutoff, !state.isPinned { return nil }
-            return ItemRow(item: item, state: state, insight: insight)
+            return ItemRow(item: item, state: state, insight: insight, authorVote: vote(for: item.author))
         }
         focusItems = candidates.filter(Self.isFocus)
         let visible = filter.isEmpty ? candidates : candidates.filter { filter.matches($0, orgs: orgs) }
@@ -423,7 +447,11 @@ final class AppModel {
             let rows: [ItemRow] = inbox.compactMap { note in
                 guard let item = byNumber[note.number] else { return nil }
                 let state = state(for: item)
-                var row = ItemRow(item: item, state: state, insight: ItemInsight(item: item, state: state, viewer: viewer, baseline: snapshot.baseline))
+                var row = ItemRow(
+                    item: item, state: state,
+                    insight: ItemInsight(item: item, state: state, viewer: viewer, baseline: snapshot.baseline),
+                    authorVote: vote(for: item.author)
+                )
                 row.note = note
                 return filter.matches(row, orgs: orgs) ? row : nil
             }
@@ -461,6 +489,8 @@ final class AppModel {
     private static func isFocus(_ row: ItemRow) -> Bool {
         guard row.item.isOpen, row.insight.isTracked, !isDismissed(row) else { return false }
         if row.state.priority == .high { return true }
+        // Downvoted authors never claim attention; only an explicit H on the item overrides that.
+        if row.authorVote == .down { return false }
         // Own PRs nobody has touched in a while (e.g. parked drafts with conflicts) aren't urgent.
         if row.item.kind == .pullRequest, row.insight.isMine,
            Date().timeIntervalSince(row.insight.lastHumanActivityAt) > ownStaleAfter

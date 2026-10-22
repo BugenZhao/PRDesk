@@ -3,7 +3,7 @@ import Foundation
 /// A parsed filter string: free text plus `key:value` tokens.
 ///
 /// Supported tokens: `is:pr|issue|draft|open|closed|merged|unread|pinned|untracked`,
-/// `turn:me|them`, `author:x`, `label:x`, `ci:fail|pending|pass`, `p:h|m|l`, `org:x`.
+/// `turn:me|them`, `author:x`, `label:x`, `ci:fail|pending|pass`, `p:h|m|l`, `org:x`, `vote:up|down|none`.
 /// A leading `-` negates a token.
 struct ItemFilter: Equatable {
     struct Token: Equatable {
@@ -12,7 +12,7 @@ struct ItemFilter: Equatable {
         var negated: Bool
     }
 
-    private static let keys: Set = ["is", "turn", "author", "label", "ci", "p", "org"]
+    private static let keys: Set = ["is", "turn", "author", "label", "ci", "p", "org", "vote"]
 
     var text: [String] = []
     var tokens: [Token] = []
@@ -83,6 +83,13 @@ struct ItemFilter: Equatable {
             }
         case "p":
             return row.state.priority?.letter.lowercased() == value
+        case "vote":
+            return switch value {
+            case "up": row.authorVote == .up
+            case "down": row.authorVote == .down
+            case "none": row.authorVote == nil
+            default: false
+            }
         case "org":
             guard let author = item.author else { return false }
             return orgs(author).contains { $0.filterNames.contains(value) }

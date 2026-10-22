@@ -20,7 +20,8 @@ struct AvatarView: View {
     }
 }
 
-/// A login, shown in the accent color when it is the signed-in user.
+/// A login, shown in the accent color when it is the signed-in user, followed by the viewer's
+/// vote on that person. Right-click to vote.
 struct LoginText: View {
     @Environment(AppModel.self) private var model
     let login: String?
@@ -28,9 +29,38 @@ struct LoginText: View {
 
     var body: some View {
         let isMe = sameLogin(login, model.viewer)
-        Text(login ?? "ghost")
-            .fontWeight(isMe ? .semibold : weight)
-            .foregroundStyle(isMe ? Color.accentColor : Color.primary)
+        HStack(spacing: 3) {
+            Text(login ?? "ghost")
+                .fontWeight(isMe ? .semibold : weight)
+                .foregroundStyle(isMe ? Color.accentColor : Color.primary)
+            if let vote = model.vote(for: login) {
+                Image(systemName: vote.symbol)
+                    .font(.caption2)
+                    .foregroundStyle(Color(nsColor: vote.nsColor))
+                    .help(vote == .up ? "Upvoted" : "Downvoted: never puts items in Focus")
+            }
+        }
+        .contextMenu {
+            if let login, !isMe {
+                VoteMenu(login: login)
+            }
+        }
+    }
+}
+
+/// Upvote / clear / downvote choices for a person.
+struct VoteMenu: View {
+    @Environment(AppModel.self) private var model
+    let login: String
+
+    var body: some View {
+        let current = model.vote(for: login)
+        Button("Upvote \(login)", systemImage: "hand.thumbsup") { model.setVote(.up, for: login) }
+            .disabled(current == .up)
+        Button("Downvote \(login)", systemImage: "hand.thumbsdown") { model.setVote(.down, for: login) }
+            .disabled(current == .down)
+        Button("Clear Vote", systemImage: "hand.raised.slash") { model.setVote(nil, for: login) }
+            .disabled(current == nil)
     }
 }
 

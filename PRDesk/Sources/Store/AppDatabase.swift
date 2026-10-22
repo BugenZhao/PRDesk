@@ -103,6 +103,13 @@ final class AppDatabase: Sendable {
             try db.execute(sql: "DELETE FROM meta WHERE key = 'lastSyncStartedAt'")
             try db.execute(sql: "DELETE FROM detailCache")
         }
+        migrator.registerMigration("v7") { db in
+            try db.create(table: "authorVote") { t in
+                t.primaryKey("login", .text)
+                t.column("vote", .integer).notNull()
+                t.column("votedAt", .datetime).notNull()
+            }
+        }
         return migrator
     }
 }
@@ -193,6 +200,8 @@ struct Snapshot: Equatable, Sendable {
     var states: [Int: ItemState] = [:]
     /// Unread before this moment is ignored, so a first sync doesn't mark everything unread.
     var baseline: Date?
+    /// Votes by lowercased login.
+    var votes: [String: Vote] = [:]
 }
 
 extension AppDatabase {
@@ -207,7 +216,8 @@ extension AppDatabase {
                 return try Snapshot(
                     items: Item.order(Item.Columns.updatedAt.desc).fetchAll(db),
                     states: Dictionary(uniqueKeysWithValues: ItemState.fetchAll(db).map { ($0.number, $0) }),
-                    baseline: baseline
+                    baseline: baseline,
+                    votes: Dictionary(uniqueKeysWithValues: AuthorVote.fetchAll(db).map { ($0.login, $0.vote) })
                 )
             }
             .removeDuplicates()

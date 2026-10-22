@@ -106,7 +106,8 @@ enum ItemColumn: String, CaseIterable {
                 font: isMine ? CellFont.regularBold : CellFont.regular,
                 flexible: true
             )
-            return [name] + (item.author.map(badges) ?? []).map(\.cellRun)
+            let vote: [CellRun] = row.authorVote.map { [.symbol($0.symbol, color: $0.nsColor)] } ?? []
+            return [name] + vote + (item.author.map(badges) ?? []).map(\.cellRun)
 
         case .review:
             return reviewRuns(row, viewer: viewer)
@@ -192,6 +193,22 @@ enum ItemColumn: String, CaseIterable {
             runs.append(.chip("rdy", color: .systemGreen))
         }
         return runs
+    }
+}
+
+extension Vote {
+    var symbol: String {
+        switch self {
+        case .up: "hand.thumbsup.fill"
+        case .down: "hand.thumbsdown.fill"
+        }
+    }
+
+    var nsColor: NSColor {
+        switch self {
+        case .up: .systemGreen
+        case .down: .systemRed
+        }
     }
 }
 

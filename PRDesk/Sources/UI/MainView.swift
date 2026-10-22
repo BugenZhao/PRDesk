@@ -101,7 +101,7 @@ struct MainView: View {
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
             Spacer(minLength: 8)
-            Text("j/k move · 1/2/3 priority · p pin · d drop from focus · n mark read · c comment · o open · u untrack")
+            Text("j/k move · 1/2/3 priority · p pin · d drop from focus · n mark read · c comment · o open · u untrack · +/- vote author")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
                 .lineLimit(1)

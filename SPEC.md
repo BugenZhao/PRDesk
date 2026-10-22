@@ -116,6 +116,15 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 
 用户信息缓存 7 天；committers.md 每天刷新一次。
 
+## 5.1 对人投票
+
+- 每个人可以是 upvote / 默认 / downvote，只存在本地
+- 作者名后显示 👍 / 👎 小图标（列表、详情头部、时间线）
+- downvote 的作者：他的所有条目都不进 Focus（单条标了 H 的除外），其余分组不受影响
+- upvote 目前只显示图标，没有其他效果
+- 操作：选中行按 `+` / `-`（再按一次取消），右键行或右键人名，设置 → Votes 管理
+- 过滤：`vote:up` / `vote:down` / `vote:none`
+
 ## 6. 详情面板
 
 - **头部**：标题、作者和徽章、状态（draft / open / merged / closed）、CI 汇总、mergeable / conflicts、labels、创建和更新时间

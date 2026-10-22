@@ -178,6 +178,8 @@ struct ItemTableView: NSViewRepresentable {
                 case "d": .dismissFocus
                 case "n": .markRead
                 case "u": .toggleUntrack
+                case "+", "=": .voteAuthor(.up)
+                case "-": .voteAuthor(.down)
                 case "o", "\r": .openInBrowser
                 default: nil
                 }
@@ -247,7 +249,11 @@ struct ItemTableView: NSViewRepresentable {
             ("Remove from Focus", .dismissFocus),
             ("Mark as Read", .markRead),
             ("Untrack / Track", .toggleUntrack),
+            ("Upvote Author", .voteAuthor(.up)),
+            ("Downvote Author", .voteAuthor(.down)),
         ]
+        /// Indices of `menuActions` after which a separator goes.
+        private static let menuSeparatorsAfter: Set = [0, 4, 8]
 
         func makeContextMenu() -> NSMenu {
             let menu = NSMenu()
@@ -256,7 +262,7 @@ struct ItemTableView: NSViewRepresentable {
                 item.tag = index
                 item.target = self
                 menu.addItem(item)
-                if index == 0 || index == 4 { menu.addItem(.separator()) }
+                if Self.menuSeparatorsAfter.contains(index) { menu.addItem(.separator()) }
             }
             menu.addItem(.separator())
             let copy = NSMenuItem(title: "Copy Link", action: #selector(copyLink), keyEquivalent: "")
@@ -274,6 +280,13 @@ struct ItemTableView: NSViewRepresentable {
         func menuNeedsUpdate(_ menu: NSMenu) {
             let enabled = clickedItemID != nil
             for item in menu.items { item.isHidden = !enabled }
+            // Check the vote item matching the clicked author's current vote.
+            guard let table, rows.indices.contains(table.clickedRow), case let .item(_, row) = rows[table.clickedRow] else { return }
+            for item in menu.items where item.action == #selector(performMenuAction(_:)) {
+                if case let .voteAuthor(vote) = Self.menuActions[item.tag].1 {
+                    item.state = row.authorVote == vote ? .on : .off
+                }
+            }
         }
 
         @objc private func performMenuAction(_ sender: NSMenuItem) {

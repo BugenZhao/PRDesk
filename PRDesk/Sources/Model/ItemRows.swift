@@ -7,6 +7,8 @@ struct ItemRow: Hashable, Sendable {
     var insight: ItemInsight
     /// The notification that brought the item to the Inbox.
     var note: InboxNote?
+    /// The viewer's vote on the item's author.
+    var authorVote: Vote?
 }
 
 enum ListSection: String, CaseIterable, Codable, Sendable {
