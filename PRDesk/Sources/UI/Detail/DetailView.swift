@@ -3,6 +3,8 @@ import SwiftUI
 /// The right-hand pane: header, then Conversation / Checks for the selected item.
 struct DetailView: View {
     @Environment(AppModel.self) private var model
+    /// Whether the inspector is open; its toolbar items otherwise linger after it closes.
+    let isShown: Bool
     @State private var tab: DetailTab = .conversation
 
     enum DetailTab: Hashable {
@@ -26,20 +28,22 @@ struct DetailView: View {
             }
         }
         .toolbar {
-            // In the inspector's part of the window toolbar, over the pane it switches. Always
-            // there (disabled unless a PR is shown): without an item of its own the inspector has
-            // no toolbar section, and the list's buttons jump to the window's far edge.
-            ToolbarItem {
-                let pullRequest = model.selectedItem.flatMap { $0.kind == .pullRequest ? $0 : nil }
-                Picker("View", selection: $tab) {
-                    Text("Conversation").tag(DetailTab.conversation)
-                    Text(pullRequest.map(checksTitle) ?? "Checks").tag(DetailTab.checks)
-                    Text("Files").tag(DetailTab.files)
+            // In the inspector's part of the window toolbar, over the pane it switches. Present
+            // whenever the pane is open (disabled unless a PR is shown): without an item of its own
+            // the inspector has no toolbar section, and the list's buttons jump to the far edge.
+            if isShown {
+                ToolbarItem {
+                    let pullRequest = model.selectedItem.flatMap { $0.kind == .pullRequest ? $0 : nil }
+                    Picker("View", selection: $tab) {
+                        Text("Conversation").tag(DetailTab.conversation)
+                        Text(pullRequest.map(checksTitle) ?? "Checks").tag(DetailTab.checks)
+                        Text("Files").tag(DetailTab.files)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
+                    .disabled(pullRequest == nil)
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
-                .disabled(pullRequest == nil)
             }
         }
     }

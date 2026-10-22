@@ -31,7 +31,7 @@ struct MainView: View {
         }
         .frame(minWidth: 560, maxHeight: .infinity)
         .inspector(isPresented: $showsDetail) {
-            DetailView()
+            DetailView(isShown: showsDetail)
                 // The inspector column ignores the status bar's inset; keep its bottom (the
                 // composer's buttons) clear of the bar.
                 .padding(.bottom, StatusBar.height)
