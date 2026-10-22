@@ -196,7 +196,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
   - 自上次查看以来的新内容高亮，并自动滚到第一条新内容
 - **Checks**：按状态分组列出 check runs 和 statuses，失败的置顶，点击打开日志 URL
 - **Files**（v1 只读）：变更文件列表和 diff；每个文件默认折叠，文件名过长时省略中间
-- **写操作**：底部是 Markdown 评论框（支持预览，`⌘↩` 发送）
+- **写操作**：底部是 Markdown 评论框（支持预览，`⌘↩` 发送）；open 的条目可以 Close：PR 直接关，issue 选 completed / not planned。框里有内容时先作为评论发出再关（Close with comment）。关之前要确认，没有快捷键
   - PR：Comment / Approve / Request changes，以带正文的整体 review 提交
   - Issue：仅 Comment
   - 行内代码评论放到 v2，届时在 Files 里实现
@@ -239,5 +239,5 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 2. 分组、本地状态、快捷键、过滤、颜色、排序和列持久化
 3. 组织徽章（自动来源 + 手动设置）
 4. 详情：头部、Conversation（原生时间线 + WebView 正文）、Checks
-5. 写操作：评论、review；Inbox
+5. 写操作：评论、review、关闭；Inbox
 6. 打磨：Files diff、菜单栏和 Dock 未读数、性能

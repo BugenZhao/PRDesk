@@ -321,6 +321,18 @@ final class AppModel {
         loadDetail(force: true)
     }
 
+    /// Closes the item, posting `comment` on it first unless it is empty.
+    func close(_ item: Item, detail: ItemDetail, reason: CloseReason?, comment: String) async throws {
+        if !comment.isEmpty {
+            try await engine.submit(.comment, body: comment, subjectID: detail.id)
+            setDraft("", for: item.number)
+        }
+        try await engine.close(subjectID: detail.id, isPullRequest: item.kind == .pullRequest, reason: reason)
+        updateState(item) { $0.seenAt = Date() }
+        _ = try? await engine.refresh(ids: [item.id])
+        loadDetail(force: true)
+    }
+
     func renderMarkdown(_ text: String) async throws -> String {
         try await engine.renderMarkdown(text)
     }

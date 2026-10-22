@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Markdown composer under the conversation: comment, or (on PRs) approve / request changes.
+/// Markdown composer under the conversation: comment, close (with the text as a comment), or (on
+/// PRs) approve / request changes.
 struct ComposerView: View {
     @Environment(AppModel.self) private var model
     let item: Item
@@ -10,12 +11,21 @@ struct ComposerView: View {
     @State private var previewHTML: String?
     @State private var isPreviewing = false
     @State private var sending: Submission?
+    @State private var isClosing = false
+    /// The close waiting for confirmation; its reason is nil for a PR.
+    @State private var pendingClose: PendingClose?
     @State private var error: String?
     /// The item whose draft `text` holds.
     @State private var draftNumber: Int?
     @FocusState private var focused: Bool
 
+    private struct PendingClose: Equatable {
+        var reason: CloseReason?
+    }
+
     private var trimmed: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var isBusy: Bool { sending != nil || isClosing }
+    private var closeTitle: String { trimmed.isEmpty ? "Close" : "Close with comment" }
 
     /// Grows with the number of lines, from three to about nine.
     private var editorHeight: CGFloat {
@@ -70,21 +80,24 @@ struct ComposerView: View {
                         .help(error)
                 }
                 Spacer()
-                if sending != nil {
+                if isBusy {
                     ProgressView().controlSize(.small)
+                }
+                if item.isOpen {
+                    closeButton
                 }
                 if item.kind == .pullRequest, item.isOpen, !isAuthor {
                     Button("Request changes") { send(.requestChanges) }
-                        .disabled(trimmed.isEmpty || sending != nil)
+                        .disabled(trimmed.isEmpty || isBusy)
                         .help("Submit a review requesting changes; needs a comment")
                     Button("Approve") { send(.approve) }
-                        .disabled(sending != nil)
+                        .disabled(isBusy)
                         .help("Submit an approving review, with the text as its comment")
                 }
                 Button("Comment") { send(.comment) }
                     .keyboardShortcut(.return, modifiers: .command)
                     .buttonStyle(.borderedProminent)
-                    .disabled(trimmed.isEmpty || sending != nil)
+                    .disabled(trimmed.isEmpty || isBusy)
             }
             .controlSize(.small)
         }
@@ -105,6 +118,57 @@ struct ComposerView: View {
         .onChange(of: model.composerFocusRequest) {
             isPreviewing = false
             focused = true
+        }
+        .confirmationDialog(
+            "Close #\(item.number)?",
+            isPresented: Binding(get: { pendingClose != nil }, set: { if !$0 { pendingClose = nil } }),
+            presenting: pendingClose
+        ) { pending in
+            Button(closeTitle, role: .destructive) { close(reason: pending.reason) }
+        } message: { pending in
+            Text(closeMessage(pending.reason))
+        }
+    }
+
+    /// PRs close outright; issues ask why, as on GitHub.
+    @ViewBuilder private var closeButton: some View {
+        if item.kind == .pullRequest {
+            Button(closeTitle) { pendingClose = PendingClose(reason: nil) }
+                .disabled(isBusy)
+                .help("Close the pull request, posting the text as a comment first")
+        } else {
+            Menu(closeTitle) {
+                Button("Close as completed") { pendingClose = PendingClose(reason: .completed) }
+                Button("Close as not planned") { pendingClose = PendingClose(reason: .notPlanned) }
+            }
+            .fixedSize(horizontal: true, vertical: false)
+            .disabled(isBusy)
+            .help("Close the issue, posting the text as a comment first")
+        }
+    }
+
+    private func closeMessage(_ reason: CloseReason?) -> String {
+        let what = switch reason {
+        case nil: "The pull request will be closed"
+        case .completed: "The issue will be closed as completed"
+        case .notPlanned: "The issue will be closed as not planned"
+        }
+        return trimmed.isEmpty ? "\(what)." : "\(what), after posting your comment."
+    }
+
+    private func close(reason: CloseReason?) {
+        let body = trimmed
+        isClosing = true
+        error = nil
+        Task {
+            do {
+                try await model.close(item, detail: detail, reason: reason, comment: body)
+                text = ""
+                isPreviewing = false
+            } catch {
+                self.error = error.localizedDescription
+            }
+            isClosing = false
         }
     }
 

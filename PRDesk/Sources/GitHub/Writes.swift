@@ -16,6 +16,12 @@ enum Submission: Sendable {
     }
 }
 
+/// Why an issue was closed; PRs are closed without one.
+enum CloseReason: String, Sendable {
+    case completed = "COMPLETED"
+    case notPlanned = "NOT_PLANNED"
+}
+
 /// A notification thread from the GitHub inbox, for an issue or PR in the repository.
 struct InboxNote: Hashable, Sendable {
     var threadID: String
@@ -75,6 +81,29 @@ extension SyncEngine {
             _ = try await client.query(
                 "mutation($input: AddCommentInput!) { addComment(input: $input) { clientMutationId } }",
                 variables: Variables(input: Input(subjectId: subjectID, body: body)),
+                as: [String: Ignored].self,
+                strict: true
+            )
+        }
+    }
+
+    func close(subjectID: String, isPullRequest: Bool, reason: CloseReason?) async throws {
+        if isDryRun("close \(subjectID) (\(reason?.rawValue ?? "no reason"))") { return }
+        if isPullRequest {
+            struct Input: Encodable, Sendable { let pullRequestId: String }
+            struct Variables: Encodable, Sendable { let input: Input }
+            _ = try await client.query(
+                "mutation($input: ClosePullRequestInput!) { closePullRequest(input: $input) { clientMutationId } }",
+                variables: Variables(input: Input(pullRequestId: subjectID)),
+                as: [String: Ignored].self,
+                strict: true
+            )
+        } else {
+            struct Input: Encodable, Sendable { let issueId: String; let stateReason: String? }
+            struct Variables: Encodable, Sendable { let input: Input }
+            _ = try await client.query(
+                "mutation($input: CloseIssueInput!) { closeIssue(input: $input) { clientMutationId } }",
+                variables: Variables(input: Input(issueId: subjectID, stateReason: reason?.rawValue)),
                 as: [String: Ignored].self,
                 strict: true
             )
