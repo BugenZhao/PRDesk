@@ -38,7 +38,7 @@ struct DetailView: View {
                     ToolbarItem {
                         Picker("View", selection: $tab) {
                             Text("Conversation").tag(DetailTab.conversation)
-                            Text(checksTitle(item)).tag(DetailTab.checks)
+                            Text("Checks").tag(DetailTab.checks)
                             Text("Files").tag(DetailTab.files)
                         }
                         .pickerStyle(.segmented)
@@ -51,11 +51,6 @@ struct DetailView: View {
                 }
             }
         }
-    }
-
-    private func checksTitle(_ item: Item) -> String {
-        guard let ci = item.ci else { return "Checks" }
-        return ci.failed > 0 ? "Checks (\(ci.failed) failed)" : "Checks (\(ci.total))"
     }
 
     @ViewBuilder
