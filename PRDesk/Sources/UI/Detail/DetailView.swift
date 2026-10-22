@@ -5,26 +5,24 @@ struct DetailView: View {
     @Environment(AppModel.self) private var model
     /// Whether the inspector is open; its toolbar items otherwise linger after it closes.
     let isShown: Bool
-    @State private var tab: DetailTab = .conversation
     /// The pages live as long as the pane, so switching items or tabs doesn't reload them.
     @State private var timelinePage = WebDocument(kind: .timeline)
     @State private var filesPage = WebDocument(kind: .files)
 
-    enum DetailTab: Hashable {
-        case conversation, checks, files
-    }
+    typealias DetailTab = AppModel.DetailTab
 
     var body: some View {
-        Group {
+        @Bindable var model = model
+        return Group {
             if let item = model.selectedItem {
                 VStack(spacing: 0) {
-                    DetailHeader(item: item, state: model.state(for: item), tab: $tab)
+                    DetailHeader(item: item, state: model.state(for: item), tab: $model.detailTab)
                         .padding(12)
                     Divider()
                     content(item)
                 }
                 .onChange(of: item.number) {
-                    if item.kind == .issue { tab = .conversation }
+                    if item.kind == .issue { model.detailTab = .conversation }
                 }
             } else {
                 ContentUnavailableView("No Selection", systemImage: "sidebar.right", description: Text("Select a PR or issue."))
@@ -39,20 +37,13 @@ struct DetailView: View {
                 page.openItem = { [model] number in model.openItem(number: number) }
             }
         }
-        .modifier(DetailToolbar(isShown: isShown, showsTabs: showsTabs, tab: $tab))
-        // For View > Conversation / Checks / Files (⌥⌘1–3).
-        .focusedSceneValue(\.detailTab, showsTabs ? $tab : nil)
-    }
-
-    /// Only PRs have Checks and Files.
-    private var showsTabs: Bool {
-        isShown && model.selectedItem?.kind == .pullRequest
+        .modifier(DetailToolbar(isShown: isShown, showsTabs: isShown && model.selectedItem?.kind == .pullRequest, tab: $model.detailTab))
     }
 
     @ViewBuilder
     private func content(_ item: Item) -> some View {
         if let detail = model.detail, detail.number == item.number {
-            switch tab {
+            switch model.detailTab {
             case .conversation:
                 VStack(spacing: 0) {
                     ConversationView(item: item, detail: detail, previousSeenAt: model.selectedItemPreviousSeenAt, page: timelinePage)
@@ -76,11 +67,6 @@ struct DetailView: View {
             DelayedProgressView()
         }
     }
-}
-
-extension FocusedValues {
-    /// The detail pane's tab, while it shows a PR.
-    @Entry var detailTab: Binding<DetailView.DetailTab>?
 }
 
 /// The Conversation / Checks / Files tabs in the inspector's part of the window toolbar. Its own

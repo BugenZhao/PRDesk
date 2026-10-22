@@ -57,6 +57,8 @@ final class AppModel {
     var selection: TableSelection? {
         didSet {
             if hasSelection != (selection != nil) { hasSelection.toggle() }
+            let isPullRequest = selectedItem?.kind == .pullRequest
+            if selectionIsPullRequest != isPullRequest { selectionIsPullRequest = isPullRequest }
             selectionChanged(from: oldValue)
         }
     }
@@ -64,6 +66,16 @@ final class AppModel {
     /// Whether anything is selected. Observed apart from `selection`, so views that only care
     /// about this (the menu commands) aren't rebuilt each time the selection moves.
     private(set) var hasSelection = false
+    /// Whether the selection is a PR, which has the Checks and Files tabs; observed apart from it
+    /// for the same reason.
+    private(set) var selectionIsPullRequest = false
+
+    enum DetailTab: Hashable {
+        case conversation, checks, files
+    }
+
+    /// The detail pane's tab. Here rather than in the pane, for the View menu's commands.
+    var detailTab: DetailTab = .conversation
 
     enum ListMode: Hashable {
         case dashboard, inbox

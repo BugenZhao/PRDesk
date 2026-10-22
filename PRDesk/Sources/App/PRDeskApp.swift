@@ -56,7 +56,6 @@ private struct MenuBarLabel: View {
 /// need, so moving the selection doesn't rebuild the menus.
 private struct AppCommands: Commands {
     let model: AppModel
-    @FocusedBinding(\.detailTab) private var detailTab
 
     var body: some Commands {
         // View > Show / Hide Inspector (⌃⌘I) for the detail pane.
@@ -73,15 +72,15 @@ private struct AppCommands: Commands {
                 .keyboardShortcut("2")
             Divider()
             // The detail pane's tabs, as Xcode numbers its inspectors.
-            Button("Conversation") { detailTab = .conversation }
+            Button("Conversation") { model.detailTab = .conversation }
                 .keyboardShortcut("1", modifiers: [.command, .option])
-                .disabled(detailTab == nil)
-            Button("Checks") { detailTab = .checks }
+                .disabled(!model.selectionIsPullRequest)
+            Button("Checks") { model.detailTab = .checks }
                 .keyboardShortcut("2", modifiers: [.command, .option])
-                .disabled(detailTab == nil)
-            Button("Files") { detailTab = .files }
+                .disabled(!model.selectionIsPullRequest)
+            Button("Files") { model.detailTab = .files }
                 .keyboardShortcut("3", modifiers: [.command, .option])
-                .disabled(detailTab == nil)
+                .disabled(!model.selectionIsPullRequest)
         }
         CommandMenu("Go") {
             Button("Back") { model.goBack() }
