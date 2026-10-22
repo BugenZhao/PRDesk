@@ -214,17 +214,23 @@ extension AppDatabase {
 
 extension AppDatabase {
     /// Replaces the cached board with `entries`, except for `keeping`: numbers the app has just
-    /// written, whose local value is newer than what the sync read.
-    func replaceBoard(_ entries: [BoardEntry], keeping: Set<Int>) async throws {
+    /// written, whose local value is newer than what the sync read. Returns the entries it replaced.
+    func replaceBoard(_ entries: [BoardEntry], keeping: Set<Int>) async throws -> [Int: BoardEntry] {
         try await writer.write { db in
-            let kept = try BoardEntry.filter(keys: Array(keeping)).fetchAll(db)
+            let previous = try Dictionary(uniqueKeysWithValues: BoardEntry.fetchAll(db).map { ($0.number, $0) })
             try BoardEntry.deleteAll(db)
-            for entry in entries where !keeping.contains(entry.number) {
+            for var entry in entries where !keeping.contains(entry.number) {
+                // Setting the same option again (renewing a skip) may leave GitHub's time alone.
+                if let old = previous[entry.number], old.status == entry.status,
+                   let at = old.statusAt, at > entry.statusAt ?? .distantPast {
+                    entry.statusAt = at
+                }
                 try entry.insert(db)
             }
-            for entry in kept {
-                try entry.insert(db)
+            for number in keeping {
+                try previous[number]?.insert(db)
             }
+            return previous
         }
     }
 

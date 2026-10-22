@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// The triage board: a GitHub Project whose Status, Priority and Comment fields are the source of
 /// truth for triage (SPEC §3.1).
@@ -176,7 +177,11 @@ extension SyncEngine {
         } while after != nil
         // Writes made while the board was being read would be undone by what it read.
         let recent = Set(boardWrites.filter { $0.value > startedAt.addingTimeInterval(-Self.boardWriteGrace) }.keys)
-        try await db.replaceBoard(entries, keeping: recent)
+        let previous = try await db.replaceBoard(entries, keeping: recent)
+        // The first read has nothing to compare with.
+        if !previous.isEmpty {
+            await followStatusChanges(entries.filter { !recent.contains($0.number) }, previous: previous)
+        }
         return entries.filter { !$0.isForeign && !$0.isArchived }.map(\.contentID)
     }
 
@@ -283,20 +288,45 @@ extension SyncEngine {
             let (id, option) = try Self.option(schema.status, named: status.rawValue, in: "Status")
             return (id, FieldValue(singleSelectOptionId: option))
         }
-        let subscription = status?.subscription ?? (previous?.isQuiet == true ? "SUBSCRIBED" : nil)
-        // Only the notification thread can be muted for good, and only once it exists.
-        let threadIgnored: Bool? = status == .muted ? true : previous == .muted ? false : nil
         do {
-            if let subscription, subscription != previous?.subscription {
-                try await setSubscription(subscription, subjectID: contentID)
-            }
-            if let threadIgnored, let thread = try await notificationThread(number: number) {
-                try await setThread(thread, ignored: threadIgnored)
-            }
+            try await followSubscription(from: previous, to: status, number: number, contentID: contentID)
         } catch {
             throw BoardError.subscription(status: status?.rawValue ?? "untriaged", underlying: error.localizedDescription)
         }
     }
+
+    /// Moves the subscription along with a Status change: quiet statuses turn notifications down,
+    /// leaving them turns them back on. Setting the same status again (renewing a woken skip)
+    /// applies its subscription again, since a mention may have subscribed the viewer since.
+    private func followSubscription(from previous: TriageStatus?, to status: TriageStatus?, number: Int, contentID: String) async throws {
+        let renewing = status != nil && status == previous
+        let subscription = status?.subscription ?? (previous?.isQuiet == true ? "SUBSCRIBED" : nil)
+        // Only the notification thread can be muted for good, and only once it exists.
+        let threadIgnored: Bool? = status == .muted ? true : previous == .muted ? false : nil
+        if let subscription, renewing || subscription != previous?.subscription {
+            try await setSubscription(subscription, subjectID: contentID)
+        }
+        if let threadIgnored, let thread = try await notificationThread(number: number) {
+            try await setThread(thread, ignored: threadIgnored)
+        }
+    }
+
+    /// Follows Status changes made outside the app (on the web) with the subscription, as
+    /// `setTriage` does for the app's own. Only a change counts, so a subscription changed by hand
+    /// on GitHub afterwards stands. Done is set by the board's workflow, not a triage decision.
+    private func followStatusChanges(_ entries: [BoardEntry], previous: [Int: BoardEntry]) async {
+        for entry in entries where !entry.isForeign && !entry.isArchived && entry.status != "Done" {
+            let before = previous[entry.number]
+            guard before?.isForeign != true, before?.triage != entry.triage else { continue }
+            do {
+                try await followSubscription(from: before?.triage, to: entry.triage, number: entry.number, contentID: entry.contentID)
+            } catch {
+                Self.boardLogger.error("Failed to follow the Status of #\(entry.number) with its subscription: \(String(describing: error), privacy: .public)")
+            }
+        }
+    }
+
+    private static let boardLogger = Logger(subsystem: "com.bugenzhao.PRDesk", category: "Board")
 
     func setPriority(_ priority: Priority?, number: Int, contentID: String) async throws {
         try await writeBoard(number: number, contentID: contentID) { entry in

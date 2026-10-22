@@ -159,13 +159,14 @@ private struct DetailHeader: View {
 
     private var controls: some View {
         let board = model.board(for: item)
+        let triage = model.triage(for: item)
         return HStack(spacing: 8) {
             Picker("Status", selection: Binding(
-                get: { board?.triage },
+                get: { triage },
                 set: { status in
                     if let status {
-                        if status != board?.triage { model.perform(.triage(status), on: item.id) }
-                    } else if let current = board?.triage {
+                        if status != triage { model.perform(.triage(status), on: item.id) }
+                    } else if let current = triage {
                         // Choosing the current status again clears it.
                         model.perform(.triage(current), on: item.id)
                     }

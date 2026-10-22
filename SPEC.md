@@ -60,6 +60,9 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
   - 被 @
   - 被人手动请求 review（不是作者在打开、转 ready 或 push 时发出的自动请求）
   - 我参与过的条目上，他人在我最后一次活动之后评论或 review
+
+  对被唤醒的条目按 `s`（或在详情里选 Skipped）是重新 skip：再写一次 Skipped、刷新设置时间，并重新 UNSUBSCRIBED（被 @ 时 GitHub 会自动订阅）
+- **网页上改的 Status**：同步时发现 Status 在 app 之外变了（和本地缓存不同），订阅按上面的规则跟着改，和在 app 里改一样；只在变化的那一次改，之后在 GitHub 上手动改的订阅不会被改回去。Done（board 的 workflow 设的）、从 board 移除、archive 不算；第一次读 board 时没有可比较的，也不改
 - 写操作立即在本地生效，再写到 GitHub；同步时以 board 为准
 
 ## 4. 主界面
@@ -92,7 +95,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 - **Recently closed**：最近 14 天 merged / closed 的条目，默认折叠
 - **Skipped**、**Muted**：对应 Status 的 open 条目，默认折叠
 
-除 Recently viewed 和 Pinned 外，每个条目只出现在一个组里。组的折叠状态持久化。过滤时显示所有匹配项，忽略折叠。
+除 Recently viewed 和 Pinned 外，每个条目只出现在一个组里。所有组始终显示，空的也显示（数量为 0）；组标题的 tooltip 说明这个组装的是什么、和 board 的关系。组的折叠状态持久化。过滤时显示所有匹配项，忽略折叠。
 
 ### 4.2 列
 
@@ -131,7 +134,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 | `esc` | 取消选中，详情面板回到空状态 |
 | `⌘` / `⇧` 点击 | 多选；下面的快捷键和右键菜单作用于所有选中条目（右键的行不在选区里时只作用于该行）。切换类操作按整体切换：都已是该状态则清除，否则全部设置 |
 | `/` | 聚焦过滤框 |
-| `w` / `b` / `s` / `m` | Status 设为 Working / Backlog / Skipped / Muted；再按一次同一个键清除 Status（回到未分诊） |
+| `w` / `b` / `s` / `m` | Status 设为 Working / Backlog / Skipped / Muted；再按一次同一个键清除 Status（回到未分诊）；被唤醒的 Skipped 条目按 `s` 是重新 skip，不清除 |
 | `1` / `2` / `3` / `0` | Priority 设为 H / M / L / 清除 |
 | `p` | 置顶 / 取消置顶 |
 | `n` | 标为已读 |

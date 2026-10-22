@@ -21,6 +21,9 @@ struct ItemRow: Hashable, Sendable {
         guard triage == .skipped, let ask = insight.directAsk, ask.at > board?.statusAt ?? .distantPast else { return nil }
         return ask.reason
     }
+
+    /// The Status as the list treats it: none for a woken Skipped item, which is back in Triage.
+    var listedTriage: TriageStatus? { wakeReason == nil ? triage : nil }
 }
 
 enum ListSection: String, CaseIterable, Codable, Sendable {
@@ -41,7 +44,36 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
         }
     }
 
+    /// What the section holds and how it relates to the board (Status on vllm-project #56).
+    var help: String {
+        switch self {
+        case .recent:
+            "The last \(Self.recentLimit) items you opened. Not tied to the board; they also stay in their own section."
+        case .pinned:
+            "Items you pinned (p). Kept on this Mac, not on the board; they also stay in their own section."
+        case .working:
+            "Status Working on the board (old Good and Pending count too), except approved PRs. Yours to move first. The subscription is left alone."
+        case .good:
+            "Status Working and approved: waiting to be merged."
+        case .triage:
+            "No Status yet: not on the board, on it without a Status, or Done but open again. Also Skipped items someone asked you about since, with the reason. Downvoted authors go last."
+        case .backlog:
+            "Status Backlog: worth caring about, but later. The subscription is left alone."
+        case .closed:
+            "Merged or closed in the last \(Int(Self.closedRetention / 86400)) days, whatever the Status. The board's own workflow sets Done."
+        case .skipped:
+            "Status Skipped: ignored for now. Unsubscribed, so GitHub only notifies on mentions or when you take part. Back in Triage when someone asks you directly; s skips it again."
+        case .muted:
+            "Status Muted: dropped for good. Unsubscribed and the notification thread ignored, so the Inbox and unread counts leave it out."
+        case .inbox:
+            "GitHub notifications for this repository where you take part. Not tied to the board."
+        }
+    }
+
     static let defaultCollapsed: Set<ListSection> = [.backlog, .closed, .skipped, .muted]
+    /// Closed or merged items stay visible this long after closing.
+    static let closedRetention: TimeInterval = 14 * 24 * 3600
+    static let recentLimit = 8
 
     /// The one triage section an item belongs to (besides Recently viewed and Pinned), or nil for
     /// items the app leaves alone.

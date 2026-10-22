@@ -322,7 +322,7 @@ struct ItemTableView: NSViewRepresentable {
             }
             for item in menu.items where item.action == #selector(performMenuAction(_:)) {
                 item.state = switch Self.menuActions[item.tag].1 {
-                case let .triage(status): state { $0.triage == status }
+                case let .triage(status): state { $0.listedTriage == status }
                 case let .priority(priority?): state { $0.priority == priority }
                 case let .voteAuthor(vote): state { $0.authorVote == vote }
                 default: .off
@@ -409,10 +409,14 @@ struct ItemTableView: NSViewRepresentable {
                 view.identifier = ItemRowView.identifier
                 return view
             }()
-            if case let .item(_, itemRow) = rows[row] {
+            switch rows[row] {
+            case let .item(_, itemRow):
                 view.tint = itemRow.priority?.rowTint
-            } else {
+                view.toolTip = nil
+            case let .header(section, _, _):
                 view.tint = nil
+                // On the row: a group row doesn't show its cell's tooltip.
+                view.toolTip = section.help
             }
             return view
         }

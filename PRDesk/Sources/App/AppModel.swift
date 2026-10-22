@@ -24,9 +24,6 @@ final class AppModel {
         case failed(String)
     }
 
-    /// Closed or merged items stay visible this long after closing.
-    static let closedRetention: TimeInterval = 14 * 24 * 3600
-    static let recentLimit = 8
     /// Seconds between automatic syncs, set in Settings. Each round costs a few GraphQL points.
     var syncInterval: Int = Defaults.get(.syncInterval) ?? 300 {
         didSet { Defaults.set(syncInterval, for: .syncInterval) }
@@ -165,6 +162,11 @@ final class AppModel {
 
     func board(for item: Item) -> BoardEntry? {
         board[item.number]
+    }
+
+    /// The item's Status as the list shows it: none for a Skipped item that was woken.
+    func triage(for item: Item) -> TriageStatus? {
+        board(for: item)?.triage == nil ? nil : row(for: item).listedTriage
     }
 
     private func row(for item: Item) -> ItemRow {
@@ -354,8 +356,10 @@ final class AppModel {
         let what = items.count == 1 ? "#\(items[0].number)" : "\(items.count) items"
         switch action {
         case let .triage(status):
-            let next = items.allSatisfy { board(for: $0)?.triage == status } ? nil : status
-            let changes = items.filter { board(for: $0)?.triage != next }
+            // A woken Skipped item is back in Triage, so skipping it again renews the skip.
+            let has = { (item: Item) in self.triage(for: item) == status }
+            let next = items.allSatisfy(has) ? nil : status
+            let changes = next == nil ? items : items.filter { !has($0) }
             writeBoard("set the status of \(what)") { engine in
                 for item in changes {
                     try await engine.setTriage(next, number: item.number, contentID: item.id)
@@ -529,7 +533,7 @@ final class AppModel {
 
     private func rebuild() {
         itemsByID = Dictionary(uniqueKeysWithValues: snapshot.items.map { ($0.id, $0) })
-        let cutoff = Date().addingTimeInterval(-Self.closedRetention)
+        let cutoff = Date().addingTimeInterval(-ListSection.closedRetention)
         let filter = ItemFilter(filterText)
         let affiliations = affiliations
         let orgs = { (login: String) in affiliations.badges(for: login).map(\.org) }
@@ -571,7 +575,7 @@ final class AppModel {
         members[.recent] = Array(visible
             .filter { $0.state.viewedAt != nil }
             .sorted { $0.state.viewedAt! > $1.state.viewedAt! }
-            .prefix(Self.recentLimit))
+            .prefix(ListSection.recentLimit))
         members[.pinned] = ordered.filter(\.state.isPinned)
         for row in ordered {
             if let section = ListSection.triageSection(of: row) { members[section, default: []].append(row) }
@@ -584,7 +588,6 @@ final class AppModel {
         var rows: [TableRow] = []
         for section in Self.dashboardSections {
             let items = members[section] ?? []
-            guard !items.isEmpty || section == .working || section == .triage else { continue }
             // While filtering, show every match rather than hiding some in collapsed sections.
             let isCollapsed = filter.isEmpty && collapsed.contains(section)
             rows.append(.header(section, count: items.count, collapsed: isCollapsed))
