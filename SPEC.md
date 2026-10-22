@@ -31,7 +31,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 - **手动**：`+ Add`（粘贴编号或 URL）加入；`u` untrack 后不再自动加回，除非之后有新的 @me 或 review request
 - **增量**：每 60s 用 `updated:>=上次同步时间` 拉增量；选中条目时实时拉详情；窗口激活时立即同步一次
 - **限流**：顶栏显示 GraphQL 剩余额度；低于 500 时自动降低轮询频率
-- **Inbox**：GitHub Notifications（仅本仓库），未读数显示在 tab 上；打开条目即标记已读
+- **Inbox**：GitHub Notifications（仅本仓库、仅 participating，不含 watching），未读数显示在 tab、Dock 和菜单栏上；打开条目或按 `n` 即在 GitHub 上标记已读
 
 ## 4. 主界面
 

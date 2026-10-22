@@ -12,11 +12,8 @@ let project = Project(
             product: .app,
             bundleId: "com.bugenzhao.PRDesk",
             deploymentTargets: .macOS("26.0"),
-            infoPlist: .extendingDefault(with: [
-                "CFBundleName": "PR Desk",
-                "CFBundleDisplayName": "PR Desk",
-                "LSApplicationCategoryType": "public.app-category.developer-tools",
-            ]),
+            // Not Tuist's default plist, which names a Main storyboard this app doesn't have.
+            infoPlist: .file(path: "PRDesk/Info.plist"),
             sources: ["PRDesk/Sources/**"],
             dependencies: [
                 .package(product: "GRDB"),

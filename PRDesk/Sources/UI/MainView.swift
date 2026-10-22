@@ -60,7 +60,16 @@ struct MainView: View {
             }
         }
         .onChange(of: model.filterFocusRequest) { filterFocused = true }
-        .task { model.start() }
+        .task {
+            #if DEBUG
+                // `-PRDeskAppearance dark|light` forces an appearance, for checking both without
+                // changing the system setting.
+                if let name = UserDefaults.standard.string(forKey: "PRDeskAppearance") {
+                    NSApp.appearance = NSAppearance(named: name == "dark" ? .darkAqua : .aqua)
+                }
+            #endif
+            model.start()
+        }
     }
 
     private var filterBar: some View {
