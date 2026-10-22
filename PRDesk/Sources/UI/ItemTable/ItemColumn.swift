@@ -61,6 +61,7 @@ enum ItemColumn: String, CaseIterable {
         }
     }
 
+    @MainActor
     func makeTableColumn() -> NSTableColumn {
         let column = NSTableColumn(identifier: identifier)
         column.title = header

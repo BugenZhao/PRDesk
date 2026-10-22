@@ -10,6 +10,9 @@ xcodebuild -workspace PRDesk.xcworkspace -scheme PRDesk -derivedDataPath .build/
 open .build/DerivedData/Build/Products/Debug/PRDesk.app
 ```
 
+`scripts/install.sh` builds Release and installs it as `/Applications/PR Desk.app` (quitting any
+running copy first) — that is the copy for daily use. Keep the build free of warnings.
+
 Debug builds accept `-PRDeskAppearance dark|light` to force an appearance.
 Local data lives in `~/Library/Application Support/PR Desk/` (SQLite via GRDB, avatar cache).
 
