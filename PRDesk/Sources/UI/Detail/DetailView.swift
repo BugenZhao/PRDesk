@@ -150,10 +150,10 @@ private struct DetailHeader: View {
 
     private var stateChip: some View {
         switch (item.state, item.isDraft) {
-        case (.open, true): Chip(text: "draft")
-        case (.open, false): Chip(text: "open", color: .green)
-        case (.merged, _): Chip(text: "merged", color: .purple)
-        case (.closed, _): Chip(text: "closed", color: item.kind == .issue ? .purple : .red)
+        case (.open, true): Chip(text: "Draft")
+        case (.open, false): Chip(text: "Open", color: .green)
+        case (.merged, _): Chip(text: "Merged", color: .purple)
+        case (.closed, _): Chip(text: "Closed", color: item.kind == .issue ? .purple : .red)
         }
     }
 

@@ -8,7 +8,7 @@ enum Turn: String, Sendable {
 /// Someone turning to the viewer directly: what wakes a Skipped item (SPEC §3.1).
 struct DirectAsk: Hashable, Sendable {
     var at: Date
-    /// E.g. "mentioned you", "@x requested your review", "@x replied".
+    /// E.g. "Mentioned you", "@x requested your review", "@x replied".
     var reason: String
 }
 
@@ -78,7 +78,7 @@ struct ItemInsight: Hashable, Sendable {
         for event in item.events {
             switch event.kind {
             case .mentioned where isMe(event.target):
-                asks.append(DirectAsk(at: event.at, reason: "mentioned you"))
+                asks.append(DirectAsk(at: event.at, reason: "Mentioned you"))
             case .reviewRequested where isMe(event.target) && !event.isAutomated && isManual(event, item: item, isMe: isMe):
                 asks.append(DirectAsk(at: event.at, reason: "@\(event.actor ?? "ghost") requested your review"))
             default:

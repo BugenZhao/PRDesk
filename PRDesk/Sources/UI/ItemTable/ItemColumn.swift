@@ -122,11 +122,11 @@ enum ItemColumn: String, CaseIterable {
         case .turn:
             // A pending review request is the most common reason it's the viewer's move; name it.
             if item.isOpen, row.insight.isReviewRequestedFromMe {
-                return [.text("review", color: .systemOrange, font: CellFont.smallBold)]
+                return [.text("Review", color: .systemOrange, font: CellFont.smallBold)]
             }
             return switch row.insight.turn {
-            case .me: [.text("me", color: .systemOrange, font: CellFont.smallBold)]
-            case .them: [.text("them", color: .tertiaryLabelColor, font: CellFont.small)]
+            case .me: [.text("Me", color: .systemOrange, font: CellFont.smallBold)]
+            case .them: [.text("Them", color: .tertiaryLabelColor, font: CellFont.small)]
             case nil: []
             }
 
@@ -161,7 +161,7 @@ enum ItemColumn: String, CaseIterable {
             runs.append(.chip(note.reasonLabel, color: .controlAccentColor))
             // The Inbox has no triage sections, so say where the item stands.
             if let triage = row.triage {
-                runs.append(.chip(triage.rawValue.lowercased(), color: .secondaryLabelColor))
+                runs.append(.chip(triage.rawValue, color: .secondaryLabelColor))
             }
         }
         if let reason = row.wakeReason {

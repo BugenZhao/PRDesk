@@ -28,11 +28,13 @@ struct InboxNote: Hashable, Sendable {
 
     var reasonLabel: String {
         switch reason {
-        case "review_requested": "review requested"
-        case "team_mention": "team mention"
-        case "state_change": "state change"
-        case "ci_activity": "ci"
-        default: reason.replacingOccurrences(of: "_", with: " ")
+        case "review_requested": "Review requested"
+        case "team_mention": "Team mention"
+        case "state_change": "State change"
+        case "ci_activity": "CI"
+        default:
+            // e.g. "mention" → "Mention", "security_alert" → "Security alert".
+            reason.prefix(1).uppercased() + reason.dropFirst().replacingOccurrences(of: "_", with: " ")
         }
     }
 }

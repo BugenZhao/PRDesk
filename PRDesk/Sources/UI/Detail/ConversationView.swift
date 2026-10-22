@@ -212,7 +212,7 @@ private struct CommentCard: View {
                 .foregroundStyle(.secondary)
                 .help(at.formatted(date: .abbreviated, time: .shortened))
             if isNew {
-                Chip(text: "new", color: .accentColor)
+                Chip(text: "New", color: .accentColor)
             }
             Spacer()
             if let url, let link = URL(string: url) {
@@ -246,7 +246,7 @@ private struct ReviewCommentView: View {
                     .font(.caption.monospaced())
                     .lineLimit(1)
                     .truncationMode(.head)
-                if comment.outdated { Chip(text: "outdated") }
+                if comment.outdated { Chip(text: "Outdated") }
                 Spacer()
                 if let url = URL(string: comment.url) {
                     Link(destination: url) { Image(systemName: "arrow.up.right") }
