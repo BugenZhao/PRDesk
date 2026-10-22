@@ -24,7 +24,8 @@ struct MainView: View {
                 onSort: { model.sort = $0 },
                 onToggleSection: { model.toggleCollapsed($0) },
                 onFocusFilter: { model.requestFilterFocus() },
-                onFocusComposer: { model.requestComposerFocus() }
+                onFocusComposer: { model.requestComposerFocus() },
+                onAutoSelect: { model.autoSelect($0) }
             )
         }
         .frame(minWidth: 560, maxHeight: .infinity)
@@ -36,7 +37,7 @@ struct MainView: View {
             ToolbarItem(placement: .principal) {
                 Picker("View", selection: $model.mode) {
                     Text("Dashboard").tag(AppModel.ListMode.dashboard)
-                    Text(model.inbox.isEmpty ? "Inbox" : "Inbox \(model.inbox.count)").tag(AppModel.ListMode.inbox)
+                    Text(model.unreadInboxCount == 0 ? "Inbox" : "Inbox \(model.unreadInboxCount)").tag(AppModel.ListMode.inbox)
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()

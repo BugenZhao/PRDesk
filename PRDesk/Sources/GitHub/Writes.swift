@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// What submitting the composer does.
 enum Submission: Sendable {
@@ -22,6 +23,8 @@ struct InboxNote: Hashable, Sendable {
     /// GitHub's reason, e.g. `mention`, `review_requested`, `comment`, `author`.
     var reason: String
     var updatedAt: Date
+    /// Read in this session; stays listed (without the unread dot) until the next inbox sync.
+    var isRead = false
 
     var reasonLabel: String {
         switch reason {
@@ -39,8 +42,22 @@ private struct Ignored: Decodable, Sendable {
     init(from _: any Decoder) throws {}
 }
 
+/// Debug builds launched with `-PRDeskDryRunWrites YES` log writes to GitHub instead of sending
+/// them, so flows that comment or mark notifications read can be tested safely.
+private func isDryRun(_ what: @autoclosure () -> String) -> Bool {
+    #if DEBUG
+        if UserDefaults.standard.bool(forKey: "PRDeskDryRunWrites") {
+            let message = what()
+            Logger(subsystem: "com.bugenzhao.PRDesk", category: "DryRun").notice("Dry run: \(message, privacy: .public)")
+            return true
+        }
+    #endif
+    return false
+}
+
 extension SyncEngine {
     func submit(_ submission: Submission, body: String, subjectID: String) async throws {
+        if isDryRun("submit \(String(describing: submission)) on \(subjectID)") { return }
         if let event = submission.reviewEvent {
             struct Input: Encodable, Sendable { let pullRequestId: String; let event: String; let body: String }
             struct Variables: Encodable, Sendable { let input: Input }
@@ -106,6 +123,7 @@ extension SyncEngine {
     }
 
     func markThreadRead(_ threadID: String) async throws {
+        if isDryRun("mark thread \(threadID) read") { return }
         try await client.rest("PATCH", "/notifications/threads/\(threadID)")
     }
 }

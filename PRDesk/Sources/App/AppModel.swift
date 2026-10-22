@@ -54,8 +54,10 @@ final class AppModel {
     var mode: ListMode = .dashboard { didSet { rebuild() } }
     /// Unread notifications for issues and PRs in the repository, newest first.
     private(set) var inbox: [InboxNote] = [] {
-        didSet { NSApp.dockTile.badgeLabel = inbox.isEmpty ? nil : String(inbox.count) }
+        didSet { NSApp.dockTile.badgeLabel = unreadInboxCount == 0 ? nil : String(unreadInboxCount) }
     }
+
+    var unreadInboxCount: Int { inbox.count { !$0.isRead } }
     /// All Focus items regardless of the filter, most recently updated first (for the menu bar).
     private(set) var focusItems: [ItemRow] = []
 
@@ -216,8 +218,10 @@ final class AppModel {
 
     /// Marks the item's notification thread read on GitHub, if it has one.
     private func markNotificationRead(number: Int) {
-        guard let note = inbox.first(where: { $0.number == number }) else { return }
-        inbox.removeAll { $0.threadID == note.threadID }
+        guard let index = inbox.firstIndex(where: { $0.number == number && !$0.isRead }) else { return }
+        let note = inbox[index]
+        // Keep the row in place so the selection doesn't jump; the next sync drops it.
+        inbox[index].isRead = true
         rebuild()
         Task { [engine, logger] in
             do {
@@ -400,6 +404,16 @@ final class AppModel {
         }
     }
 
+    @ObservationIgnored private var isAutoSelecting = false
+
+    /// Selects without counting as the user opening the item: nothing is marked viewed or read.
+    /// Otherwise each read Inbox row leaving the list would select (and then read) the next one.
+    func autoSelect(_ selection: TableSelection?) {
+        isAutoSelecting = true
+        defer { isAutoSelecting = false }
+        self.selection = selection
+    }
+
     private func selectionChanged(from old: TableSelection?) {
         guard selection?.itemID != old?.itemID else { return }
         dwellTask?.cancel()
@@ -409,6 +423,7 @@ final class AppModel {
             return
         }
         selectedItemPreviousSeenAt = [state(for: item).seenAt, snapshot.baseline].compactMap(\.self).max()
+        guard !isAutoSelecting else { return }
         dwellTask = Task { [weak self] in
             try? await Task.sleep(for: Self.dwellBeforeViewed)
             guard !Task.isCancelled, let self else { return }

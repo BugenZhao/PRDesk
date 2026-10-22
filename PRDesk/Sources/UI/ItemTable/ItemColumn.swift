@@ -86,7 +86,8 @@ enum ItemColumn: String, CaseIterable {
         let item = row.item
         switch self {
         case .unread:
-            return row.insight.isUnread || row.note != nil ? [.dot(.controlAccentColor)] : []
+            let unreadNote = row.note.map { !$0.isRead } ?? false
+            return row.insight.isUnread || unreadNote ? [.dot(.controlAccentColor)] : []
 
         case .priority:
             guard let priority = row.state.priority else { return [] }

@@ -41,11 +41,11 @@ struct PRDeskApp: App {
             MenuBarContent()
                 .environment(model)
         } label: {
-            if model.inbox.isEmpty {
+            if model.unreadInboxCount == 0 {
                 Image(systemName: "tray")
             } else {
                 Image(systemName: "tray.full")
-                Text(String(model.inbox.count))
+                Text(String(model.unreadInboxCount))
             }
         }
     }

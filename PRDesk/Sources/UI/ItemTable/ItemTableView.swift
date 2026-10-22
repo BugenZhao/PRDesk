@@ -16,6 +16,9 @@ struct ItemTableView: NSViewRepresentable {
     var onToggleSection: (ListSection) -> Void
     var onFocusFilter: () -> Void
     var onFocusComposer: () -> Void
+    /// Selection made by the table itself (e.g. moving to a neighbor when the selected row goes
+    /// away); unlike user selection it must not count as opening the item.
+    var onAutoSelect: (TableSelection?) -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -118,7 +121,7 @@ struct ItemTableView: NSViewRepresentable {
                     // The selected item left its section (e.g. dismissed from Focus): select its neighbor.
                     select(replacement)
                     let id = rows[replacement].selectionID
-                    DispatchQueue.main.async { self.parent.selection = id }
+                    DispatchQueue.main.async { self.parent.onAutoSelect(id) }
                 } else {
                     table.deselectAll(nil)
                 }

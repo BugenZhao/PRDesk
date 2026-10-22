@@ -22,7 +22,7 @@ struct MenuBarContent: View {
             }
         }
         Divider()
-        Button(model.inbox.isEmpty ? "Inbox" : "Inbox · \(model.inbox.count) unread") {
+        Button(model.unreadInboxCount == 0 ? "Inbox" : "Inbox · \(model.unreadInboxCount) unread") {
             show { model.mode = .inbox }
         }
         Button("Sync Now") {

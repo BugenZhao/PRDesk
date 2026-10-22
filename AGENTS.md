@@ -13,7 +13,9 @@ open .build/DerivedData/Build/Products/Debug/PRDesk.app
 `scripts/install.sh` builds Release and installs it as `/Applications/PR Desk.app` (quitting any
 running copy first) — that is the copy for daily use. Keep the build free of warnings.
 
-Debug builds accept `-PRDeskAppearance dark|light` to force an appearance.
+Debug builds accept `-PRDeskAppearance dark|light` to force an appearance, and
+`-PRDeskDryRunWrites YES` to log writes to GitHub (comments, reviews, marking notifications read)
+instead of sending them — use it whenever a test could trigger a write.
 Local data lives in `~/Library/Application Support/PR Desk/` (SQLite via GRDB, avatar cache).
 
 ## Layout
@@ -68,7 +70,11 @@ are used off the main actor); no glass on content (cards, chips, rows).
   with `errors`, not an HTTP error.
 - Heavy fields in the list search (e.g. comment bodies) push pages past GitHub's time limit
   (502s and truncated JSON); keep the list query lean and fetch detail on selection.
-- Never post to GitHub (comments, reviews, marking notifications read) while testing.
+- Never post to GitHub (comments, reviews, marking notifications read) while testing; use the
+  dry-run flag above.
+- Only user-initiated selection counts as opening an item (viewed, unread cleared, notification
+  marked read). Selections the table makes itself go through `AppModel.autoSelect`; otherwise a
+  row leaving the list selects its neighbor, which gets read and leaves too, in a chain.
 - The app icon is an Icon Composer bundle (`PRDesk/AppIcon.icon`: `icon.json` + SVG layers on a
   1024 canvas). Layers must be filled shapes — strokes render as solid fills. Keep same-colored
   parts in one layer and make pieces overlap rather than abut, or the glass rendering shows
