@@ -58,6 +58,8 @@ private struct AppCommands: Commands {
     let model: AppModel
 
     var body: some Commands {
+        // View > Show / Hide Inspector (⌃⌘I) for the detail pane.
+        InspectorCommands()
         CommandGroup(after: .toolbar) {
             Button("Sync Now") {
                 Task { await model.sync() }

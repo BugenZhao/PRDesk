@@ -50,6 +50,10 @@ struct ItemTableView: NSViewRepresentable {
         table.dataSource = coordinator
         table.delegate = coordinator
         table.target = coordinator
+        // Rows drag out as links (to a browser, Notes, a chat). Only sideways: a vertical drag
+        // still selects a run of rows.
+        table.setDraggingSourceOperationMask(.copy, forLocal: false)
+        table.verticalMotionCanBeginDrag = false
         table.doubleAction = #selector(Coordinator.openClickedItem)
         table.keyHandler = { [weak coordinator] event in coordinator?.handleKey(event) ?? false }
         table.headerClickHandler = { [weak coordinator] row in coordinator?.toggleHeader(at: row) ?? false }
@@ -427,6 +431,16 @@ struct ItemTableView: NSViewRepresentable {
             rows.count
         }
 
+        func tableView(_: NSTableView, pasteboardWriterForRow row: Int) -> (any NSPasteboardWriting)? {
+            guard rows.indices.contains(row), case let .item(_, itemRow) = rows[row] else { return nil }
+            let item = NSPasteboardItem()
+            item.setString(itemRow.item.url, forType: .URL)
+            item.setString(itemRow.item.url, forType: .string)
+            // The link's title where the destination shows one, as Safari's links carry.
+            item.setString("#\(itemRow.item.number) \(itemRow.item.title)", forType: NSPasteboard.PasteboardType("public.url-name"))
+            return item
+        }
+
         // MARK: NSTableViewDelegate
 
         func tableView(_: NSTableView, isGroupRow row: Int) -> Bool {
@@ -592,6 +606,11 @@ final class ItemNSTableView: NSTableView {
         if copyLinksHandler?() != true { NSSound.beep() }
     }
 
+    /// Edit > Copy (⌘C) in the list copies the selected items' links too.
+    @objc func copy(_ sender: Any?) {
+        copyItemLinks(sender)
+    }
+
     override func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
         guard let manager = listUndoManager else { return super.validateUserInterfaceItem(item) }
         switch item.action {
@@ -601,6 +620,8 @@ final class ItemNSTableView: NSTableView {
         case #selector(redo(_:)):
             (item as? NSMenuItem)?.title = manager.redoMenuItemTitle
             return manager.canRedo
+        case #selector(copy(_:)):
+            return selectedRow != -1
         default:
             return super.validateUserInterfaceItem(item)
         }

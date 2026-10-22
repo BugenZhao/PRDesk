@@ -123,6 +123,19 @@ final class RunsCellView: NSTableCellView {
         return widths
     }
 
+    // MARK: Accessibility
+
+    // The cell draws its text rather than holding text fields, so it speaks for itself.
+
+    override func isAccessibilityElement() -> Bool { true }
+
+    override func accessibilityRole() -> NSAccessibility.Role? { .staticText }
+
+    override func accessibilityValue() -> Any? {
+        let text = runs.compactMap(\.spokenText).joined(separator: ", ")
+        return text.isEmpty ? nil : text
+    }
+
     /// The full text of runs cut short at the current width (e.g. a long title), one per line;
     /// asked for only when a tooltip is about to show.
     var truncatedText: String? {
@@ -339,6 +352,16 @@ private extension CellRun {
         switch self {
         case let .text(_, _, _, flexible, _), let .segments(_, _, flexible): flexible
         default: false
+        }
+    }
+
+    /// What VoiceOver reads for the run; nil for pure decoration.
+    var spokenText: String? {
+        switch self {
+        case let .text(string, _, _, _, _), let .chip(string, _), let .tile(string, _): string
+        case let .segments(parts, _, _): parts.map(\.text).joined()
+        case let .slot(run?, _, _): run.spokenText
+        default: nil
         }
     }
 

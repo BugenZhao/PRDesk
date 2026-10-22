@@ -2,7 +2,7 @@ import SwiftUI
 
 struct MainView: View {
     @Environment(AppModel.self) private var model
-    @State private var showsDetail = true
+    @AppStorage("showsDetail") private var showsDetail = true
 
     var body: some View {
         // The status bar sits under the whole split view, so neither the list nor the detail pane
