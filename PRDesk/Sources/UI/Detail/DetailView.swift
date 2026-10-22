@@ -92,7 +92,7 @@ private struct DetailHeader: View {
 
             HStack(spacing: 6) {
                 AvatarView(login: item.author, size: 16)
-                Text(item.author ?? "ghost").fontWeight(.medium)
+                LoginText(login: item.author)
                 BadgeIcons(login: item.author)
                 stateChip
                 if item.isOpen, item.mergeable == "CONFLICTING" {

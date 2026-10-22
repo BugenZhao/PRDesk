@@ -204,7 +204,7 @@ private struct CommentCard: View {
     private var header: some View {
         HStack(spacing: 6) {
             AvatarView(login: login, size: 18)
-            Text(login ?? "ghost").fontWeight(.semibold)
+            LoginText(login: login, weight: .semibold)
             BadgeIcons(login: login)
             Text(verb).foregroundStyle(verbColor)
             Text("\(at.compactAge()) ago")
@@ -292,7 +292,7 @@ private struct EventRow: View {
                 .foregroundStyle(entry.verbColor)
                 .frame(width: 16)
             AvatarView(login: entry.actor, size: 14)
-            Text(entry.actor ?? "ghost").fontWeight(.medium)
+            LoginText(login: entry.actor)
             description
             Text("\(entry.at.compactAge()) ago").foregroundStyle(.tertiary)
             Spacer(minLength: 0)
@@ -336,7 +336,7 @@ private struct CommitsRow: View {
                     .foregroundStyle(.secondary)
                     .frame(width: 16)
                 AvatarView(login: entries[0].actor, size: 14)
-                Text(entries[0].actor ?? "ghost").fontWeight(.medium)
+                LoginText(login: entries[0].actor)
                 Text("pushed \(entries.count) commit\(entries.count == 1 ? "" : "s")").foregroundStyle(.secondary)
                 Text("\(entries.last!.at.compactAge()) ago").foregroundStyle(.tertiary)
             }

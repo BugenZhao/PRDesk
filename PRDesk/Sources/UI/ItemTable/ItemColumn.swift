@@ -98,7 +98,15 @@ enum ItemColumn: String, CaseIterable {
             return titleRuns(row, now: now)
 
         case .author:
-            return [.text(item.author ?? "ghost", flexible: true)] + (item.author.map(badges) ?? []).map(\.cellRun)
+            // The signed-in user's own items stand out in the accent color.
+            let isMine = sameLogin(item.author, viewer)
+            let name: CellRun = .text(
+                item.author ?? "ghost",
+                color: isMine ? .controlAccentColor : .labelColor,
+                font: isMine ? CellFont.regularBold : CellFont.regular,
+                flexible: true
+            )
+            return [name] + (item.author.map(badges) ?? []).map(\.cellRun)
 
         case .review:
             return reviewRuns(row, viewer: viewer)

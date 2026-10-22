@@ -20,6 +20,20 @@ struct AvatarView: View {
     }
 }
 
+/// A login, shown in the accent color when it is the signed-in user.
+struct LoginText: View {
+    @Environment(AppModel.self) private var model
+    let login: String?
+    var weight: Font.Weight = .medium
+
+    var body: some View {
+        let isMe = sameLogin(login, model.viewer)
+        Text(login ?? "ghost")
+            .fontWeight(isMe ? .semibold : weight)
+            .foregroundStyle(isMe ? Color.accentColor : Color.primary)
+    }
+}
+
 /// Affiliation badges for a login, as small org avatars with explanatory tooltips.
 struct BadgeIcons: View {
     @Environment(AppModel.self) private var model
