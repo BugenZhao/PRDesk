@@ -41,7 +41,7 @@ struct Badge: Hashable, Sendable {
 struct Affiliations: Equatable, Sendable {
     /// Lowercased login → area, from committers.md.
     var committers: [String: String] = [:]
-    /// Lowercased public members of each org's GitHub organizations.
+    /// Lowercased members of each org's GitHub organizations, as visible to the viewer.
     var members: [Org: Set<String>] = [:]
     var users: [String: UserInfo] = [:]
     var overrides: [OrgOverride] = []
@@ -66,7 +66,7 @@ struct Affiliations: Equatable, Sendable {
             return committers[key].map { "committers.md: \($0)" }
         }
         if members[org]?.contains(key) == true {
-            return "public member of \(org.githubOrgs.joined(separator: " / "))"
+            return "member of \(org.githubOrgs.joined(separator: " / "))"
         }
         if let user = users[key] {
             if let membership = user.orgs.first(where: { login in org.githubOrgs.contains { sameLogin($0, login) } }) {
@@ -87,7 +87,7 @@ struct Affiliations: Equatable, Sendable {
 }
 
 extension Org {
-    /// GitHub organizations whose public members get this badge.
+    /// GitHub organizations whose members get this badge.
     var githubOrgs: [String] {
         switch self {
         case .vllm: []

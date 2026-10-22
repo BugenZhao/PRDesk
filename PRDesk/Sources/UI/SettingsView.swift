@@ -105,7 +105,7 @@ private struct AffiliationSettingsView: View {
             Section {
                 LabeledContent("vLLM committers", value: "\(affiliations.committers.count) from committers.md")
                 ForEach([Org.inferact, .redhat, .nvidia]) { org in
-                    LabeledContent(org.displayName, value: "\(affiliations.members[org]?.count ?? 0) public members")
+                    LabeledContent(org.displayName, value: "\(affiliations.members[org]?.count ?? 0) members")
                 }
                 LabeledContent("User profiles", value: "\(affiliations.users.count) fetched")
                 HStack {

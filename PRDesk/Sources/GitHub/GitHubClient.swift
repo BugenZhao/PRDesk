@@ -80,7 +80,7 @@ actor GitHubClient {
         return result
     }
 
-    /// Calls a REST endpoint, e.g. `rest("GET", "/orgs/NVIDIA/public_members")`, and returns the raw body.
+    /// Calls a REST endpoint, e.g. `rest("GET", "/orgs/NVIDIA/members")`, and returns the raw body.
     @discardableResult
     func rest(_ method: String, _ path: String, query: [URLQueryItem] = [], json: (any Encodable & Sendable)? = nil) async throws -> Data {
         var components = URLComponents(string: "https://api.github.com" + path)!

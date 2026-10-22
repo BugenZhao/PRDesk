@@ -3,7 +3,8 @@ import os
 
 /// Collects the public data that affiliation badges are inferred from.
 ///
-/// Daily: the committers list and public members of the relevant GitHub organizations.
+/// Daily: the committers list and members of the relevant GitHub organizations (all members for
+/// orgs the viewer belongs to, such as Inferact; public members otherwise).
 /// Weekly per user: profile company and public org memberships, plus commit email
 /// domains for users that nothing else identifies.
 actor AffiliationEngine {
@@ -106,7 +107,9 @@ actor AffiliationEngine {
                 var page = 1
                 while true {
                     let members = try await client.rest(
-                        "GET", "/orgs/\(githubOrg)/public_members",
+                        // `/members` lists everyone when the viewer is in the org, and falls back to
+                        // public members when not.
+                        "GET", "/orgs/\(githubOrg)/members",
                         query: [URLQueryItem(name: "per_page", value: "100"), URLQueryItem(name: "page", value: String(page))],
                         as: [Member].self
                     )

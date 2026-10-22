@@ -109,7 +109,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 
 1. 手动设置：设置页里的"用户 → 组织"表，可添加，也可强制排除
 2. vLLM committer：解析仓库里的 `docs/governance/committers.md`，悬停时显示负责领域（如 "Rust frontend"）。不用 `author_association`，因为 vllm-project 的 MEMBER 范围太广
-3. GitHub 公开组织成员：`Inferact`、`NVIDIA`、`RedHatOfficial` / `redhat-et`
+3. GitHub 组织成员：`Inferact`、`NVIDIA`、`RedHatOfficial` / `redhat-et` / `neuralmagic`（你所在的组织如 Inferact 能看到全部成员，其余只能看到公开成员）
 4. 个人资料的 company 字段，例如 `@Inferact`、`Red Hat`、`NVIDIA`
 5. 该用户 PR commit 的作者邮箱域名：`redhat.com`、`nvidia.com`、`inferact.ai`
 6. 用户名后缀，例如 `-redhat`、`-nv`
