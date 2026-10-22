@@ -172,31 +172,41 @@ private struct DetailHeader: View {
                 get: { board?.priorityValue },
                 set: { model.perform(.priority($0), on: item.id) }
             )) {
-                ForEach(Priority.allCases, id: \.self) { Text($0.letter).tag(Optional($0)) }
-                Text("–").tag(Priority?.none)
+                ForEach(Priority.allCases, id: \.self) { priority in
+                    Image(systemName: priority.symbol)
+                        .help("\(priority.optionName) (\(priority.rawValue))")
+                        .tag(Optional(priority))
+                }
+                Text("None").tag(Priority?.none)
             }
             .pickerStyle(.segmented)
             .labelsHidden()
             .fixedSize()
             .help("Priority on the board (1/2/3, 0 to clear)")
 
-            Button(state.isPinned ? "Unpin" : "Pin", systemImage: state.isPinned ? "pin.slash" : "pin") {
+            iconButton(state.isPinned ? "Unpin" : "Pin", symbol: state.isPinned ? "pin.slash" : "pin") {
                 model.perform(.togglePin, on: item.id)
             }
-            .labelStyle(.iconOnly)
             .help(state.isPinned ? "Unpin (p)" : "Pin (p)")
             Spacer()
             if model.detailState == .loading {
                 ProgressView().controlSize(.small)
             }
-            Button("Refresh", systemImage: "arrow.clockwise") { model.loadDetail(force: true) }
-                .labelStyle(.iconOnly)
+            iconButton("Refresh", symbol: "arrow.clockwise") { model.loadDetail(force: true) }
                 .disabled(model.detailState == .loading)
-            Button("Open", systemImage: "arrow.up.right") { model.perform(.openInBrowser, on: item.id) }
-                .labelStyle(.iconOnly)
+            iconButton("Open", symbol: "arrow.up.right") { model.perform(.openInBrowser, on: item.id) }
                 .help("Open on GitHub (o)")
         }
         .controlSize(.small)
+    }
+
+    /// An icon-only button whose icon gets a fixed box: symbols differ in height, and the button
+    /// sizes to its icon, so otherwise neighbors come out different heights.
+    private func iconButton(_ title: String, symbol: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol).frame(width: 14, height: 14)
+        }
+        .accessibilityLabel(title)
     }
 }
 

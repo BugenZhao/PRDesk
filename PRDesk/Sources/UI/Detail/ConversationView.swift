@@ -314,15 +314,20 @@ private struct EventRow: View {
             Text(entry.kind == .labeled ? "added" : "removed").foregroundStyle(.secondary)
             LabelChip(name: entry.detail ?? "", hex: entry.color ?? "")
         case .crossReferenced:
-            Text("mentioned this in").foregroundStyle(.secondary)
-            if let url = entry.url.flatMap(URL.init(string:)) {
-                Link(entry.detail ?? "", destination: url)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
+            // One text, so the linked title stays on the line and truncates (a Link view wraps,
+            // centered, beside the words instead).
+            Text(crossReference).truncationMode(.tail)
         default:
             Text(entry.eventText).foregroundStyle(.secondary).truncationMode(.tail)
         }
+    }
+
+    private var crossReference: AttributedString {
+        var text = AttributedString("mentioned this in ")
+        text.foregroundColor = .secondary
+        var title = AttributedString(entry.detail ?? "")
+        title.link = entry.url.flatMap(URL.init(string:))
+        return text + title
     }
 }
 

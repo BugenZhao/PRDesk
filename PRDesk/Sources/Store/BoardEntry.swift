@@ -33,6 +33,24 @@ enum Priority: Int, Codable, Sendable, CaseIterable, Comparable {
         }
     }
 
+    /// SF Symbol shown for the priority: a minus for low, one or two exclamation marks above it.
+    var symbol: String {
+        switch self {
+        case .high: "exclamationmark.2"
+        case .medium: "exclamationmark"
+        case .low: "minus"
+        }
+    }
+
+    /// The same marks in plain text, for menus.
+    var marks: String {
+        switch self {
+        case .high: "!!"
+        case .medium: "!"
+        case .low: "–"
+        }
+    }
+
     /// The option name on the board.
     var optionName: String {
         switch self {

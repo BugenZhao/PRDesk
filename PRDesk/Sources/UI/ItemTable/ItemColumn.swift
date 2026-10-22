@@ -91,7 +91,7 @@ enum ItemColumn: String, CaseIterable {
 
         case .priority:
             guard let priority = row.priority else { return [] }
-            return [.chip(priority.letter, color: priority.color)]
+            return [.symbol(priority.symbol, color: priority.color, pointSize: 11)]
 
         case .number:
             return [.text(String(item.number), color: .secondaryLabelColor, font: CellFont.digits)]

@@ -38,7 +38,7 @@ struct MenuBarContent: View {
         var parts: [String] = []
         if row.insight.isUnread { parts.append("●") }
         if row.insight.turn == .me { parts.append("→") }
-        if let priority = row.priority { parts.append(priority.letter) }
+        if let priority = row.priority { parts.append(priority.marks) }
         parts.append("#\(row.item.number) \(row.item.title)")
         return parts.joined(separator: " ")
     }
