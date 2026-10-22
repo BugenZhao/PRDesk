@@ -232,10 +232,29 @@ final class AppModel {
         let state = state(for: item)
         return ItemRow(
             item: item, state: state,
-            insight: ItemInsight(item: item, state: state, viewer: viewer, baseline: snapshot.baseline),
+            insight: insight(for: item, state: state),
             authorVote: vote(for: item.author),
             board: board(for: item)
         )
+    }
+
+    private struct InsightInputs: Equatable {
+        var item: Item
+        var state: ItemState
+        var viewer: String?
+        var baseline: Date?
+    }
+
+    /// Insights by item, reused while what they are worked out from stays the same: every
+    /// rebuild (each keystroke in the filter) makes rows for all items.
+    @ObservationIgnored private var insights: [Item.ID: (inputs: InsightInputs, insight: ItemInsight)] = [:]
+
+    private func insight(for item: Item, state: ItemState) -> ItemInsight {
+        let inputs = InsightInputs(item: item, state: state, viewer: viewer, baseline: snapshot.baseline)
+        if let cached = insights[item.id], cached.inputs == inputs { return cached.insight }
+        let insight = ItemInsight(item: item, state: state, viewer: viewer, baseline: snapshot.baseline)
+        insights[item.id] = (inputs, insight)
+        return insight
     }
 
     // MARK: Lifecycle

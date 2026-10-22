@@ -122,7 +122,26 @@ extension Item: FetchableRecord, PersistableRecord {
 /// Logins are case-insensitive on GitHub.
 func sameLogin(_ a: String?, _ b: String?) -> Bool {
     guard let a, let b else { return false }
-    return a.caseInsensitiveCompare(b) == .orderedSame
+    // Logins are ASCII, so fold case byte by byte: `caseInsensitiveCompare` goes through NSString,
+    // which made up much of each list rebuild (the Turn of every item compares logins).
+    var lhs = a.utf8.makeIterator()
+    var rhs = b.utf8.makeIterator()
+    while true {
+        switch (lhs.next(), rhs.next()) {
+        case (nil, nil):
+            return true
+        case let (x?, y?):
+            if x == y { continue }
+            guard x < 0x80, y < 0x80 else { return a.caseInsensitiveCompare(b) == .orderedSame }
+            if asciiLowercase(x) != asciiLowercase(y) { return false }
+        default:
+            return false
+        }
+    }
+}
+
+private func asciiLowercase(_ byte: UInt8) -> UInt8 {
+    (0x41 ... 0x5A).contains(byte) ? byte | 0x20 : byte
 }
 
 extension Item {
