@@ -11,6 +11,8 @@ enum ItemAction {
     case togglePin
     case markRead
     case openInBrowser
+    /// Copies the items' GitHub links, one per line.
+    case copyLink
     /// Vote on the item's author; voting the same way again clears the vote.
     case voteAuthor(Vote)
     /// Brings an item opened from a link onto the desk.
@@ -563,6 +565,12 @@ final class AppModel {
             for item in items.prefix(Self.maxTabsAtOnce) {
                 if let url = URL(string: item.url) { NSWorkspace.shared.open(url) }
             }
+        case .copyLink:
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            pasteboard.setString(items.map(\.url).joined(separator: "\n"), forType: .string)
+            // A single link also goes as a URL, so apps that take one (Mail, Notes) make it a link.
+            if items.count == 1 { pasteboard.setString(items[0].url, forType: .URL) }
         case let .voteAuthor(vote):
             let authors = Array(Set(items.compactMap(\.author)))
             let clear = authors.allSatisfy { self.vote(for: $0) == vote }

@@ -53,6 +53,7 @@ struct ItemTableView: NSViewRepresentable {
         table.doubleAction = #selector(Coordinator.openClickedItem)
         table.keyHandler = { [weak coordinator] event in coordinator?.handleKey(event) ?? false }
         table.headerClickHandler = { [weak coordinator] row in coordinator?.toggleHeader(at: row) ?? false }
+        table.copyLinksHandler = { [weak coordinator] in coordinator?.copySelectedLinks() ?? false }
         table.listUndoManager = listUndoManager
         table.menu = coordinator.makeContextMenu()
         coordinator.table = table
@@ -360,7 +361,8 @@ struct ItemTableView: NSViewRepresentable {
                 if Self.menuSeparatorsAfter.contains(index) { menu.addItem(.separator()) }
             }
             menu.addItem(.separator())
-            let copy = NSMenuItem(title: "Copy Link", action: #selector(copyLink), keyEquivalent: "")
+            let copy = NSMenuItem(title: "Copy Link", action: #selector(copyClickedLinks), keyEquivalent: "c")
+            copy.keyEquivalentModifierMask = [.command, .shift]
             copy.target = self
             menu.addItem(copy)
             menu.delegate = self
@@ -403,11 +405,18 @@ struct ItemTableView: NSViewRepresentable {
             parent.onAction(Self.menuActions[sender.tag].1, ids)
         }
 
-        @objc private func copyLink() {
-            let urls = menuTargets.map(\.item.url)
-            guard !urls.isEmpty else { return }
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(urls.joined(separator: "\n"), forType: .string)
+        @objc private func copyClickedLinks() {
+            let ids = menuTargets.map(\.item.id)
+            guard !ids.isEmpty else { return }
+            parent.onAction(.copyLink, ids)
+        }
+
+        /// Edit > Copy Link while the table has focus: every selected item, not just the primary one.
+        func copySelectedLinks() -> Bool {
+            let ids = selectedItemIDs
+            guard !ids.isEmpty else { return false }
+            parent.onAction(.copyLink, ids)
+            return true
         }
 
         // MARK: NSTableViewDataSource
@@ -555,9 +564,16 @@ final class ItemNSTableView: NSTableView {
     /// Returns whether the row was a section header and was toggled.
     var headerClickHandler: ((Int) -> Bool)?
     weak var listUndoManager: UndoManager?
+    /// Copies the selected items' links; returns whether anything was selected.
+    var copyLinksHandler: (() -> Bool)?
 
     @objc func undo(_: Any?) { listUndoManager?.undo() }
     @objc func redo(_: Any?) { listUndoManager?.redo() }
+
+    /// Sent by Edit > Copy Link down the responder chain; see `PRDeskApp`.
+    @objc func copyItemLinks(_: Any?) {
+        if copyLinksHandler?() != true { NSSound.beep() }
+    }
 
     override func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
         guard let manager = listUndoManager else { return super.validateUserInterfaceItem(item) }

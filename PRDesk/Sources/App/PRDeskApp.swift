@@ -41,6 +41,19 @@ struct PRDeskApp: App {
                     .keyboardShortcut("]")
                     .disabled(model.forwardHistory.isEmpty)
             }
+            CommandGroup(after: .pasteboard) {
+                Divider()
+                // The list answers with all its selected rows; elsewhere (e.g. reading the
+                // conversation) it is the item in the detail pane.
+                Button("Copy Link") {
+                    if !NSApp.sendAction(#selector(ItemNSTableView.copyItemLinks(_:)), to: nil, from: nil),
+                       let id = model.selectedItem?.id {
+                        model.perform(.copyLink, on: id)
+                    }
+                }
+                .keyboardShortcut("c", modifiers: [.command, .shift])
+                .disabled(model.selectedItem == nil)
+            }
             // In the conversation or files of the detail pane, wherever focus is.
             CommandGroup(after: .textEditing) {
                 Button("Find…") { WebDocument.performFind(.showFindInterface) }
