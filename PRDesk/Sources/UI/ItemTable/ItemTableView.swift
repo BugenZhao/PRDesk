@@ -718,6 +718,12 @@ final class ItemRowView: NSTableRowView {
         didSet { needsDisplay = true }
     }
 
+    /// No crossfade of the alternating stripe when a row slides to the other parity: the cells
+    /// draw into the row's layer, so each frame of the fade would redraw the whole row.
+    override class func defaultAnimation(forKey key: NSAnimatablePropertyKey) -> Any? {
+        key == "backgroundColor" ? nil : super.defaultAnimation(forKey: key)
+    }
+
     override func drawBackground(in dirtyRect: NSRect) {
         super.drawBackground(in: dirtyRect)
         if drawsSeparator {

@@ -63,8 +63,9 @@ final class RunsCellView: NSTableCellView {
     private static let chipHeight: CGFloat = 14
     private static let chipPadding: CGFloat = 4
 
+    // Row views set this again on every frame of a row animation; redraw only when it changes.
     override var backgroundStyle: NSView.BackgroundStyle {
-        didSet { needsDisplay = true }
+        didSet { if backgroundStyle != oldValue { needsDisplay = true } }
     }
 
     override var isFlipped: Bool { true }
