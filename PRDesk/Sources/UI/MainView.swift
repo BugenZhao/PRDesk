@@ -27,10 +27,10 @@ struct MainView: View {
                 onFocusComposer: { model.requestComposerFocus() }
             )
         }
-        .frame(minWidth: 640, maxHeight: .infinity)
+        .frame(minWidth: 560, maxHeight: .infinity)
         .inspector(isPresented: $showsDetail) {
             DetailView()
-                .inspectorColumnWidth(min: 360, ideal: 520, max: 1000)
+                .inspectorColumnWidth(min: 360, ideal: 480, max: 1000)
         }
         .toolbar {
             ToolbarItem(placement: .principal) {

@@ -17,7 +17,7 @@ struct PRDeskApp: App {
             MainView()
                 .environment(model)
         }
-        .defaultSize(width: 1500, height: 900)
+        .defaultSize(width: 1360, height: 860)
         .commands {
             CommandGroup(after: .toolbar) {
                 Button("Sync Now") {

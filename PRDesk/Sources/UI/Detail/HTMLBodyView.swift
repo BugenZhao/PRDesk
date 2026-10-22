@@ -66,6 +66,12 @@ private struct WebBody: NSViewRepresentable {
         context.coordinator.load(html, into: webView)
     }
 
+    /// Fill whatever is offered rather than the web view's own fitting size; the measured
+    /// content height is applied by the caller.
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView _: PassthroughWebView, context _: Context) -> CGSize? {
+        CGSize(width: proposal.width ?? 0, height: proposal.height ?? 0)
+    }
+
     @MainActor
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         var onHeight: (CGFloat) -> Void

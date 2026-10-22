@@ -16,6 +16,12 @@ struct ComposerView: View {
     @FocusState private var focused: Bool
 
     private var trimmed: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    /// Grows with the number of lines, from three to about nine.
+    private var editorHeight: CGFloat {
+        let lines = CGFloat(text.split(separator: "\n", omittingEmptySubsequences: false).count)
+        return min(160, max(54, lines * 17 + 10))
+    }
     private var isAuthor: Bool { sameLogin(item.author, model.viewer) }
 
     var body: some View {
@@ -36,8 +42,9 @@ struct ComposerView: View {
                     .font(.body)
                     .scrollContentBackground(.hidden)
                     .focused($focused)
-                    .frame(minHeight: 54, maxHeight: 160)
-                    .fixedSize(horizontal: false, vertical: true)
+                    // An explicit height that follows the text, so the editor's own sizing can
+                    // never feed into the window's minimum size.
+                    .frame(height: editorHeight)
                     .padding(4)
                     .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
                     .overlay(alignment: .topLeading) {

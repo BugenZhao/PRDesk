@@ -82,9 +82,11 @@ private struct DetailHeader: View {
                 Text("#\(String(item.number))")
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
+                // No vertical fixedSize: while the window measures its minimum size it proposes a
+                // tiny width, and a fixed-height title would wrap to a window-sized column.
                 Text(item.title)
+                    .lineLimit(3)
                     .textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
             }
             .font(.title3.weight(.semibold))
 

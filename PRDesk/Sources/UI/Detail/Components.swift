@@ -81,8 +81,12 @@ struct LabelChip: View {
 struct FlowLayout: Layout {
     var spacing: CGFloat = 4
 
+    /// Narrower proposals (the window probing for its minimum size) are laid out at this width,
+    /// so one chip per row doesn't turn into a tall minimum height.
+    private static let minimumLayoutWidth: CGFloat = 240
+
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache _: inout ()) -> CGSize {
-        let rows = arrange(subviews, width: proposal.width ?? .infinity)
+        let rows = arrange(subviews, width: max(proposal.width ?? .infinity, Self.minimumLayoutWidth))
         let width = rows.map { $0.width }.max() ?? 0
         let height = rows.reduce(0) { $0 + $1.height } + spacing * CGFloat(max(0, rows.count - 1))
         return CGSize(width: width, height: height)

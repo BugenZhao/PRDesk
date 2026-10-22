@@ -70,6 +70,12 @@ struct ItemTableView: NSViewRepresentable {
         context.coordinator.update(self)
     }
 
+    /// Take whatever space is offered. Without this SwiftUI uses the table's fitting size (the sum
+    /// of its column widths) as a minimum, which can force the window wider than the screen.
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView _: NSScrollView, context _: Context) -> CGSize? {
+        CGSize(width: proposal.width ?? 600, height: proposal.height ?? 400)
+    }
+
     @MainActor
     final class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSMenuDelegate {
         weak var table: ItemNSTableView?
