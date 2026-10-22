@@ -236,15 +236,18 @@ final class RunsCellView: NSTableCellView {
         case let .symbol(name, color, pointSize):
             guard let image = Self.symbol(name, color: emphasized ? .alternateSelectedControlTextColor : color, pointSize: pointSize) else { return }
             let size = image.size
-            image.draw(in: NSRect(
+            drawRaster(.symbol(name, pointSize), color: emphasized ? .alternateSelectedControlTextColor : color, shape: .none, in: NSRect(
                 x: rect.minX + (rect.width - size.width) / 2,
                 y: rect.midY - size.height / 2,
                 width: size.width,
                 height: size.height
-            ))
+            )) { bounds in image.draw(in: bounds) }
 
         case let .image(image):
-            drawImage(image, in: rect)
+            let size = Self.imageSize
+            drawRaster(.image(Self.identity(of: image)), shape: .rounded, in: NSRect(x: rect.minX, y: rect.midY - size / 2, width: size, height: size)) { bounds in
+                image.draw(in: bounds)
+            }
 
         case let .tile(string, color):
             let size = Self.imageSize
@@ -269,15 +272,12 @@ final class RunsCellView: NSTableCellView {
 
         case let .avatar(image):
             let size = Self.imageSize
-            let circle = NSBezierPath(ovalIn: NSRect(x: rect.minX, y: rect.midY - size / 2, width: size, height: size))
+            let target = NSRect(x: rect.minX, y: rect.midY - size / 2, width: size, height: size)
             if let image {
-                NSGraphicsContext.saveGraphicsState()
-                circle.addClip()
-                image.draw(in: circle.bounds, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
-                NSGraphicsContext.restoreGraphicsState()
+                drawRaster(.image(Self.identity(of: image)), shape: .circle, in: target) { bounds in image.draw(in: bounds) }
             } else {
                 NSColor.quaternaryLabelColor.setFill()
-                circle.fill()
+                NSBezierPath(ovalIn: target).fill()
             }
 
         case let .icon(.symbol(name), color):
@@ -286,15 +286,102 @@ final class RunsCellView: NSTableCellView {
         case let .icon(.asset(name), color):
             guard let image = NSImage(named: name) else { return }
             let size = Self.symbolSize
+            let tint = emphasized ? NSColor.alternateSelectedControlTextColor : color
             let target = NSRect(x: rect.minX + (rect.width - size) / 2, y: rect.midY - size / 2, width: size, height: size)
-            // Tint the template: draw it in a transparency layer, then fill the color over its alpha.
-            let context = NSGraphicsContext.current!.cgContext
-            context.beginTransparencyLayer(auxiliaryInfo: nil)
-            image.draw(in: target, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
-            (emphasized ? NSColor.alternateSelectedControlTextColor : color).setFill()
-            target.fill(using: .sourceIn)
-            context.endTransparencyLayer()
+            drawRaster(.asset(name), color: tint, shape: .none, in: target) { bounds in
+                // Tint the template: draw it, then fill the color over its alpha.
+                image.draw(in: bounds)
+                tint.setFill()
+                bounds.fill(using: .sourceIn)
+            }
         }
+    }
+
+    // MARK: Rasterized images
+
+    // Images are drawn from bitmaps made once per screen scale and appearance: an NSImage picks
+    // a representation, resamples and (here) clips or tints on every draw, which added up to a
+    // large share of the time rows take to scroll in and redraw on resize.
+
+    private enum RasterSource: Hashable {
+        case image(ObjectIdentifier)
+        case asset(String)
+        case symbol(String, CGFloat)
+    }
+
+    private enum RasterShape: Hashable { case none, circle, rounded }
+
+    private struct RasterKey: Hashable {
+        var source: RasterSource
+        /// Resolved in the appearance, so dynamic colors are drawn as they look in it.
+        var color: NSColor?
+        var shape: RasterShape
+        var size: NSSize
+        var scale: CGFloat
+        var appearance: NSAppearance.Name
+    }
+
+    private static var rasters: [RasterKey: CGImage] = [:]
+    /// Images keyed by identity are kept alive, so an identity can't come back as a different
+    /// image. Few: avatars and org logos.
+    private static var rasterSources: [ObjectIdentifier: NSImage] = [:]
+    private static let rasterColorSpace = CGColorSpace(name: CGColorSpace.displayP3)!
+
+    private static func identity(of image: NSImage) -> ObjectIdentifier {
+        let id = ObjectIdentifier(image)
+        if rasterSources[id] == nil { rasterSources[id] = image }
+        return id
+    }
+
+    /// Draws what `draw` paints into a `rect`-sized box, from a bitmap made on first use.
+    private func drawRaster(_ source: RasterSource, color: NSColor? = nil, shape: RasterShape, in rect: NSRect, draw: (NSRect) -> Void) {
+        guard let context = NSGraphicsContext.current?.cgContext else { return }
+        let scale = window?.backingScaleFactor ?? 2
+        let appearance = NSAppearance.currentDrawing()
+        let key = RasterKey(source: source, color: color, shape: shape, size: rect.size, scale: scale, appearance: appearance.name)
+        let raster: CGImage
+        if let cached = Self.rasters[key] {
+            raster = cached
+        } else {
+            guard let made = Self.rasterize(size: rect.size, scale: scale, shape: shape, appearance: appearance, draw: draw) else { return }
+            if Self.rasters.count > 3000 { Self.rasters.removeAll() }
+            Self.rasters[key] = made
+            raster = made
+        }
+        // Whole device pixels, so the bitmap isn't resampled into a blur.
+        let origin = NSPoint(x: (rect.minX * scale).rounded() / scale, y: (rect.minY * scale).rounded() / scale)
+        context.saveGState()
+        // The cell is flipped; the bitmap is not.
+        context.translateBy(x: origin.x, y: origin.y + rect.height)
+        context.scaleBy(x: 1, y: -1)
+        context.draw(raster, in: CGRect(origin: .zero, size: rect.size))
+        context.restoreGState()
+    }
+
+    private static func rasterize(size: NSSize, scale: CGFloat, shape: RasterShape, appearance: NSAppearance, draw: (NSRect) -> Void) -> CGImage? {
+        let width = Int((size.width * scale).rounded(.up))
+        let height = Int((size.height * scale).rounded(.up))
+        guard width > 0, height > 0,
+              let context = CGContext(
+                  data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: rasterColorSpace,
+                  bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+              )
+        else { return nil }
+        context.scaleBy(x: scale, y: scale)
+        context.interpolationQuality = .high
+        let bounds = NSRect(origin: .zero, size: size)
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
+        appearance.performAsCurrentDrawingAppearance {
+            switch shape {
+            case .none: break
+            case .circle: NSBezierPath(ovalIn: bounds).addClip()
+            case .rounded: NSBezierPath(roundedRect: bounds, xRadius: 3, yRadius: 3).addClip()
+            }
+            draw(bounds)
+        }
+        NSGraphicsContext.restoreGraphicsState()
+        return context.makeImage()
     }
 
     private struct SymbolKey: Hashable {
@@ -316,15 +403,6 @@ final class RunsCellView: NSTableCellView {
         if symbols.count > 500 { symbols.removeAll() }
         symbols[key] = image
         return image
-    }
-
-    private func drawImage(_ image: NSImage, in rect: NSRect) {
-        let size = Self.imageSize
-        let target = NSRect(x: rect.minX, y: rect.midY - size / 2, width: size, height: size)
-        NSGraphicsContext.saveGraphicsState()
-        NSBezierPath(roundedRect: target, xRadius: 3, yRadius: 3).addClip()
-        image.draw(in: target, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
-        NSGraphicsContext.restoreGraphicsState()
     }
 
     private static let truncatingTail: NSParagraphStyle = {
