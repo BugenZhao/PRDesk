@@ -32,6 +32,7 @@ struct ItemTableView: NSViewRepresentable {
         table.allowsMultipleSelection = false
         table.allowsEmptySelection = true
         table.floatsGroupRows = true
+        table.usesAlternatingRowBackgroundColors = true
         // The title column is sized manually to fill whatever the other columns leave.
         table.columnAutoresizingStyle = .noColumnAutoresizing
         for column in ItemColumn.allCases {
