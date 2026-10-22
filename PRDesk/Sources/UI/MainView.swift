@@ -32,6 +32,9 @@ struct MainView: View {
         .frame(minWidth: 560, maxHeight: .infinity)
         .inspector(isPresented: $showsDetail) {
             DetailView()
+                // The inspector column ignores the status bar's inset; keep its bottom (the
+                // composer's buttons) clear of the bar.
+                .padding(.bottom, StatusBar.height)
                 .inspectorColumnWidth(min: 360, ideal: 480, max: 1000)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -162,6 +165,8 @@ private struct AddItemView: View {
 private struct StatusBar: View {
     @Environment(AppModel.self) private var model
 
+    static let height: CGFloat = 22
+
     private static let boardURL = URL(string: "https://github.com/orgs/\(BoardQuery.owner)/projects/\(BoardQuery.number)")!
 
     var body: some View {
@@ -182,7 +187,7 @@ private struct StatusBar: View {
             .foregroundStyle(.secondary)
             .lineLimit(1)
             .padding(.horizontal, 10)
-            .frame(height: 22)
+            .frame(height: Self.height)
         }
         .background(.bar)
     }
