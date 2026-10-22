@@ -100,8 +100,6 @@ struct ItemTableView: NSViewRepresentable {
         /// The selection the table last showed, to tell a new one (scrolled to) from the same one
         /// at a new index after rows came or went above it (left where it is).
         private var shownSelection: TableSelection?
-        /// Above this many inserted and removed rows (a new filter, the Inbox), reload instead of animating.
-        private static let maxAnimatedChanges = 60
         private var clock: Task<Void, Never>?
 
         init(_ parent: ItemTableView) {
@@ -176,8 +174,9 @@ struct ItemTableView: NSViewRepresentable {
         }
 
         /// Moves, inserts and removes rows with animation instead of reloading, so an item given a
-        /// new Status travels to its new section and one leaving the list fades out. Returns false
-        /// when the change is too big to animate, for the caller to reload.
+        /// new Status travels to its new section, one leaving the list fades out, and a section
+        /// expands or collapses the same way whatever its size. Returns false when rows can't be
+        /// matched up (duplicate identities), for the caller to reload.
         private func animateChanges(from old: [TableRow], in table: NSTableView) -> Bool {
             let oldKeys = old.map(\.animationKey)
             let newKeys = rows.map(\.animationKey)
@@ -185,8 +184,6 @@ struct ItemTableView: NSViewRepresentable {
             let newSet = Set(newKeys)
             guard oldSet.count == oldKeys.count, newSet.count == newKeys.count else { return false }
             let removed = IndexSet(oldKeys.indices.filter { !newSet.contains(oldKeys[$0]) })
-            let insertedCount = newKeys.count { !oldSet.contains($0) }
-            guard removed.count + insertedCount <= Self.maxAnimatedChanges else { return false }
 
             // Changes in an update block apply one after another, each to the rows as the previous
             // one left them; `current` follows along.
@@ -431,6 +428,7 @@ struct ItemTableView: NSViewRepresentable {
                     .text(String(count), color: .secondaryLabelColor, font: CellFont.digits),
                 ]
                 cell.alphaValue = 1
+                cell.showsTruncatedText = false
                 return cell
 
             case let .item(_, itemRow):
@@ -439,6 +437,7 @@ struct ItemTableView: NSViewRepresentable {
                 cell.alignment = column.alignment
                 cell.runs = column.runs(for: itemRow, viewer: viewer, badges: parent.badges, contribution: parent.contribution, now: Date())
                 cell.alphaValue = itemRow.item.isOpen ? 1 : 0.55
+                cell.showsTruncatedText = column == .title
                 cell.toolTip = switch column {
                 case .author: authorTooltip(itemRow.item.author)
                 case .ci: ItemColumn.ciTooltip(itemRow.item)
@@ -479,8 +478,11 @@ struct ItemTableView: NSViewRepresentable {
             case let .item(_, itemRow):
                 view.tint = itemRow.priority?.rowTint
                 view.toolTip = nil
+                view.drawsSeparator = false
             case let .header(section, _, _):
                 view.tint = nil
+                // Divides each section from the one above.
+                view.drawsSeparator = row > 0
                 // On the row: a group row doesn't show its cell's tooltip.
                 view.toolTip = section.help
             }
@@ -584,8 +586,17 @@ final class ItemRowView: NSTableRowView {
         didSet { needsDisplay = true }
     }
 
+    /// A hairline along the top, for section headers.
+    var drawsSeparator = false {
+        didSet { needsDisplay = true }
+    }
+
     override func drawBackground(in dirtyRect: NSRect) {
         super.drawBackground(in: dirtyRect)
+        if drawsSeparator {
+            NSColor.separatorColor.setFill()
+            NSRect(x: bounds.minX, y: bounds.minY, width: bounds.width, height: 1 / (window?.backingScaleFactor ?? 2)).fill()
+        }
         guard let tint, !isGroupRowStyle else { return }
         tint.setFill()
         dirtyRect.fill(using: .sourceOver)

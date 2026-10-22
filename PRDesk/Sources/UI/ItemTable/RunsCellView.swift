@@ -38,8 +38,10 @@ enum CellFont {
 final class RunsCellView: NSTableCellView {
     enum Alignment { case leading, trailing }
 
-    var runs: [CellRun] = [] { didSet { needsDisplay = true } }
+    var runs: [CellRun] = [] { didSet { needsDisplay = true; updateTruncationToolTip() } }
     var alignment: Alignment = .leading { didSet { needsDisplay = true } }
+    /// Shows the full text of runs cut short (e.g. a long title) as the tooltip.
+    var showsTruncatedText = false { didSet { updateTruncationToolTip() } }
 
     nonisolated static let spacing: CGFloat = 4
     nonisolated static let inset: CGFloat = 2
@@ -59,11 +61,26 @@ final class RunsCellView: NSTableCellView {
 
     override func draw(_: NSRect) {
         guard !runs.isEmpty else { return }
-        let natural = runs.map(naturalWidth)
+        let widths = layoutWidths(natural: runs.map(naturalWidth))
+        let total = widths.reduce(0, +) + Self.spacing * CGFloat(runs.count - 1)
+        var x = alignment == .trailing ? bounds.maxX - Self.inset - total : Self.inset
+        for (run, width) in zip(runs, widths) {
+            draw(run, in: NSRect(x: x, y: 0, width: width, height: bounds.height))
+            x += width + Self.spacing
+        }
+    }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        updateTruncationToolTip()
+    }
+
+    /// The width each run gets: flexible runs share what the fixed ones leave, earlier runs first;
+    /// springs get the rest.
+    private func layoutWidths(natural: [CGFloat]) -> [CGFloat] {
         let gaps = Self.spacing * CGFloat(runs.count - 1)
         let available = bounds.width - 2 * Self.inset - gaps
         let fixed = zip(runs, natural).reduce(0) { $0 + ($1.0.isFlexible ? 0 : $1.1) }
-        // Flexible runs share what the fixed ones leave, earlier runs first; springs get the rest.
         var remaining = max(0, available - fixed)
         var widths = zip(runs, natural).map { run, width -> CGFloat in
             guard run.isFlexible else { return width }
@@ -75,12 +92,17 @@ final class RunsCellView: NSTableCellView {
         for index in springs {
             widths[index] = remaining / CGFloat(springs.count)
         }
-        let total = widths.reduce(0, +) + gaps
-        var x = alignment == .trailing ? bounds.maxX - Self.inset - total : Self.inset
-        for (run, width) in zip(runs, widths) {
-            draw(run, in: NSRect(x: x, y: 0, width: width, height: bounds.height))
-            x += width + Self.spacing
+        return widths
+    }
+
+    private func updateTruncationToolTip() {
+        guard showsTruncatedText else { return }
+        let widths = layoutWidths(natural: runs.map(naturalWidth))
+        let cut = zip(runs, widths).compactMap { run, width in
+            run.fullWidth.map { $0 > width + 0.5 } == true ? run.fullText : nil
         }
+        let tip = cut.isEmpty ? nil : cut.joined(separator: "\n")
+        if toolTip != tip { toolTip = tip }
     }
 
     private func naturalWidth(_ run: CellRun) -> CGFloat {
@@ -233,6 +255,24 @@ private extension CellRun {
         switch self {
         case let .text(_, _, _, flexible, _), let .segments(_, _, flexible): flexible
         default: false
+        }
+    }
+
+    /// The text of a run that can be cut short.
+    var fullText: String? {
+        switch self {
+        case let .text(string, _, _, _, _): string
+        case let .segments(parts, _, _): parts.map(\.text).joined()
+        default: nil
+        }
+    }
+
+    /// The width the whole text needs, uncapped; nil for runs that can't be cut short.
+    var fullWidth: CGFloat? {
+        switch self {
+        case let .text(string, _, font, _, _): ceil(string.size(withAttributes: [.font: font]).width)
+        case let .segments(parts, font, _): ceil(parts.map(\.text).joined().size(withAttributes: [.font: font]).width)
+        default: nil
         }
     }
 }
