@@ -113,7 +113,8 @@ enum ItemColumn: String, CaseIterable {
                 }
             }
             let avatar: CellRun = .avatar(item.author.flatMap(AvatarCache.shared.image(for:)))
-            return [avatar, name] + vote + mark + orgBadges.map(\.cellRun)
+            // Badges sit at the right edge, so they line up down the column.
+            return [avatar, name] + vote + [.spring] + mark + orgBadges.map(\.cellRun)
 
         case .review:
             return reviewRuns(row, viewer: viewer)
