@@ -172,14 +172,12 @@ private struct DetailHeader: View {
                 get: { board?.priorityValue },
                 set: { model.perform(.priority($0), on: item.id) }
             )) {
+                Text("No Priority").tag(Priority?.none)
+                Divider()
                 ForEach(Priority.allCases, id: \.self) { priority in
-                    Image(systemName: priority.symbol)
-                        .help("\(priority.optionName) (\(priority.rawValue))")
-                        .tag(Optional(priority))
+                    Label(priority.optionName, systemImage: priority.symbol).tag(Optional(priority))
                 }
-                Text("None").tag(Priority?.none)
             }
-            .pickerStyle(.segmented)
             .labelsHidden()
             .fixedSize()
             .help("Priority on the board (1/2/3, 0 to clear)")
