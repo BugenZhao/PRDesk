@@ -3,7 +3,6 @@ import SwiftUI
 struct MainView: View {
     @Environment(AppModel.self) private var model
     @State private var showsDetail = true
-    @State private var showsAdd = false
     @FocusState private var filterFocused: Bool
 
     var body: some View {
@@ -50,18 +49,13 @@ struct MainView: View {
                 .labelsHidden()
                 .fixedSize()
             }
-            // The list's own actions, at the right end of its part of the toolbar.
-            ToolbarItemGroup(placement: .primaryAction) {
+            // The list's own action, at the right end of its part of the toolbar.
+            ToolbarItem(placement: .primaryAction) {
                 Button("Sync Now", systemImage: "arrow.clockwise") {
                     Task { await model.sync() }
                 }
                 .help("Sync now (⌘R)")
                 .disabled(model.syncState == .syncing)
-                Button("Add", systemImage: "plus") { showsAdd = true }
-                    .help("Add a PR or issue to the board by number or URL")
-                    .popover(isPresented: $showsAdd, arrowEdge: .bottom) {
-                        AddItemView { showsAdd = false }
-                    }
             }
             ToolbarSpacer(.fixed, placement: .primaryAction)
             ToolbarItem(placement: .primaryAction) {
@@ -113,49 +107,6 @@ struct MainView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
-    }
-}
-
-private struct AddItemView: View {
-    @Environment(AppModel.self) private var model
-    let dismiss: () -> Void
-    @State private var input = ""
-    @State private var error: String?
-    @State private var isAdding = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            TextField("Number or URL", text: $input)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 260)
-                .onSubmit(add)
-                .disabled(isAdding)
-            if let error {
-                Text(error).font(.caption).foregroundStyle(.red)
-            }
-            HStack {
-                Spacer()
-                if isAdding { ProgressView().controlSize(.small) }
-                Button("Add", action: add)
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(input.isEmpty || isAdding)
-            }
-        }
-        .padding(12)
-    }
-
-    private func add() {
-        isAdding = true
-        error = nil
-        Task {
-            do {
-                try await model.addItem(input)
-                dismiss()
-            } catch {
-                self.error = error.localizedDescription
-            }
-            isAdding = false
-        }
     }
 }
 

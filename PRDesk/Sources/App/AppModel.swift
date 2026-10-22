@@ -414,23 +414,6 @@ final class AppModel {
         }
     }
 
-    /// Fetches an item by number or URL and adds it to the board (without a Status), so it stays
-    /// tracked even if no search finds it.
-    func addItem(_ input: String) async throws {
-        let digits = input.split(whereSeparator: { !$0.isNumber }).last.flatMap { Int($0) }
-        guard let number = digits else { throw SyncError.notFound(0) }
-        let item = try await engine.fetchItem(number: number)
-        try await engine.addToBoard(number: number, contentID: item.id)
-        mode = .dashboard
-        filterText = ""
-        // The snapshot with the new item may not have arrived yet; build its row from what's known.
-        var row = row(for: item)
-        if row.board == nil { row.board = try await db.boardEntry(number: number) }
-        let section = ListSection.triageSection(of: row) ?? .triage
-        collapsed.remove(section)
-        selection = TableSelection(section: section, itemID: item.id)
-    }
-
     /// Updates affiliation data for everyone who appears in the list.
     func refreshAffiliations(force: Bool = false) async {
         let authors = Set(snapshot.items.compactMap(\.author))

@@ -311,18 +311,6 @@ extension SyncEngine {
         }
     }
 
-    /// Adds the item to the board without a Status, so it stays tracked and shows up in Triage.
-    func addToBoard(number: Int, contentID: String) async throws {
-        guard try await db.boardEntry(number: number) == nil else { return }
-        let schema = try await schema()
-        var entry = BoardEntry(number: number, itemID: "", contentID: contentID, isArchived: false)
-        boardWrites[number] = Date()
-        try await db.saveBoardEntry(entry)
-        if isDryRun("add #\(number) to the board") { return }
-        entry.itemID = try await addToBoard(projectID: schema.projectID, contentID: contentID)
-        try await db.saveBoardEntry(entry)
-    }
-
     /// The viewer's notification thread for the item, if there is one. Notifications come newest
     /// first; threads older than a few hundred notifications are not looked for.
     private func notificationThread(number: Int) async throws -> String? {
