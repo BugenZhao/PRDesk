@@ -97,7 +97,7 @@ actor AffiliationEngine {
             // Being in vllm-project says nothing about an employer.
             let employers = Org.allCases.filter { $0 != .vllm }
             let unknown = users.values.filter { user in
-                user.company == nil && !user.orgs.contains { org in employers.contains { $0.githubOrgs.contains(org) } }
+                user.company == nil && !user.orgs.contains { org in employers.contains { $0.githubOrgs.contains { sameLogin($0, org) } } }
             }
             for emailBatch in unknown.map(\.login).chunked(Self.emailBatchSize) {
                 for (login, domains) in try await fetchEmailDomains(emailBatch) {
@@ -143,7 +143,7 @@ actor AffiliationEngine {
 
     private func fetchMembers() async throws -> [String: [String]] {
         var result: [String: [String]] = [:]
-        for org in Org.allCases {
+        for org in Org.allCases where org.listsMembers {
             var logins: [String] = []
             for githubOrg in org.githubOrgs {
                 var page = 1

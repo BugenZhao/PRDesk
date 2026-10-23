@@ -44,6 +44,12 @@ struct Contribution: Hashable, Sendable {
     /// Nothing merged yet.
     var isFirstTime: Bool { merged == 0 }
 
+    /// A first-timer nothing else vouches for, shown as a caution beside their name: a known
+    /// affiliation (`badges`) outweighs an empty record.
+    func isUnvouched(badges: [Badge]) -> Bool {
+        isFirstTime && badges.isEmpty
+    }
+
     var summary: String {
         isFirstTime ? "No PRs merged in vllm yet" : "\(merged) PR\(merged == 1 ? "" : "s") merged in vllm"
     }
@@ -115,10 +121,10 @@ struct Affiliations: Equatable, Sendable {
             if let membership = user.orgs.first(where: { login in org.githubOrgs.contains { sameLogin($0, login) } }) {
                 return "public member of \(membership)"
             }
-            if let company = user.company, org.companyPatterns.contains(where: company.lowercased().contains) {
+            if let company = user.company, org.matches(company: company) {
                 return "profile company: \(company)"
             }
-            if let domain = user.emailDomains.first(where: org.emailDomains.contains) {
+            if let domain = user.emailDomains.first(where: org.matches(emailDomain:)) {
                 return "commit email @\(domain)"
             }
         }
@@ -126,45 +132,6 @@ struct Affiliations: Equatable, Sendable {
             return "username ends with \(suffix)"
         }
         return nil
-    }
-}
-
-extension Org {
-    /// GitHub organizations whose members get this badge.
-    var githubOrgs: [String] {
-        switch self {
-        case .vllm: ["vllm-project"]
-        case .inferact: ["Inferact"]
-        case .redhat: ["RedHatOfficial", "redhat-et", "neuralmagic"]
-        case .nvidia: ["NVIDIA"]
-        }
-    }
-
-    var companyPatterns: [String] {
-        switch self {
-        case .vllm: []
-        case .inferact: ["inferact"]
-        case .redhat: ["red hat", "redhat", "neural magic", "neuralmagic"]
-        case .nvidia: ["nvidia"]
-        }
-    }
-
-    var emailDomains: [String] {
-        switch self {
-        case .vllm: []
-        case .inferact: ["inferact.ai", "inferact.com"]
-        case .redhat: ["redhat.com"]
-        case .nvidia: ["nvidia.com"]
-        }
-    }
-
-    var loginSuffixes: [String] {
-        switch self {
-        case .vllm: []
-        case .inferact: ["-inferact"]
-        case .redhat: ["-redhat"]
-        case .nvidia: ["-nv", "-nvidia"]
-        }
     }
 }
 

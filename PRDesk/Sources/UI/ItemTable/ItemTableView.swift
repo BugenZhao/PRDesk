@@ -480,9 +480,17 @@ struct ItemTableView: NSViewRepresentable {
                 let cell = reusableCell(tableView, id: column.rawValue)
                 cell.alignment = column.alignment
                 cell.runs = column.runs(for: itemRow, viewer: viewer, badges: parent.badges, contribution: parent.contribution, now: Date())
-                cell.opacity = itemRow.item.isOpen ? 1 : 0.55
+                cell.opacity = Self.opacity(of: itemRow.item, in: column)
                 return cell
             }
+        }
+
+        /// Closed items fade, and drafts nearly as much (all but the unread dot, which still has
+        /// to catch the eye), so the PRs ready for review stand out.
+        private static func opacity(of item: Item, in column: ItemColumn) -> CGFloat {
+            if !item.isOpen { return 0.55 }
+            if item.isDraft, column != .unread { return 0.6 }
+            return 1
         }
 
         /// The tooltip for a cell, worked out only when it is about to show; see

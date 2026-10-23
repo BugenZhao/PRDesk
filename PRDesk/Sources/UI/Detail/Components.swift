@@ -20,7 +20,8 @@ struct AvatarView: View {
     }
 }
 
-/// A login followed by the viewer's vote on that person. Right-click to vote.
+/// A login followed by the viewer's vote on that person and the first-timer caution. Right-click
+/// to vote.
 struct LoginText: View {
     @Environment(AppModel.self) private var model
     let login: String?
@@ -36,6 +37,12 @@ struct LoginText: View {
                     .font(.caption2)
                     .foregroundStyle(Color(nsColor: vote.nsColor))
                     .help(vote == .up ? "Upvoted" : "Downvoted: sinks to the bottom of Triage")
+            }
+            if let contribution = model.contribution(for: login),
+               contribution.isUnvouched(badges: login.map(model.affiliations.badges(for:)) ?? [])
+            {
+                BadgeTile(text: "1st", color: Color(nsColor: .firstTimer))
+                    .help(contribution.summary)
             }
         }
         .contextMenu {
@@ -73,17 +80,13 @@ struct BadgeIcons: View {
         _ = cache.version
         let badges = login.map(model.affiliations.badges(for:)) ?? []
         return HStack(spacing: 3) {
-            if let contribution = model.contribution(for: login) {
-                // An org badge already says the author is established.
-                if contribution.isRegular, badges.isEmpty {
-                    Image(systemName: "checkmark.seal")
-                        .font(.system(size: size - 2))
-                        .foregroundStyle(.green)
-                        .help(contribution.summary)
-                } else if contribution.isFirstTime {
-                    BadgeTile(text: "1st", color: Color(nsColor: .firstTimer), size: size)
-                        .help(contribution.summary)
-                }
+            // An org badge already says the author is established. (The first-timer caution is
+            // `LoginText`'s.)
+            if let contribution = model.contribution(for: login), contribution.isRegular, badges.isEmpty {
+                Image(systemName: "checkmark.seal")
+                    .font(.system(size: size - 2))
+                    .foregroundStyle(.green)
+                    .help(contribution.summary)
             }
             ForEach(badges, id: \.org) { badge in
                 Group {

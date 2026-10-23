@@ -109,10 +109,11 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 | 列 | 内容 |
 |---|---|
 | (标记) | `•` 有未读的他人动态（相对我上次查看） |
+| （整行） | 已关闭的条目整行变淡；draft PR 也整行变淡（只保留未读点），一眼和待 review 的 PR 分开 |
 | P | 优先级（来自 board），用 SF Symbol：H 双感叹号（红）、M 单感叹号（橙）、L 横杠（灰） |
 | # | 编号；PR / Issue 用不同的小图标区分 |
 | Title | 状态图标 + 标题（开头的 `[..]` / `xx:` 标签变淡），被唤醒的条目带原因标签；有 board Comment 时接着显示备注；灰色的最新事件摘要（如 `@xx commented 2h`、`you reviewed 2d`）始终靠右对齐；被截断的文字（标题、备注、摘要）悬停时 tooltip 显示全文 |
-| Author | 头像 + 用户名 + 投票图标；贡献者标记和组织徽章（见 §5、§5.2）靠右对齐 |
+| Author | 头像 + 用户名 + 投票图标 + 首次贡献的警示；可信标记（seal、组织徽章，见 §5、§5.2）靠右对齐 |
 | Review | 裸 ✓ + approve 总数（含我）：我 approve 过时为绿色，只有别人 approve 时为灰色；我 request changes 时后面多一个红 ✗。和 CI 列同样的结构：小标记 + 数字，固定位置 |
 | Turn | `review`（请求我 review 且未完成）/ `me` / `them` / 空（已关闭） |
 | CI | 色点：绿 通过 / 红 失败 / 黄 运行中 / 灰 被取消；带 `ready` label 时实心，否则空心；失败 / 运行中的数量在悬停提示里 |
@@ -157,16 +158,16 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 
 ## 5. 组织徽章
 
-显示四种：**vLLM committer**、**Inferact**、**Red Hat**、**NVIDIA**。图标用内置的透明底 logo（vLLM、Inferact、NVIDIA 只用标志不带文字），没有内置 logo 的（Red Hat）用 GitHub 组织头像（缓存到本地）。vLLM 另有低一档的灰色徽章（logo 去色），给不是 committer 的 `vllm-project` 组织成员和仓库 collaborator（triage 及以上权限）。
+徽章表示"可信"：**vLLM committer**、**Inferact**、**Red Hat**、**NVIDIA**，以及近半年贡献最多的公司（按总体和 Rust frontend 的 top contributors 选出）：**AMD**、**Intel**、**IBM**、**Hugging Face**、**Mistral AI**、**Meta**、**Google**、**DaoCloud**、**Huawei**、**Microsoft**、**Alibaba**、**Ant Group**、**ByteDance**、**Moonshot AI**、**Arm**、**Samsung**、**EmbeddedLLM**。图标用内置的透明底 logo（vLLM、Inferact、NVIDIA 只用标志不带文字）；头像是文字 logo、缩小后认不出的（AMD、Intel、IBM、Alibaba、Arm、Samsung、EmbeddedLLM）画成品牌色小方块加简写；其余用 GitHub 组织头像（缓存到本地）。vLLM 另有低一档的灰色徽章（logo 去色），给不是 committer 的 `vllm-project` 组织成员和仓库 collaborator（triage 及以上权限）。
 
 判定来源按优先级从高到低，命中即生效，悬停显示命中来源：
 
 1. 手动设置：设置页里的"用户 → 组织"表，可添加，也可强制排除
 2. vLLM committer：解析仓库里的 `docs/governance/committers.md`，悬停时显示负责领域（如 "Rust frontend"）。其次是灰色档：`vllm-project` 组织成员，再其次是仓库 collaborator（列 collaborator 需要 push 权限，没有就跳过）。不用 `author_association`：它挂在单个条目上，不按人，也随查看者权限变化
-3. GitHub 组织成员：`Inferact`、`NVIDIA`、`RedHatOfficial` / `redhat-et` / `neuralmagic`（你所在的组织如 Inferact 能看到全部成员，其余只能看到公开成员）
-4. 个人资料的 company 字段，例如 `@Inferact`、`Red Hat`、`NVIDIA`
-5. 该用户 PR commit 的作者邮箱域名：`redhat.com`、`nvidia.com`、`inferact.ai`
-6. 用户名后缀，例如 `-redhat`、`-nv`
+3. GitHub 组织成员：每天拉 `Inferact`、`NVIDIA` / `ai-dynamo`、`RedHatOfficial` / `redhat-et` / `neuralmagic` 的成员列表（你所在的组织如 Inferact 能看到全部成员，其余只能看到公开成员）；大公司（`amd`、`intel`、`google` 等）公开成员太多，不拉列表，只看用户自己公开的组织
+4. 个人资料的 company 字段，按整词匹配（`intel` 匹配 `@intel`、`Intel Corporation`，不匹配 `Intelligence`），例如 `@Inferact`、`Red Hat`、`AMD`、`@ROCm`
+5. 该用户 PR commit 的作者邮箱域名（含子域名，如 `us.ibm.com`）：`redhat.com`、`nvidia.com`、`amd.com`、`intel.com` 等
+6. 用户名后缀，例如 `-redhat`、`-nv`、`-amd`、`-intel`、`-ibm`
 
 用户信息缓存 7 天；committers.md、组织成员和 collaborator 每天刷新一次。
 
@@ -184,8 +185,8 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 ## 5.2 贡献者标记
 
 - 统计每个作者在 vllm 合并过的 PR 数（GitHub search，每批 40 人，每周刷新；为 0 的每天刷新）
-- 合并数 ≥ 阈值（默认 10，设置 → Affiliations 可改）：作者名后显示绿色描边 seal 图标；已有组织徽章的作者不显示
-- 合并数 = 0：显示 "1st" 小方块（灰底白字，大小形状同组织徽章）
+- 合并数 ≥ 阈值（默认 10，设置 → Affiliations 可改）：显示绿色描边 seal 图标，和组织徽章一起靠右；已有组织徽章的作者不显示
+- 合并数 = 0 且没有任何组织徽章：作者名后紧跟 "1st" 小方块（橙底白字），表示"没有记录、需要留意"，和右侧的可信标记分开；有组织徽章的首次贡献者不显示（`is:first` 仍能过滤出来）
 - 悬停显示具体数字；列表、详情头部、时间线都显示
 - 过滤：`merged:N`、`merged:>=N`（也支持 `>`、`<`、`<=`）、`is:regular`、`is:first`
 - 只存本地，不写 board，也不影响分组

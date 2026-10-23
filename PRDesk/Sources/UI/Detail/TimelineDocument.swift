@@ -306,7 +306,7 @@ struct TimelineDocument {
                 // An org badge already says the author is established.
                 if contribution.isRegular, badges.isEmpty {
                     html += symbol("checkmark.seal", cls: "c-green", title: contribution.summary)
-                } else if contribution.isFirstTime {
+                } else if contribution.isUnvouched(badges: badges) {
                     html += #"<span class="tile first" title="\#(contribution.summary.htmlEscaped)">1st</span>"#
                 }
             }

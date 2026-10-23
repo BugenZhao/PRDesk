@@ -111,18 +111,20 @@ enum ItemColumn: String, CaseIterable {
             let name: CellRun = .text(item.author ?? "ghost", flexible: true)
             let vote: [CellRun] = row.authorVote.map { [.symbol($0.symbol, color: $0.nsColor)] } ?? []
             let orgBadges = item.author.map(badges) ?? []
-            var mark: [CellRun] = []
+            var seal: [CellRun] = []
+            var caution: [CellRun] = []
             if let contribution = item.author.flatMap(contribution) {
                 // An org badge already says the author is established.
                 if contribution.isRegular, orgBadges.isEmpty {
-                    mark = [.symbol("checkmark.seal", color: .systemGreen)]
-                } else if contribution.isFirstTime {
-                    mark = [.tile("1st", color: .firstTimer)]
+                    seal = [.symbol("checkmark.seal", color: .systemGreen)]
+                } else if contribution.isUnvouched(badges: orgBadges) {
+                    caution = [.tile("1st", color: .firstTimer)]
                 }
             }
             let avatar: CellRun = .avatar(item.author.flatMap(AvatarCache.shared.image(for:)))
-            // Badges sit at the right edge, so they line up down the column.
-            return [avatar, name] + vote + [.spring] + mark + orgBadges.map(\.cellRun)
+            // Marks of trust sit at the right edge, so they line up down the column; the
+            // first-timer caution stays with the name, apart from them.
+            return [avatar, name] + vote + caution + [.spring] + seal + orgBadges.map(\.cellRun)
 
         case .review:
             return reviewRuns(row, viewer: viewer)
@@ -284,11 +286,11 @@ extension NSColor {
             : NSColor(srgbRed: 0.81, green: 0.13, blue: 0.18, alpha: 1)
     }
 
-    /// The first-timer tile: an opaque gray deep enough to carry white text.
+    /// The first-timer caution tile: an orange deep enough to carry white text.
     static let firstTimer = NSColor(name: nil) { appearance in
         appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-            ? NSColor(white: 0.45, alpha: 1)
-            : NSColor(white: 0.58, alpha: 1)
+            ? NSColor(srgbRed: 0.85, green: 0.45, blue: 0.08, alpha: 1)
+            : NSColor(srgbRed: 0.91, green: 0.45, blue: 0.0, alpha: 1)
     }
 }
 

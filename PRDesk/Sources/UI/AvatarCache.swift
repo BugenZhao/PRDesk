@@ -31,6 +31,36 @@ final class AvatarCache {
         return nil
     }
 
+    @ObservationIgnored private var brandTiles: [String: NSImage] = [:]
+
+    /// `text` in white on a rounded square of the color `hex`, shrunk to fit; one image per tile,
+    /// so the list's raster cache keeps it.
+    func brandTile(_ text: String, hex: String) -> NSImage {
+        let key = "\(text)/\(hex)"
+        if let image = brandTiles[key] { return image }
+        let value = Int(hex, radix: 16) ?? 0
+        let color = NSColor(
+            srgbRed: CGFloat((value >> 16) & 0xFF) / 255, green: CGFloat((value >> 8) & 0xFF) / 255,
+            blue: CGFloat(value & 0xFF) / 255, alpha: 1
+        )
+        let image = NSImage(size: NSSize(width: 13, height: 13), flipped: false) { rect in
+            color.setFill()
+            NSBezierPath(roundedRect: rect, xRadius: rect.width * 3 / 13, yRadius: rect.height * 3 / 13).fill()
+            var font = NSFont.systemFont(ofSize: rect.height * 8 / 13, weight: .heavy)
+            let width = (text as NSString).size(withAttributes: [.font: font]).width
+            let room = rect.width * 0.88
+            if width > room { font = NSFont.systemFont(ofSize: font.pointSize * room / width, weight: .heavy) }
+            let size = (text as NSString).size(withAttributes: [.font: font])
+            (text as NSString).draw(
+                at: NSPoint(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2),
+                withAttributes: [.font: font, .foregroundColor: NSColor.white]
+            )
+            return true
+        }
+        brandTiles[key] = image
+        return image
+    }
+
     /// `image` without color, for a lesser badge, cached under `key`.
     func grayscale(_ image: NSImage, key: String) -> NSImage? {
         if let image = grayscaleImages[key] { return image }
@@ -92,11 +122,12 @@ final class AvatarCache {
 }
 
 extension Badge {
-    /// The org's bundled logo, else its GitHub avatar (nil while that loads); without color for a
-    /// secondary badge.
+    /// The org's bundled logo or brand tile, else its GitHub avatar (nil while that loads); without
+    /// color for a secondary badge.
     @MainActor
     var image: NSImage? {
         let cache = AvatarCache.shared
+        if let tile = org.brandTile { return cache.brandTile(tile.text, hex: tile.hex) }
         let key = org.logoAsset ?? org.avatarLogin.lowercased()
         guard let image = org.logoAsset.flatMap(NSImage.init(named:)) ?? cache.image(for: org.avatarLogin) else { return nil }
         return isSecondary ? cache.grayscale(image, key: key) : image
