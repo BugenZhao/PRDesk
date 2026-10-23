@@ -21,21 +21,31 @@ struct AvatarView: View {
 }
 
 /// A login followed by the viewer's vote on that person, in italics for a first-timer nothing
-/// vouches for. Right-click to vote.
+/// vouches for. Click to open their GitHub profile; right-click to vote.
 struct LoginText: View {
     @Environment(AppModel.self) private var model
     let login: String?
     var weight: Font.Weight = .medium
+    @State private var isHovered = false
 
     var body: some View {
         let isMe = sameLogin(login, model.viewer)
         let contribution = model.contribution(for: login)
         let unvouched = contribution?.isUnvouched(badges: login.map(model.affiliations.badges(for:)) ?? []) ?? false
         HStack(spacing: 3) {
-            Text(login ?? "ghost")
-                .fontWeight(weight)
-                .italic(unvouched)
-                .help(unvouched ? contribution?.summary ?? "" : "")
+            Button {
+                if let login { AppModel.openProfile(login) }
+            } label: {
+                Text(login ?? "ghost")
+                    .fontWeight(weight)
+                    .italic(unvouched)
+                    .underline(isHovered && login != nil)
+            }
+            .buttonStyle(.plain)
+            .disabled(login == nil)
+            .pointerStyle(login == nil ? nil : .link)
+            .onHover { isHovered = $0 }
+            .help([unvouched ? contribution?.summary : nil, login.map { "Open \($0)'s profile on GitHub" }].compactMap(\.self).joined(separator: "\n"))
             if let vote = model.vote(for: login) {
                 Image(systemName: vote.symbol)
                     .font(.caption2)
@@ -44,8 +54,16 @@ struct LoginText: View {
             }
         }
         .contextMenu {
-            if let login, !isMe {
-                VoteMenu(login: login)
+            if let login {
+                if !isMe {
+                    VoteMenu(login: login)
+                    Divider()
+                }
+                Button("Open Profile on GitHub") { AppModel.openProfile(login) }
+                Button("Copy Username") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(login, forType: .string)
+                }
             }
         }
     }

@@ -280,6 +280,7 @@ struct ItemTableView: NSViewRepresentable {
                 case "+", "=": .voteAuthor(.up)
                 case "-": .voteAuthor(.down)
                 case "o", "\r": .openInBrowser
+                case "u": .openAuthorProfile
                 default: nil
                 }
                 guard let action else { return false }
@@ -349,6 +350,7 @@ struct ItemTableView: NSViewRepresentable {
 
         private static let menuActions: [MenuAction] = [
             MenuAction(title: "Open in Browser", action: .openInBrowser, symbol: "safari", key: "o"),
+            MenuAction(title: "Open Author's Profile", action: .openAuthorProfile, symbol: "person.crop.circle", key: "u"),
             MenuAction(title: "Working", action: .triage(.working), symbol: "hammer", key: "w"),
             MenuAction(title: "Backlog", action: .triage(.backlog), symbol: "tray", key: "b"),
             MenuAction(title: "Skipped", action: .triage(.skipped), symbol: "forward", key: "s"),
@@ -363,7 +365,7 @@ struct ItemTableView: NSViewRepresentable {
             MenuAction(title: "Downvote Author", action: .voteAuthor(.down), symbol: "hand.thumbsdown", key: "-"),
         ]
         /// Indices of `menuActions` after which a separator goes.
-        private static let menuSeparatorsAfter: Set = [0, 4, 8, 10]
+        private static let menuSeparatorsAfter: Set = [1, 5, 9, 11]
 
         func makeContextMenu() -> NSMenu {
             let menu = NSMenu()

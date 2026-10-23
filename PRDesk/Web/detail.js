@@ -75,7 +75,7 @@ const PRDesk = (() => {
 
   // Right-clicking a person offers the app's vote menu instead of WebKit's.
   addEventListener("contextmenu", (event) => {
-    const login = event.target.closest(".login[data-login]");
+    const login = event.target.closest("[data-login]");
     if (login) {
       event.preventDefault();
       post({ type: "loginMenu", login: login.dataset.login, x: event.clientX, y: event.clientY });
@@ -521,6 +521,12 @@ const PRDesk = (() => {
     const link = event.target.closest("a[href]");
     if (link) {
       handleLink(event, link);
+      return;
+    }
+    // A person's name or avatar opens their GitHub profile.
+    const person = event.target.closest("[data-login]");
+    if (person) {
+      post({ type: "openProfile", login: person.dataset.login });
       return;
     }
     if (event.target.closest(".login")) return;

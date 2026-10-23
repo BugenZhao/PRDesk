@@ -289,7 +289,7 @@ struct TimelineDocument {
         private func avatar(_ login: String?, small: Bool = false) -> String {
             let cls = small ? "avatar small" : "avatar"
             guard let login else { return #"<span class="\#(cls)"></span>"# }
-            return #"<img class="\#(cls)" src="\#(AvatarSchemeHandler.url(for: login).htmlEscaped)" alt="">"#
+            return #"<img class="\#(cls)" src="\#(AvatarSchemeHandler.url(for: login).htmlEscaped)" data-login="\#(login.htmlEscaped)" alt="">"#
         }
 
         /// The login with the viewer's vote and affiliation badges, as `LoginText` and `BadgeIcons`.

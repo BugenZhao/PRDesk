@@ -122,6 +122,11 @@ private struct AppCommands: Commands {
             }
             .keyboardShortcut("o")
             .disabled(!model.hasSelection)
+            Button("Open Author's Profile") {
+                if let id = model.selectedItem?.id { model.perform(.openAuthorProfile, on: id) }
+            }
+            .keyboardShortcut("o", modifiers: [.command, .shift])
+            .disabled(!model.hasSelection)
         }
     }
 }

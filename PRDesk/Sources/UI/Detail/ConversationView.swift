@@ -78,9 +78,7 @@ struct ConversationView: View {
             })
             menu.addItem(.separator())
         }
-        if let profile = URL(string: "https://github.com/\(login)") {
-            menu.addItem(ClosureMenuItem("Open Profile on GitHub") { NSWorkspace.shared.open(profile) })
-        }
+        menu.addItem(ClosureMenuItem("Open Profile on GitHub") { AppModel.openProfile(login) })
         menu.addItem(ClosureMenuItem("Copy Username") {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(login, forType: .string)

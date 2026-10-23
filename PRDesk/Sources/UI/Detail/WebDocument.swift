@@ -191,6 +191,8 @@ extension WebDocument: WKScriptMessageHandler {
             if let subject = body["subject"] as? String, let content = (body["content"] as? String).flatMap(Reaction.Content.init) {
                 toggleReaction?(content, subject)
             }
+        case "openProfile":
+            if let login = body["login"] as? String { AppModel.openProfile(login) }
         case "openItem":
             if let number = body["number"] as? Int { openItem?(number) }
         case "fileMenu":

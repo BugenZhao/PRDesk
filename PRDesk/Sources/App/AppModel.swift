@@ -11,6 +11,8 @@ enum ItemAction {
     case togglePin
     case markRead
     case openInBrowser
+    /// Opens the GitHub profiles of the items' authors.
+    case openAuthorProfile
     /// Copies the items' GitHub links, one per line.
     case copyLink
     /// Vote on the item's author; voting the same way again clears the vote.
@@ -645,6 +647,12 @@ final class AppModel {
             for item in items.prefix(Self.maxTabsAtOnce) {
                 if let url = URL(string: item.url) { NSWorkspace.shared.open(url) }
             }
+        case .openAuthorProfile:
+            var seen = Set<String>()
+            let authors = items.compactMap(\.author).filter { seen.insert($0.lowercased()).inserted }
+            for author in authors.prefix(Self.maxTabsAtOnce) {
+                Self.openProfile(author)
+            }
         case .copyLink:
             let pasteboard = NSPasteboard.general
             pasteboard.clearContents()
@@ -661,6 +669,15 @@ final class AppModel {
     }
 
     private static let maxTabsAtOnce = 10
+
+    static func profileURL(for login: String) -> URL? {
+        URL(string: "https://github.com/\(login.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? login)")
+    }
+
+    /// Opens a person's GitHub profile in the browser.
+    static func openProfile(_ login: String) {
+        if let url = profileURL(for: login) { NSWorkspace.shared.open(url) }
+    }
 
     /// Runs a board write, reporting failure in `writeError`.
     // MARK: Undo

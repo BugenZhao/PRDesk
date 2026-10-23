@@ -43,6 +43,9 @@ a:hover { text-decoration: underline; }
 .vote { font-size: 9px; }
 .badge { width: 13px; height: 13px; border-radius: 3px; flex: none; }
 .login.unvouched { font-style: italic; }
+/* Names and avatars open the person's GitHub profile. */
+[data-login] { cursor: pointer; }
+.login[data-login]:hover { text-decoration: underline; }
 .chip {
   font-size: 10px; font-weight: 500; padding: 1px 5px; border-radius: 4px; white-space: nowrap; flex: none;
   color: var(--secondary); background: color-mix(in srgb, currentColor 15%, transparent);
