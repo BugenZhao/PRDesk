@@ -20,8 +20,8 @@ struct AvatarView: View {
     }
 }
 
-/// A login followed by the viewer's vote on that person and the first-timer caution. Right-click
-/// to vote.
+/// A login followed by the viewer's vote on that person, in italics for a first-timer nothing
+/// vouches for. Right-click to vote.
 struct LoginText: View {
     @Environment(AppModel.self) private var model
     let login: String?
@@ -29,20 +29,18 @@ struct LoginText: View {
 
     var body: some View {
         let isMe = sameLogin(login, model.viewer)
+        let contribution = model.contribution(for: login)
+        let unvouched = contribution?.isUnvouched(badges: login.map(model.affiliations.badges(for:)) ?? []) ?? false
         HStack(spacing: 3) {
             Text(login ?? "ghost")
                 .fontWeight(weight)
+                .italic(unvouched)
+                .help(unvouched ? contribution?.summary ?? "" : "")
             if let vote = model.vote(for: login) {
                 Image(systemName: vote.symbol)
                     .font(.caption2)
                     .foregroundStyle(Color(nsColor: vote.nsColor))
                     .help(vote == .up ? "Upvoted" : "Downvoted: sinks to the bottom of Triage")
-            }
-            if let contribution = model.contribution(for: login),
-               contribution.isUnvouched(badges: login.map(model.affiliations.badges(for:)) ?? [])
-            {
-                BadgeTile(text: "1st", color: Color(nsColor: .firstTimer))
-                    .help(contribution.summary)
             }
         }
         .contextMenu {
@@ -80,7 +78,7 @@ struct BadgeIcons: View {
         _ = cache.version
         let badges = login.map(model.affiliations.badges(for:)) ?? []
         return HStack(spacing: 3) {
-            // An org badge already says the author is established. (The first-timer caution is
+            // An org badge already says the author is established. (A first-timer's italics are
             // `LoginText`'s.)
             if let contribution = model.contribution(for: login), contribution.isRegular, badges.isEmpty {
                 Image(systemName: "checkmark.seal")

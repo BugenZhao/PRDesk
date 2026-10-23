@@ -154,7 +154,7 @@ private struct AffiliationSettingsView: View {
             } header: {
                 Text("Contributors")
             } footer: {
-                Text("Regular contributors without an affiliation badge get a seal; authors with nothing merged yet and no affiliation get an orange \"1st\" by their name. Counts refresh weekly, or daily for first-timers. Filter with merged:>=N, is:regular or is:first.")
+                Text("Regular contributors without an affiliation badge get a seal; authors with nothing merged yet and no affiliation have their name in italics. Counts refresh weekly, or daily for first-timers. Filter with merged:>=N, is:regular or is:first.")
                     .foregroundStyle(.secondary)
             }
         }

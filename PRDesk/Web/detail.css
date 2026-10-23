@@ -42,13 +42,7 @@ a:hover { text-decoration: underline; }
 .card .head .login { font-weight: 600; }
 .vote { font-size: 9px; }
 .badge { width: 13px; height: 13px; border-radius: 3px; flex: none; }
-.tile {
-  width: 13px; height: 13px; border-radius: 3px; flex: none; display: inline-flex; align-items: center; justify-content: center;
-  font-size: 8px; font-weight: 700; color: white; background: var(--tertiary);
-}
-/* A caution, in the list's first-timer orange (`NSColor.firstTimer`). */
-.tile.first { background: #e87300; }
-@media (prefers-color-scheme: dark) { .tile.first { background: #d97314; } }
+.login.unvouched { font-style: italic; }
 .chip {
   font-size: 10px; font-weight: 500; padding: 1px 5px; border-radius: 4px; white-space: nowrap; flex: none;
   color: var(--secondary); background: color-mix(in srgb, currentColor 15%, transparent);

@@ -296,19 +296,20 @@ struct TimelineDocument {
         private func person(_ login: String?) -> String {
             guard let login else { return #"<span class="person"><span class="login">ghost</span></span>"# }
             let escaped = login.htmlEscaped
-            var html = #"<span class="person"><span class="login" data-login="\#(escaped)">\#(escaped)</span>"#
+            let badges = people.badges(for: login)
+            let contribution = people.contribution(for: login)
+            // A first-timer nothing vouches for is set in italics, as in the list.
+            let unvouched = contribution.map { $0.isUnvouched(badges: badges) } ?? false
+            let cls = unvouched ? "login unvouched" : "login"
+            let title = unvouched ? #" title="\#(contribution!.summary.htmlEscaped)""# : ""
+            var html = #"<span class="person"><span class="\#(cls)"\#(title) data-login="\#(escaped)">\#(escaped)</span>"#
             if let vote = people.vote(for: login) {
                 let title = vote == .up ? "Upvoted" : "Downvoted: sinks to the bottom of Triage"
                 html += symbol(vote.symbol, cls: vote == .up ? "vote c-green" : "vote c-red", title: title)
             }
-            let badges = people.badges(for: login)
-            if let contribution = people.contribution(for: login) {
-                // An org badge already says the author is established.
-                if contribution.isRegular, badges.isEmpty {
-                    html += symbol("checkmark.seal", cls: "c-green", title: contribution.summary)
-                } else if contribution.isUnvouched(badges: badges) {
-                    html += #"<span class="tile first" title="\#(contribution.summary.htmlEscaped)">1st</span>"#
-                }
+            // An org badge already says the author is established.
+            if let contribution, contribution.isRegular, badges.isEmpty {
+                html += symbol("checkmark.seal", cls: "c-green", title: contribution.summary)
             }
             for badge in badges {
                 let title = "\(badge.name) — \(badge.source)".htmlEscaped

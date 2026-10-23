@@ -30,6 +30,7 @@ indirect enum CellRun {
 enum CellFont {
     nonisolated(unsafe) static let regular = NSFont.systemFont(ofSize: 12)
     nonisolated(unsafe) static let regularBold = NSFont.systemFont(ofSize: 12, weight: .semibold)
+    nonisolated(unsafe) static let regularItalic = NSFontManager.shared.convert(regular, toHaveTrait: .italicFontMask)
     nonisolated(unsafe) static let digits = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)
     nonisolated(unsafe) static let small = NSFont.systemFont(ofSize: 11)
     nonisolated(unsafe) static let smallBold = NSFont.systemFont(ofSize: 11, weight: .semibold)
