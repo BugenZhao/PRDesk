@@ -18,6 +18,10 @@ final class WebDocument: NSObject {
     var loginMenu: ((String) -> NSMenu)?
     /// Opens issue or PR `number` of the repository in the app, for a link to it.
     var openItem: ((Int) -> Void)?
+    /// The menu of reactions to add on a comment, review or description, by node id.
+    var reactionMenu: ((String) -> NSMenu?)?
+    /// Adds or takes back the viewer's reaction on a node, for clicking a reaction under it.
+    var toggleReaction: ((Reaction.Content, String) -> Void)?
 
     /// Every page's base URL, so relative links in GitHub's HTML resolve.
     static let baseURL = URL(string: "https://github.com/")!
@@ -181,6 +185,12 @@ extension WebDocument: WKScriptMessageHandler {
             pageReady()
         case "loginMenu":
             if let login = body["login"] as? String, let menu = loginMenu?(login) { popUp(menu, x: x, y: y) }
+        case "reactionMenu":
+            if let subject = body["subject"] as? String, let menu = reactionMenu?(subject) { popUp(menu, x: x, y: y) }
+        case "react":
+            if let subject = body["subject"] as? String, let content = (body["content"] as? String).flatMap(Reaction.Content.init) {
+                toggleReaction?(content, subject)
+            }
         case "openItem":
             if let number = body["number"] as? Int { openItem?(number) }
         case "fileMenu":

@@ -4,14 +4,16 @@ import Foundation
 /// so the two run side by side (GitHub takes a second or two on each).
 enum DetailQuery {
     private static let actor = "{ __typename login }"
+    /// Only the first few reactors, for the tooltip; the groups come back for every kind, even unused.
+    private static let reactions = "reactionGroups { content viewerHasReacted reactors(first: 10) { totalCount nodes { ... on User { login } ... on Bot { login } ... on Organization { login } ... on Mannequin { login } } } }"
 
     private static let timelineFragment = """
     fragment TimelineFields on PullRequestTimelineItems {
       __typename
-      ... on IssueComment { id author \(actor) createdAt bodyHTML bodyText url }
+      ... on IssueComment { id author \(actor) createdAt bodyHTML bodyText url \(reactions) }
       ... on PullRequestReview {
-        id author \(actor) state submittedAt createdAt bodyHTML bodyText url
-        comments(first: 50) { nodes { id path line originalLine diffHunk bodyHTML outdated url } }
+        id author \(actor) state submittedAt createdAt bodyHTML bodyText url \(reactions)
+        comments(first: 50) { nodes { id path line originalLine diffHunk bodyHTML outdated url \(reactions) } }
       }
       ... on PullRequestCommit { id url commit { abbreviatedOid messageHeadline committedDate author { user { login } name } } }
       ... on HeadRefForcePushedEvent { id actor \(actor) createdAt afterCommit { abbreviatedOid } }
@@ -42,14 +44,14 @@ enum DetailQuery {
         issueOrPullRequest(number: $number) {
           __typename
           ... on PullRequest {
-            id bodyHTML bodyText headRefName baseRefName updatedAt
+            id bodyHTML bodyText headRefName baseRefName updatedAt \(reactions)
             timelineItems(first: 100, after: $after, itemTypes: \(prTypes)) {
               pageInfo { hasNextPage endCursor }
               nodes { ...TimelineFields }
             }
           }
           ... on Issue {
-            id bodyHTML bodyText updatedAt
+            id bodyHTML bodyText updatedAt \(reactions)
             timelineItems(first: 100, after: $after, itemTypes: \(issueTypes)) {
               pageInfo { hasNextPage endCursor }
               nodes { ...TimelineFields }
@@ -140,7 +142,31 @@ enum DetailQuery {
         let headRefName: String?
         let baseRefName: String?
         let updatedAt: Date
+        let reactionGroups: [ReactionGroup]?
         let timelineItems: Timeline
+    }
+
+    struct ReactionGroup: Decodable, Sendable {
+        struct Reactors: Decodable, Sendable {
+            struct Reactor: Decodable, Sendable { let login: String? }
+            let totalCount: Int
+            let nodes: [Reactor?]?
+        }
+
+        let content: String
+        let viewerHasReacted: Bool
+        let reactors: Reactors
+
+        /// The groups people used, in GitHub's order; unknown kinds are left out.
+        static func reactions(_ groups: [ReactionGroup]?) -> [Reaction] {
+            (groups ?? []).compactMap { group in
+                guard group.reactors.totalCount > 0, let content = Reaction.Content(rawValue: group.content) else { return nil }
+                return Reaction(
+                    content: content, count: group.reactors.totalCount, viewerHasReacted: group.viewerHasReacted,
+                    logins: group.reactors.nodes?.compactMap { $0?.login } ?? []
+                )
+            }
+        }
     }
 
     struct Contexts: Decodable, Sendable {
@@ -228,6 +254,7 @@ enum DetailQuery {
                 let bodyHTML: String
                 let outdated: Bool
                 let url: String
+                let reactionGroups: [ReactionGroup]?
             }
 
             let nodes: [Comment?]?
@@ -261,6 +288,7 @@ enum DetailQuery {
         let bodyHTML: String?
         let bodyText: String?
         let url: String?
+        let reactionGroups: [ReactionGroup]?
         let comments: Comments?
         let commit: Commit?
         let afterCommit: AfterCommit?
@@ -272,7 +300,7 @@ enum DetailQuery {
 
         private enum CodingKeys: String, CodingKey {
             case typename = "__typename"
-            case id, author, actor, createdAt, submittedAt, state, bodyHTML, bodyText, url, comments, commit
+            case id, author, actor, createdAt, submittedAt, state, bodyHTML, bodyText, url, reactionGroups, comments, commit
             case afterCommit, requestedReviewer, label, source, assignee, currentTitle
         }
 
@@ -282,7 +310,8 @@ enum DetailQuery {
             func make(_ kind: TimelineEntry.Kind, at date: Date?, detail: String? = nil, color: String? = nil) -> TimelineEntry? {
                 date.map {
                     TimelineEntry(id: id, kind: kind, actor: who?.login, isAutomated: who?.isAutomated ?? false, at: $0, url: url,
-                                  bodyHTML: bodyHTML, bodyText: bodyText, detail: detail, color: color)
+                                  bodyHTML: bodyHTML, bodyText: bodyText, detail: detail, color: color,
+                                  reactions: ReactionGroup.reactions(reactionGroups))
                 }
             }
             switch typename {
@@ -304,7 +333,8 @@ enum DetailQuery {
                 entry?.reviewComments = comments?.nodes?.compactMap { comment in
                     comment.map {
                         ReviewComment(id: $0.id, path: $0.path, line: $0.line ?? $0.originalLine, diffHunk: $0.diffHunk,
-                                      bodyHTML: $0.bodyHTML, outdated: $0.outdated, url: $0.url)
+                                      bodyHTML: $0.bodyHTML, outdated: $0.outdated, url: $0.url,
+                                      reactions: ReactionGroup.reactions($0.reactionGroups))
                     }
                 } ?? []
                 return entry
@@ -364,6 +394,7 @@ extension SyncEngine {
             bodyText: subject.bodyText,
             headRef: subject.headRefName,
             baseRef: subject.baseRefName,
+            reactions: DetailQuery.ReactionGroup.reactions(subject.reactionGroups),
             entries: entries,
             checks: checks,
             itemUpdatedAt: subject.updatedAt,

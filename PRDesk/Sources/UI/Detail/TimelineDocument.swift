@@ -24,16 +24,17 @@ struct TimelineDocument {
     init(item: Item, detail: ItemDetail, previousSeenAt: Date?, showAutomated: Bool, people: some TimelinePeople) {
         let builder = Builder(people: people, previousSeenAt: previousSeenAt)
         let groups = Self.group(detail.entries.filter { showAutomated || !$0.isAutomated })
-        let cardIDs = groups.compactMap { if case let .card(entry) = $0 { entry.id } else { nil } }
-        let expandedIDs = Set(cardIDs.suffix(Self.expandedTail))
+        let cards = groups.compactMap { if case let .card(entry) = $0 { entry } else { nil } }
+        // Cards without a body (most approvals) have nothing to expand, so don't use up the tail.
+        let expandedIDs = Set(cards.filter(\.hasBody).map(\.id).suffix(Self.expandedTail))
 
         var blocks: [Block] = []
         if !detail.bodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || item.author != nil {
             blocks.append(builder.card(
-                id: Self.descriptionID, login: item.author, verb: "opened", verbClass: "c-secondary",
+                id: Self.descriptionID, subjectID: detail.id, login: item.author, verb: "opened", verbClass: "c-secondary",
                 at: item.createdAt, url: item.url,
                 bodyHTML: detail.bodyHTML.isEmpty ? "<p><em>No description.</em></p>" : detail.bodyHTML,
-                bodyText: detail.bodyText, reviewComments: [], isNew: false, expanded: true
+                bodyText: detail.bodyText, reviewComments: [], reactions: detail.reactions, isNew: false, expanded: true
             ))
         }
         var firstNew: String?
@@ -43,10 +44,10 @@ struct TimelineDocument {
             switch group {
             case let .card(entry):
                 blocks.append(builder.card(
-                    id: entry.id, login: entry.actor, verb: entry.verb, verbClass: entry.verbClass,
+                    id: entry.id, subjectID: entry.id, login: entry.actor, verb: entry.verb, verbClass: entry.verbClass,
                     at: entry.at, url: entry.url, bodyHTML: entry.bodyHTML ?? "", bodyText: entry.bodyText ?? "",
-                    reviewComments: entry.reviewComments, isNew: isNew,
-                    expanded: isNew || expandedIDs.contains(entry.id)
+                    reviewComments: entry.reviewComments, reactions: entry.reactions, isNew: isNew,
+                    expanded: isNew || expandedIDs.contains(entry.id), fixed: !entry.hasBody
                 ))
             case let .event(entry):
                 blocks.append(builder.event(entry, isNew: isNew))
@@ -57,7 +58,7 @@ struct TimelineDocument {
             }
         }
 
-        cardCount = cardIDs.count
+        cardCount = cards.count
         let document = Document(key: String(item.number), blocks: blocks, firstNew: firstNew)
         payload = (try? String(decoding: JSONEncoder().encode(document), as: UTF8.self)) ?? "{}"
     }
@@ -68,7 +69,8 @@ struct TimelineDocument {
         var firstNew: String?
     }
 
-    /// A card (`head`, `preview`, lazily built `body`) or a one-line row (`html`).
+    /// A card (`head`, `preview`, lazily built `body`, `foot` of reactions) or a one-line row
+    /// (`html`). A `fixed` card has no body to expand or collapse.
     struct Block: Encodable {
         var id: String
         var type: String
@@ -76,7 +78,9 @@ struct TimelineDocument {
         var head: String?
         var preview: String?
         var body: String?
+        var foot: String?
         var expanded: Bool?
+        var fixed: Bool?
         var html: String?
 
         func with(id: String) -> Block {
@@ -150,18 +154,29 @@ struct TimelineDocument {
         }
 
         func card(
-            id: String, login: String?, verb: String, verbClass: String, at: Date, url: String?,
-            bodyHTML: String, bodyText: String, reviewComments: [ReviewComment], isNew: Bool, expanded: Bool
+            id: String, subjectID: String, login: String?, verb: String, verbClass: String, at: Date, url: String?,
+            bodyHTML: String, bodyText: String, reviewComments: [ReviewComment], reactions: [Reaction],
+            isNew: Bool, expanded: Bool, fixed: Bool = false
         ) -> Block {
             var head = avatar(login) + person(login)
             head += #"<span class="verb \#(verbClass)">\#(verb.htmlEscaped)</span>"#
             head += age(at, cls: "c-secondary")
             if isNew { head += #"<span class="chip accent">New</span>"# }
             head += #"<span class="spacer"></span>"#
+            head += reactButton(subjectID)
             if let url {
                 head += #"<a class="icon-link" href="\#(url.htmlEscaped)" title="Open on GitHub">\#(symbol("arrow.up.right"))</a>"#
             }
+            // Kept in place (hidden) on fixed cards, so the buttons line up with other cards'.
             head += symbol("chevron.right", cls: "chev")
+
+            let foot = reactionBar(reactions, subjectID: subjectID)
+            if fixed {
+                return Block(
+                    id: id, type: "card", cls: isNew ? "new" : "", head: head, preview: "", body: "", foot: foot,
+                    expanded: true, fixed: true
+                )
+            }
 
             var body = ""
             if !bodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || reviewComments.isEmpty {
@@ -175,7 +190,7 @@ struct TimelineDocument {
                 ?? reviewComments.first.map { "\($0.path): …" }
             return Block(
                 id: id, type: "card", cls: isNew ? "new" : "", head: head, preview: preview ?? "",
-                body: body, expanded: expanded
+                body: body, foot: foot, expanded: expanded
             )
         }
 
@@ -184,7 +199,7 @@ struct TimelineDocument {
             var html = #"<div class="rc"><div class="rc-head">\#(symbol("doc.text"))"#
             html += #"<span class="rc-path" title="\#(location.htmlEscaped)"><bdi>\#(location.htmlEscaped)</bdi></span>"#
             if comment.outdated { html += #"<span class="chip">Outdated</span>"# }
-            html += #"<span class="spacer"></span>"#
+            html += #"<span class="spacer"></span>"# + reactButton(comment.id)
             html += #"<a class="icon-link" href="\#(comment.url.htmlEscaped)" title="Open on GitHub">\#(symbol("arrow.up.right"))</a></div>"#
             // The last few lines of the hunk, for where the comment sits.
             html += #"<div class="rc-hunk">"#
@@ -192,8 +207,8 @@ struct TimelineDocument {
                 let cls = line.hasPrefix("+") ? "a" : line.hasPrefix("-") ? "d" : ""
                 html += #"<div class="\#(cls)">\#(String(line).htmlEscaped)</div>"#
             }
-            html += #"</div><div class="md">\#(comment.bodyHTML)</div></div>"#
-            return html
+            html += #"</div><div class="md">\#(comment.bodyHTML)</div>"#
+            return html + reactionBar(comment.reactions, subjectID: comment.id) + "</div>"
         }
 
         func event(_ entry: TimelineEntry, isNew: Bool) -> Block {
@@ -242,6 +257,34 @@ struct TimelineDocument {
         }
 
         // MARK: Parts
+
+        /// Opens the menu of reactions to add or take back on `subjectID`.
+        private func reactButton(_ subjectID: String) -> String {
+            #"<button class="icon-link react-add" data-subject="\#(subjectID.htmlEscaped)" title="Add Reaction">\#(symbol("face.smiling"))</button>"#
+        }
+
+        /// The reactions so far, each a button that adds or takes back the viewer's own.
+        private func reactionBar(_ reactions: [Reaction], subjectID: String) -> String {
+            guard !reactions.isEmpty else { return "" }
+            var html = #"<div class="reactions">"#
+            for reaction in reactions {
+                let cls = reaction.viewerHasReacted ? "reaction mine" : "reaction"
+                let title = "\(Self.names(reaction.logins, count: reaction.count)) reacted with \(reaction.content.name)"
+                html += #"<button class="\#(cls)" data-subject="\#(subjectID.htmlEscaped)" data-content="\#(reaction.content.rawValue)" title="\#(title.htmlEscaped)">"#
+                html += #"<span class="emoji">\#(reaction.content.emoji)</span><span class="count">\#(reaction.count)</span></button>"#
+            }
+            return html + "</div>"
+        }
+
+        /// "a, b and 3 others", from the first few of `count` people.
+        private static func names(_ logins: [String], count: Int) -> String {
+            let shown = Array(logins.prefix(count))
+            guard !shown.isEmpty else { return count == 1 ? "1 person" : "\(count) people" }
+            let others = count - shown.count
+            if others > 0 { return shown.joined(separator: ", ") + " and \(others) other\(others == 1 ? "" : "s")" }
+            if shown.count == 1 { return shown[0] }
+            return shown.dropLast().joined(separator: ", ") + " and " + shown[shown.count - 1]
+        }
 
         private func avatar(_ login: String?, small: Bool = false) -> String {
             let cls = small ? "avatar small" : "avatar"

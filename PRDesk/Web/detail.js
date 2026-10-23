@@ -112,6 +112,7 @@ const PRDesk = (() => {
   }
 
   function isExpanded(element) {
+    if (element._block.fixed) return true;
     return timeline.expanded.get(element.dataset.id) ?? timeline.all ?? element._block.expanded;
   }
 
@@ -127,19 +128,20 @@ const PRDesk = (() => {
   function makeCard(block) {
     const element = document.createElement("article");
     element.dataset.id = block.id;
-    element.innerHTML = '<header class="head"></header><div class="preview"></div><div class="body"></div>';
+    element.innerHTML = '<header class="head"></header><div class="preview"></div><div class="body"></div><footer class="foot"></footer>';
     return element;
   }
 
   function updateCard(element, block) {
     const old = element._block || {};
     element._block = block;
-    element.className = "card" + (block.cls ? " " + block.cls : "");
+    element.className = "card" + (block.cls ? " " + block.cls : "") + (block.fixed ? " fixed" : "");
     if (old.head !== block.head) {
       element.children[0].innerHTML = block.head;
       refreshAges(element.children[0]);
     }
     if (old.preview !== block.preview) element.children[1].textContent = block.preview || "";
+    if (old.foot !== block.foot) element.children[3].innerHTML = block.foot || "";
     // A body is only built once it is shown; collapsed cards stay cheap.
     if (old.body !== block.body) element._bodyStale = true;
     applyExpansion(element);
@@ -522,7 +524,18 @@ const PRDesk = (() => {
       return;
     }
     if (event.target.closest(".login")) return;
-    const head = event.target.closest(".card > .head, .card > .preview");
+    const reactAdd = event.target.closest(".react-add");
+    if (reactAdd) {
+      const rect = reactAdd.getBoundingClientRect();
+      post({ type: "reactionMenu", subject: reactAdd.dataset.subject, x: rect.left, y: rect.bottom + 2 });
+      return;
+    }
+    const reaction = event.target.closest(".reaction");
+    if (reaction) {
+      post({ type: "react", subject: reaction.dataset.subject, content: reaction.dataset.content });
+      return;
+    }
+    const head = event.target.closest(".card:not(.fixed) > .head, .card > .preview");
     if (head && !isSelectingIn(head)) {
       toggleCard(head.parentElement);
       return;

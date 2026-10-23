@@ -59,6 +59,24 @@ a:hover { text-decoration: underline; }
 }
 .icon-link { color: var(--secondary); display: inline-flex; padding: 1px; border-radius: 4px; }
 .icon-link:hover { color: var(--label); background: color-mix(in srgb, currentColor 12%, transparent); text-decoration: none; }
+button.icon-link { border: none; background: none; font: inherit; margin: 0; cursor: default; }
+button.icon-link:hover { background: color-mix(in srgb, currentColor 12%, transparent); }
+/* Adding a reaction is offered on the card or review comment under the pointer. */
+/* Still clickable while hidden, so a click there never toggles the card instead. */
+:is(.card, .rc):not(:hover) .react-add { opacity: 0; }
+.card:hover .rc:not(:hover) .react-add { opacity: 0; }
+
+.reactions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.reaction {
+  display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 7px; border-radius: 999px;
+  font: 11px -apple-system, system-ui, sans-serif; color: var(--secondary); cursor: default;
+  background: color-mix(in srgb, var(--label) 6%, transparent); border: 0.5px solid var(--separator);
+}
+.reaction:hover { background: color-mix(in srgb, var(--label) 11%, transparent); }
+.reaction.mine { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
+.reaction.mine:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.reaction > .emoji { font-size: 12px; }
+.reaction > .count { font-variant-numeric: tabular-nums; font-weight: 500; }
 
 /* MARK: Timeline */
 
@@ -74,7 +92,9 @@ a:hover { text-decoration: underline; }
 .chev { color: var(--secondary); width: 10px; height: 10px; }
 .card:not(.collapsed) > .head .chev, .file:not(.collapsed) > .fhead .chev { transform: rotate(90deg); }
 .card > .body { margin-top: 8px; }
-.card.collapsed > .body { display: none; }
+.card > .body:empty, .card > .foot:empty { display: none; }
+.card.collapsed > :is(.body, .foot) { display: none; }
+.card.fixed .chev { visibility: hidden; }
 .card > .preview { display: none; }
 .card.collapsed > .preview:not(:empty) {
   display: block; margin-top: 6px; font-size: 12px; color: var(--secondary);

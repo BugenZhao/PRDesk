@@ -26,6 +26,8 @@ struct ConversationView: View {
         }
         .onAppear {
             page.loginMenu = { [model] login in Self.loginMenu(login, model: model) }
+            page.reactionMenu = { [model] subject in Self.reactionMenu(subject, model: model) }
+            page.toggleReaction = { [model] content, subject in model.toggleReaction(content, on: subject) }
         }
     }
 
@@ -43,6 +45,20 @@ struct ConversationView: View {
         .font(.caption)
         .controlSize(.small)
         .buttonStyle(.link)
+    }
+
+    /// The reactions to add on a comment, review or description, the viewer's own checked (picking
+    /// one of those takes it back).
+    private static func reactionMenu(_ subjectID: String, model: AppModel) -> NSMenu? {
+        guard let reactions = model.detail?.reactions(on: subjectID) else { return nil }
+        let menu = NSMenu()
+        for content in Reaction.Content.allCases {
+            let reacted = reactions.contains { $0.content == content && $0.viewerHasReacted }
+            menu.addItem(ClosureMenuItem("\(content.emoji)  \(content.name)", state: reacted ? .on : .off) {
+                model.toggleReaction(content, on: subjectID)
+            })
+        }
+        return menu
     }
 
     /// Right-clicking a person: vote on them (as `VoteMenu`), or open or copy their profile.

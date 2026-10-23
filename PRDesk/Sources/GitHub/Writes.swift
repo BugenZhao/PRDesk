@@ -110,6 +110,22 @@ extension SyncEngine {
         }
     }
 
+    /// Adds the viewer's reaction to a comment, review, review comment or description, or takes it back.
+    func setReaction(_ content: Reaction.Content, on subjectID: String, reacted: Bool) async throws {
+        if isDryRun("\(reacted ? "add" : "remove") \(content.rawValue) reaction on \(subjectID)") { return }
+        struct Input: Encodable, Sendable { let subjectId: String; let content: String }
+        struct Variables: Encodable, Sendable { let input: Input }
+        let mutation = reacted
+            ? "mutation($input: AddReactionInput!) { addReaction(input: $input) { clientMutationId } }"
+            : "mutation($input: RemoveReactionInput!) { removeReaction(input: $input) { clientMutationId } }"
+        _ = try await client.query(
+            mutation,
+            variables: Variables(input: Input(subjectId: subjectID, content: content.rawValue)),
+            as: [String: Ignored].self,
+            strict: true
+        )
+    }
+
     /// Renders Markdown the way GitHub would in this repository.
     func renderMarkdown(_ text: String) async throws -> String {
         struct Body: Encodable, Sendable { let text: String; let mode: String; let context: String }

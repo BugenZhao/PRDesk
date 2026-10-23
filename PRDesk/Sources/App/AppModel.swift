@@ -404,6 +404,27 @@ final class AppModel {
         loadDetail(force: true)
     }
 
+    /// Adds or takes back the viewer's reaction on `subjectID` in the shown detail, at once on screen
+    /// and then on GitHub; a failed write puts it back.
+    func toggleReaction(_ content: Reaction.Content, on subjectID: String) {
+        guard var changed = detail, let reactions = changed.reactions(on: subjectID) else { return }
+        let reacted = !(reactions.first { $0.content == content }?.viewerHasReacted ?? false)
+        changed.setReactions(Reaction.toggling(content, in: reactions, viewer: viewer), on: subjectID)
+        detail = changed
+        Task { [weak self, engine] in
+            do {
+                try await engine.setReaction(content, on: subjectID, reacted: reacted)
+            } catch {
+                guard let self else { return }
+                logger.error("Reacting to \(subjectID, privacy: .public) failed: \(String(describing: error), privacy: .public)")
+                if var current = detail, current.number == changed.number, let now = current.reactions(on: subjectID) {
+                    current.setReactions(Reaction.toggling(content, in: now, viewer: viewer), on: subjectID)
+                    detail = current
+                }
+            }
+        }
+    }
+
     /// Closes the item, posting `comment` on it first unless it is empty.
     func close(_ item: Item, detail: ItemDetail, reason: CloseReason?, comment: String) async throws {
         if !comment.isEmpty {
