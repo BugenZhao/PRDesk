@@ -36,10 +36,10 @@ enum Parity {
     }
 
     /// The sections of the Parity tab, top to bottom.
-    static let sections: [ListSection] = [.parityReview, .parityDiscussing, .parityApproved, .parityUpstream, .parityParked, .parityClosed]
+    static let sections: [ListSection] = [.parityReview, .parityDiscussing, .parityApproved, .parityPromoted, .parityParked, .parityLanded, .parityRejected]
 
     /// Groups staging PRs and the viewer's upstream parity PRs into the Parity tab's sections,
-    /// each row linked to its other end. Rows keep their order within a section.
+    /// each row paired with its other end. Rows keep their order within a section.
     static func sections(of rows: [ItemRow], viewer: String?) -> [ListSection: [ItemRow]] {
         let upstreamRows = rows.filter { row in
             row.item.isUpstream && row.item.kind == .pullRequest && sameLogin(row.item.author, viewer)
@@ -69,11 +69,11 @@ enum Parity {
             let section: ListSection?
             if item.isParityStaging {
                 let upstream = stagingSlug(item.headRef).flatMap { upstreamBySlug[$0] }
+                row.paired = upstream
                 if upstream?.state == .merged {
-                    row.parityLink = ParityLink(kind: .landed, number: upstream!.number)
-                    section = .parityClosed
+                    section = .parityLanded
                 } else if !item.isOpen {
-                    section = .parityClosed
+                    section = .parityRejected
                 } else if item.isDraft {
                     section = .parityParked
                 } else if upstream != nil {
@@ -85,36 +85,13 @@ enum Parity {
                     section = row.insight.turn == .me ? .parityReview : .parityDiscussing
                 }
             } else if upstreamIDs.contains(item.id), item.isOpen {
-                if let staging = upstreamSlug(item.headRef).flatMap({ stagingBySlug[$0] }) {
-                    row.parityLink = ParityLink(kind: .staging, number: staging.number)
-                }
-                section = .parityUpstream
+                row.paired = upstreamSlug(item.headRef).flatMap { stagingBySlug[$0] }
+                section = .parityPromoted
             } else {
                 section = nil
             }
             if let section { result[section, default: []].append(row) }
         }
         return result
-    }
-}
-
-/// The other end of a parity row: the staging PR of an upstream PR, or the merged upstream PR of a
-/// staging one.
-struct ParityLink: Hashable, Sendable {
-    enum Kind: Hashable, Sendable {
-        /// On an upstream PR: the staging PR it was promoted from.
-        case staging
-        /// On a staging PR: the upstream PR that merged it.
-        case landed
-    }
-
-    var kind: Kind
-    var number: Int
-
-    var label: String {
-        switch kind {
-        case .staging: "staging #\(number)"
-        case .landed: "landed #\(number)"
-        }
     }
 }

@@ -88,15 +88,18 @@ Rust frontend 的 parity agent（`richard` 仓库的 `notes/vllm-rust-parity-age
   - **Review**：open、非 draft、没 approve、Turn = me 的 staging PR
   - **Discussing**：同上，但 Turn = them：我评论过，等 agent 回复
   - **Approved**：我 approve 了、还没有 upstream PR：等 promote
-  - **Upstream**：open 的 upstream parity PR 本身（`bz/rust-parity-*`），所以 Review、CI、Turn 列都是 upstream 的；标题后带 staging PR 的编号。staging PR 这时不单独列出
+  - **Promoted**：open 的 upstream parity PR 本身（`bz/rust-parity-*`），所以 Review、CI、Turn 列都是 upstream 的。staging PR 这时不单独列出
   - **Parked**：draft 的 staging PR，默认折叠
-  - **Closed**：14 天内关闭的 staging PR，以及 upstream 已合并、agent 还没来得及关的；upstream 合并了的标题后带 `landed #N`。默认折叠
-- tab 上显示 Review 组的数量（`Parity 3`）
+  - **Landed**：upstream PR 已合并的 staging PR（14 天内关闭的，以及 agent 还没来得及关的），默认折叠
+  - **Rejected**：14 天内没合并就关闭的 staging PR，默认折叠
+- tab 在 Dashboard 和 Inbox 之间，显示 Review 组的数量（`Parity 3`）
+- 列：Author（总是 agent 或我）换成 **Link**，显示另一端 PR 的状态图标和编号：staging PR 显示它的 upstream PR，Promoted 里的 upstream PR 显示它的 staging PR；悬停显示仓库和标题
+- GitHub App（如 agent）的头像不能按用户名取，用同步时拿到的头像 URL
 
 ## 4. 主界面
 
 ```
-┌ 顶栏：                    Dashboard | Inbox (n) | Parity (n)  🔍 Filter (/)  ⟳  ▣ │ Conversation | Checks | Files ┐
+┌ 顶栏：                    Dashboard | Parity (n) | Inbox (n)  🔍 Filter (/)  ⟳  ▣ │ Conversation | Checks | Files ┐
 ├ 列表 ─────────────────────────────────────────────┬ 详情 ──────────────────────────────────────────────┤
 │                                                   │ #56492 [Core] Extensible KV cache                  │
 │ ▾ Recently viewed 8                               │ by njhill ◆◆  draft  CI ● 16 failed  conflicts     │
@@ -176,7 +179,7 @@ Rust frontend 的 parity agent（`richard` 仓库的 `notes/vllm-rust-parity-age
 | `+` / `-` | upvote / downvote 作者 |
 | `c` | 聚焦评论框 |
 | `⌘R` | 立即同步 |
-| `⌘1` / `⌘2` / `⌘3` | 切换 Dashboard / Inbox / Parity |
+| `⌘1` / `⌘2` / `⌘3` | 切换 Dashboard / Parity / Inbox |
 | `⌥⌘1` / `⌥⌘2` / `⌥⌘3` | PR 详情切到 Conversation / Checks / Files |
 | `⌘B` | 显示 / 隐藏详情面板（重启后保持） |
 

@@ -4,6 +4,8 @@ import SwiftUI
 /// The dense, sectioned item list, backed by `NSTableView`.
 struct ItemTableView: NSViewRepresentable {
     var rows: [TableRow]
+    /// Shows the Parity tab's columns rather than the others'.
+    var isParity: Bool
     var viewer: String?
     @Binding var selection: TableSelection?
     var sort: ItemSort
@@ -44,6 +46,13 @@ struct ItemTableView: NSViewRepresentable {
         }
         table.autosaveName = "ItemTable"
         table.autosaveTableColumns = true
+        // A column added after the order was saved comes last; Link takes Author's place in the
+        // Parity tab, so it goes beside it.
+        let author = table.column(withIdentifier: ItemColumn.author.identifier)
+        let link = table.column(withIdentifier: ItemColumn.link.identifier)
+        if author >= 0, link >= 0, link != author + 1 {
+            table.moveColumn(link, toColumn: link > author ? author + 1 : author)
+        }
         table.sortDescriptors = [NSSortDescriptor(key: sort.key.rawValue, ascending: sort.ascending)]
 
         let coordinator = context.coordinator
@@ -165,6 +174,20 @@ struct ItemTableView: NSViewRepresentable {
                 focusRequest = parent.focusRequest
                 table.window?.makeFirstResponder(table)
             }
+            showColumns(parity: parent.isParity, in: table)
+        }
+
+        private func showColumns(parity: Bool, in table: NSTableView) {
+            var changed = false
+            for column in ItemColumn.parityOnly.union(ItemColumn.notInParity) {
+                guard let tableColumn = table.tableColumn(withIdentifier: column.identifier) else { continue }
+                let hidden = ItemColumn.parityOnly.contains(column) != parity
+                if tableColumn.isHidden != hidden {
+                    tableColumn.isHidden = hidden
+                    changed = true
+                }
+            }
+            if changed { fitTitleColumn() }
         }
 
         private func index(of selection: TableSelection) -> Int? {
@@ -509,6 +532,7 @@ struct ItemTableView: NSViewRepresentable {
                 switch itemColumn {
                 case .title: return (table.view(atColumn: column, row: row, makeIfNecessary: false) as? RunsCellView)?.truncatedText
                 case .author: return authorTooltip(itemRow.item.author)
+                case .link: return itemRow.paired.map { "\($0.repo)#\($0.number) \($0.title)" }
                 case .ci: return ItemColumn.ciTooltip(itemRow.item)
                 default: return nil
                 }

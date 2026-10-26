@@ -2,7 +2,12 @@ import AppKit
 
 /// Columns of the item table and how each renders a row.
 enum ItemColumn: String, CaseIterable {
-    case unread, priority, number, title, author, review, turn, ci, size, age, updated
+    case unread, priority, number, title, author, link, review, turn, ci, size, age, updated
+
+    /// Shown in the Parity tab only, where it takes the place of Author (always the agent there).
+    static let parityOnly: Set<ItemColumn> = [.link]
+    /// Left out of the Parity tab.
+    static let notInParity: Set<ItemColumn> = [.author]
 
     var identifier: NSUserInterfaceItemIdentifier { .init(rawValue) }
 
@@ -13,6 +18,7 @@ enum ItemColumn: String, CaseIterable {
         case .number: "#"
         case .title: "Title"
         case .author: "Author"
+        case .link: "Link"
         case .review: "Review"
         case .turn: "Turn"
         case .ci: "CI"
@@ -29,6 +35,7 @@ enum ItemColumn: String, CaseIterable {
         case .number: 42
         case .title: 520
         case .author: 168
+        case .link: 64
         case .review: 40
         case .turn: 46
         case .ci: 22
@@ -60,6 +67,7 @@ enum ItemColumn: String, CaseIterable {
         case .number: .number
         case .title: .title
         case .author: .author
+        case .link: nil
         case .review: .review
         case .turn: .turn
         case .ci: .ci
@@ -121,6 +129,10 @@ enum ItemColumn: String, CaseIterable {
             // Marks of trust sit at the right edge, so they line up down the column.
             return [avatar, name] + vote + [.spring] + seal + orgBadges.map(\.cellRun)
 
+        case .link:
+            guard let paired = row.paired else { return [] }
+            return [.icon(paired.stateIcon, color: paired.stateColor), .text("#\(paired.number)", color: .secondaryLabelColor, font: CellFont.digits)]
+
         case .review:
             return reviewRuns(row, viewer: viewer)
 
@@ -172,9 +184,6 @@ enum ItemColumn: String, CaseIterable {
         }
         if let reason = row.wakeReason {
             runs.append(.chip(reason, color: .systemPurple))
-        }
-        if let link = row.parityLink {
-            runs.append(.chip(link.label, color: link.kind == .landed ? .systemPurple : .secondaryLabelColor))
         }
         if let comment = row.comment {
             runs.append(.symbol("text.bubble", color: .tertiaryLabelColor))

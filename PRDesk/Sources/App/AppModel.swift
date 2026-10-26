@@ -192,7 +192,21 @@ final class AppModel {
         engine = SyncEngine(client: client, db: db)
         affiliationEngine = AffiliationEngine(client: client, db: db)
         sort = Defaults.get(.sort) ?? ItemSort()
-        collapsed = Defaults.get(.collapsed) ?? ListSection.defaultCollapsed
+        collapsed = Self.loadCollapsed()
+    }
+
+    /// The saved collapsed sections, skipping any that no longer exist; sections added since they
+    /// were saved start out as their defaults.
+    private static func loadCollapsed() -> Set<ListSection> {
+        // Sections weren't recorded before the Parity tab; everything else predates it.
+        let known: Set<String> = Defaults.get(.knownSections)
+            ?? Set(ListSection.allCases.filter { !Parity.sections.contains($0) }.map(\.rawValue))
+        Defaults.set(Set(ListSection.allCases.map(\.rawValue)), for: .knownSections)
+        guard let saved: [String] = Defaults.get(.collapsed) else { return ListSection.defaultCollapsed }
+        let added = ListSection.defaultCollapsed.filter { !known.contains($0.rawValue) }
+        let collapsed = Set(saved.compactMap(ListSection.init(rawValue:))).union(added)
+        Defaults.set(collapsed, for: .collapsed)
+        return collapsed
     }
 
     var selectedItem: Item? {
@@ -288,6 +302,9 @@ final class AppModel {
                     guard let self else { return }
                     self.snapshot = snapshot
                     migrateDrafts()
+                    for item in snapshot.items {
+                        if let author = item.author, let url = item.authorAvatarURL { AvatarCache.remember(url, for: author) }
+                    }
                     if votes != snapshot.votes { votes = snapshot.votes }
                     if board != snapshot.board {
                         board = snapshot.board
@@ -1121,6 +1138,8 @@ enum Defaults {
         /// Composer drafts by item number, from before drafts were kept by item id.
         case drafts
         case itemDrafts
+        /// List sections as of the last launch, so new ones can start collapsed by default.
+        case knownSections
     }
 
     static func get<T: Decodable>(_ key: Key) -> T? {

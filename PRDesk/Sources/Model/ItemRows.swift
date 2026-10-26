@@ -11,8 +11,9 @@ struct ItemRow: Hashable, Sendable {
     var authorVote: Vote?
     /// The item's entry on the triage board, if it is on it.
     var board: BoardEntry?
-    /// In the Parity tab: the other end of the item's parity pipeline.
-    var parityLink: ParityLink?
+    /// In the Parity tab, the other end of the item's pipeline: the upstream PR promoted from a
+    /// staging PR, or the staging PR of an upstream one.
+    var paired: Item?
 
     var triage: TriageStatus? { board?.triage }
     var priority: Priority? { board?.priorityValue }
@@ -35,7 +36,7 @@ struct ItemRow: Hashable, Sendable {
 
 enum ListSection: String, CaseIterable, Codable, Sendable {
     case opened, recent, pinned, working, good, triage, backlog, closed, skipped, muted, inbox
-    case parityReview, parityDiscussing, parityApproved, parityUpstream, parityParked, parityClosed
+    case parityReview, parityDiscussing, parityApproved, parityPromoted, parityParked, parityLanded, parityRejected
 
     var title: String {
         switch self {
@@ -53,9 +54,10 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
         case .parityReview: "Review"
         case .parityDiscussing: "Discussing"
         case .parityApproved: "Approved"
-        case .parityUpstream: "Upstream"
+        case .parityPromoted: "Promoted"
         case .parityParked: "Parked"
-        case .parityClosed: "Closed"
+        case .parityLanded: "Landed"
+        case .parityRejected: "Rejected"
         }
     }
 
@@ -90,16 +92,18 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
             "Staging PRs you commented on or asked changes of; the agent answers on its next run."
         case .parityApproved:
             "Staging PRs you approved that have no upstream PR yet: ready for the agent's promote run."
-        case .parityUpstream:
-            "Open upstream PRs promoted from staging PRs (bz/rust-parity-*); review, CI and Turn are upstream's. Approved ones wait for the agent's merge run."
+        case .parityPromoted:
+            "Open upstream PRs promoted from staging PRs (bz/rust-parity-*); review, CI and Turn are upstream's, Link is the staging PR. Approved ones wait for the agent's merge run."
         case .parityParked:
             "Staging PRs marked draft: parked as backlog by the agent until you resume them."
-        case .parityClosed:
-            "Staging PRs closed in the last \(Int(Self.closedRetention / 86400)) days: landed upstream, or closed as a no (accepted divergence)."
+        case .parityLanded:
+            "Staging PRs whose upstream PR (Link) merged, in the last \(Int(Self.closedRetention / 86400)) days."
+        case .parityRejected:
+            "Staging PRs closed without landing in the last \(Int(Self.closedRetention / 86400)) days: a no, which the agent records as an accepted divergence."
         }
     }
 
-    static let defaultCollapsed: Set<ListSection> = [.backlog, .closed, .skipped, .muted, .parityParked, .parityClosed]
+    static let defaultCollapsed: Set<ListSection> = [.backlog, .closed, .skipped, .muted, .parityParked, .parityLanded, .parityRejected]
     /// Closed or merged items stay visible this long after closing.
     static let closedRetention: TimeInterval = 14 * 24 * 3600
     static let recentLimit = 8
