@@ -15,7 +15,7 @@ enum WebResources {
     static func page(_ kind: WebDocument.Kind) -> String {
         """
         <!doctype html>
-        <html data-page="\(kind.rawValue)" data-repo="\(SyncEngine.repo)"><head><meta charset="utf-8"><meta name="color-scheme" content="light dark">
+        <html data-page="\(kind.rawValue)" data-repos="\(SyncEngine.repo) \(Parity.repo)"><head><meta charset="utf-8"><meta name="color-scheme" content="light dark">
         <style>\(markdownCSS)
         \(detailCSS)
         \(WebSymbols.css)</style></head>

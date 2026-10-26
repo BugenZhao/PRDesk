@@ -486,11 +486,15 @@ const PRDesk = (() => {
 
   // MARK: Clicks
 
-  /** The issue or PR of this repository a link points to, if it does. */
+  /**
+   * The issue or PR a link points to, if it is in a repository the app shows (vllm and the parity
+   * agent's fork).
+   */
   function itemLink(href) {
-    const repo = document.documentElement.dataset.repo.replace(/[.]/g, "\\.");
-    const match = new RegExp(`^https://github\\.com/${repo}/(?:pull|issues)/(\\d+)(/[^?#]*)?(?:\\?[^#]*)?(#.+)?$`, "i").exec(href);
-    return match && { number: match[1], subpage: match[2] && match[2] !== "/", hash: match[3] };
+    const repos = document.documentElement.dataset.repos.toLowerCase().split(" ");
+    const match = /^https:\/\/github\.com\/([^/]+\/[^/]+)\/(?:pull|issues)\/(\d+)(\/[^?#]*)?(?:\?[^#]*)?(#.+)?$/i.exec(href);
+    if (!match || !repos.includes(match[1].toLowerCase())) return null;
+    return { repo: match[1].toLowerCase(), number: match[2], subpage: match[3] && match[3] !== "/", hash: match[4] };
   }
 
   /** Expands and scrolls to the comment a link's anchor names, if this page shows it. */
@@ -505,7 +509,7 @@ const PRDesk = (() => {
   }
 
   /**
-   * Links to this repository's issues and PRs open in the app; a link into the item already shown
+   * Links to those repositories' issues and PRs open in the app; a link into the item already shown
    * scrolls to its comment. ⌘-click, the ↗ buttons and other links go to the browser.
    */
   function handleLink(event, link) {
@@ -513,12 +517,12 @@ const PRDesk = (() => {
     const target = itemLink(link.href);
     if (!target) return;
     const current = itemLink((document.documentElement.dataset.page === "files" ? files.url : timeline.url) || "");
-    if (current && target.number === current.number) {
+    if (current && target.repo === current.repo && target.number === current.number) {
       if (target.hash ? revealAnchor(target.hash) : !target.subpage) event.preventDefault();
       return;
     }
     event.preventDefault();
-    post({ type: "openItem", number: Number(target.number) });
+    post({ type: "openItem", repo: target.repo, number: Number(target.number) });
   }
 
   addEventListener("click", (event) => {

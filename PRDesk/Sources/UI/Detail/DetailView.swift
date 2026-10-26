@@ -32,9 +32,9 @@ struct DetailView: View {
         // nothing for a second or so.
         .onAppear {
             _ = timelinePage.webView
-            // Links to this repository's issues and PRs open here, not in the browser.
+            // Links to the repository's (and the parity fork's) issues and PRs open here, not in the browser.
             for page in [timelinePage, filesPage] {
-                page.openItem = { [model] number in model.openItem(number: number) }
+                page.openItem = { [model] repo, number in model.openItem(repo: repo, number: number) }
             }
         }
         .modifier(DetailToolbar(isShown: isShown, showsTabs: isShown && model.selectedItem?.kind == .pullRequest, tab: $model.detailTab))

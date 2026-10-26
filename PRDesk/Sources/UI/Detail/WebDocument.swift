@@ -16,8 +16,8 @@ final class WebDocument: NSObject {
     let kind: Kind
     /// The menu for right-clicking a person, set by the view showing the page.
     var loginMenu: ((String) -> NSMenu)?
-    /// Opens issue or PR `number` of the repository in the app, for a link to it.
-    var openItem: ((Int) -> Void)?
+    /// Opens issue or PR `number` of a repository (`owner/name`) in the app, for a link to it.
+    var openItem: ((String, Int) -> Void)?
     /// The menu of reactions to add on a comment, review or description, by node id.
     var reactionMenu: ((String) -> NSMenu?)?
     /// Adds or takes back the viewer's reaction on a node, for clicking a reaction under it.
@@ -194,7 +194,7 @@ extension WebDocument: WKScriptMessageHandler {
         case "openProfile":
             if let login = body["login"] as? String { AppModel.openProfile(login) }
         case "openItem":
-            if let number = body["number"] as? Int { openItem?(number) }
+            if let repo = body["repo"] as? String, let number = body["number"] as? Int { openItem?(repo, number) }
         case "fileMenu":
             if let path = body["path"] as? String { popUp(fileMenu(path: path, url: body["url"] as? String ?? ""), x: x, y: y) }
         default:

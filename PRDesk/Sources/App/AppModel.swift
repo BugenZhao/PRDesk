@@ -512,10 +512,11 @@ final class AppModel {
     private(set) var openedItems: [Item] = []
     private static let openedLimit = 10
 
-    /// Opens issue or PR `number` of the repository: selects it where the list shows it, reveals it
-    /// if it is on the desk but hidden, and otherwise fetches it into Opened.
-    func openItem(number: Int) {
-        let isTarget = { (item: Item) in item.isUpstream && item.number == number }
+    /// Opens issue or PR `number` of `repo`: selects it where the list shows it, reveals it if it is
+    /// on the desk (or in the Parity tab) but hidden, and otherwise fetches it into Opened.
+    func openItem(repo: String, number: Int) {
+        let key = "\(repo.lowercased())#\(number)"
+        let isTarget = { (item: Item) in item.repoNumber == key }
         if let selection = rows.lazy.compactMap(\.selectionID).first(where: { self.itemsByID[$0.itemID].map(isTarget) == true && $0.section != .recent }) {
             self.selection = selection
         } else if let item = snapshot.items.first(where: isTarget), isOnDesk(item) {
@@ -525,7 +526,7 @@ final class AppModel {
         } else {
             Task {
                 do {
-                    showOpened(try await engine.fetchItem(number: number, store: false))
+                    showOpened(try await engine.fetchItem(repo: repo, number: number, store: false))
                 } catch {
                     logger.error("Opening #\(number) failed: \(String(describing: error), privacy: .public)")
                     writeError = "Couldn't open #\(number): \(error.localizedDescription)"
