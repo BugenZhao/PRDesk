@@ -160,6 +160,72 @@ final class AppDatabase: Sendable {
                 t.add(column: "subscriptionBeforeQuiet", .text)
             }
         }
+        migrator.registerMigration("v14") { db in
+            // Parity staging PRs live on a fork, so numbers are no longer unique: local state and
+            // details are keyed by node id, and items carry their repository (and head branch).
+            try db.create(table: "newItemState") { t in
+                t.primaryKey("itemID", .text)
+                t.column("pinnedAt", .datetime)
+                t.column("viewedAt", .datetime)
+                t.column("seenAt", .datetime)
+                t.column("subscriptionBeforeQuiet", .text)
+            }
+            try db.execute(sql: """
+                INSERT INTO newItemState (itemID, pinnedAt, viewedAt, seenAt, subscriptionBeforeQuiet)
+                SELECT item.id, s.pinnedAt, s.viewedAt, s.seenAt, s.subscriptionBeforeQuiet
+                FROM itemState s JOIN item ON item.number = s.number
+                """)
+            try db.drop(table: "itemState")
+            try db.rename(table: "newItemState", to: "itemState")
+
+            try db.create(table: "newDetailCache") { t in
+                t.primaryKey("itemID", .text)
+                t.column("json", .blob).notNull()
+                t.column("itemUpdatedAt", .datetime)
+            }
+            try db.execute(sql: """
+                INSERT INTO newDetailCache (itemID, json, itemUpdatedAt)
+                SELECT item.id, d.json, d.itemUpdatedAt FROM detailCache d JOIN item ON item.number = d.number
+                """)
+            try db.drop(table: "detailCache")
+            try db.rename(table: "newDetailCache", to: "detailCache")
+
+            try db.create(table: "newItem") { t in
+                t.primaryKey("id", .text)
+                t.column("repo", .text).notNull()
+                t.column("number", .integer).notNull()
+                t.column("headRef", .text)
+                t.column("kind", .text).notNull()
+                t.column("title", .text).notNull()
+                t.column("url", .text).notNull()
+                t.column("state", .text).notNull()
+                t.column("isDraft", .boolean).notNull()
+                t.column("author", .text)
+                t.column("authorAvatarURL", .text)
+                t.column("createdAt", .datetime).notNull()
+                t.column("updatedAt", .datetime).notNull()
+                t.column("closedAt", .datetime)
+                t.column("additions", .integer)
+                t.column("deletions", .integer)
+                t.column("reviewDecision", .text)
+                t.column("mergeable", .text)
+                t.column("ci", .jsonText)
+                t.column("labels", .jsonText).notNull()
+                t.column("reviews", .jsonText).notNull()
+                t.column("reviewRequests", .jsonText).notNull()
+                t.column("assignees", .jsonText).notNull()
+                t.column("events", .jsonText).notNull().defaults(to: "[]")
+                t.column("fetchedAt", .datetime).notNull()
+                t.uniqueKey(["repo", "number"])
+            }
+            let columns = "id, number, kind, title, url, state, isDraft, author, authorAvatarURL, createdAt, updatedAt, closedAt, additions, deletions, reviewDecision, mergeable, ci, labels, reviews, reviewRequests, assignees, events, fetchedAt"
+            try db.execute(sql: "INSERT INTO newItem (repo, \(columns)) SELECT 'vllm-project/vllm', \(columns) FROM item")
+            try db.drop(table: "item")
+            try db.rename(table: "newItem", to: "item")
+            try db.create(index: "item_on_updatedAt", on: "item", columns: ["updatedAt"])
+            // Head branches weren't fetched before, and the fork's PRs not at all; start over.
+            try db.execute(sql: "DELETE FROM meta WHERE key = 'lastSyncStartedAt'")
+        }
         return migrator
     }
 }
@@ -193,9 +259,9 @@ extension AppDatabase {
 extension AppDatabase {
     // Whole-detail JSON coding is heavy; keep it off the caller's actor (usually main).
     @concurrent
-    func cachedDetail(number: Int) async throws -> ItemDetail? {
+    func cachedDetail(itemID: Item.ID) async throws -> ItemDetail? {
         let data = try await reader.read { db in
-            try Data.fetchOne(db, sql: "SELECT json FROM detailCache WHERE number = ?", arguments: [number])
+            try Data.fetchOne(db, sql: "SELECT json FROM detailCache WHERE itemID = ?", arguments: [itemID])
         }
         return data.flatMap { try? JSONDecoder().decode(ItemDetail.self, from: $0) }
     }
@@ -205,17 +271,17 @@ extension AppDatabase {
         let data = try JSONEncoder().encode(detail)
         try await writer.write { db in
             try db.execute(
-                sql: "INSERT OR REPLACE INTO detailCache (number, json, itemUpdatedAt) VALUES (?, ?, ?)",
-                arguments: [detail.number, data, detail.itemUpdatedAt]
+                sql: "INSERT OR REPLACE INTO detailCache (itemID, json, itemUpdatedAt) VALUES (?, ?, ?)",
+                arguments: [detail.id, data, detail.itemUpdatedAt]
             )
         }
     }
 
-    /// When each cached detail's item was last updated, by number.
-    func cachedDetailTimes() async throws -> [Int: Date] {
+    /// When each cached detail's item was last updated, by item id.
+    func cachedDetailTimes() async throws -> [Item.ID: Date] {
         try await reader.read { db in
-            let rows = try Row.fetchAll(db, sql: "SELECT number, itemUpdatedAt FROM detailCache WHERE itemUpdatedAt IS NOT NULL")
-            return Dictionary(rows.map { ($0["number"], $0["itemUpdatedAt"]) }, uniquingKeysWith: { a, _ in a })
+            let rows = try Row.fetchAll(db, sql: "SELECT itemID, itemUpdatedAt FROM detailCache WHERE itemUpdatedAt IS NOT NULL")
+            return Dictionary(rows.map { ($0["itemID"], $0["itemUpdatedAt"]) }, uniquingKeysWith: { a, _ in a })
         }
     }
 }
@@ -223,14 +289,14 @@ extension AppDatabase {
 // MARK: - Local state
 
 extension AppDatabase {
-    /// Loads (or creates) the state for `number`, applies `change`, and saves it.
-    func state(_ number: Int) async throws -> ItemState? {
-        try await reader.read { db in try ItemState.fetchOne(db, key: number) }
+    func state(_ itemID: Item.ID) async throws -> ItemState? {
+        try await reader.read { db in try ItemState.fetchOne(db, key: itemID) }
     }
 
-    func updateState(_ number: Int, _ change: @escaping @Sendable (inout ItemState) -> Void) async throws {
+    /// Loads (or creates) the state for `itemID`, applies `change`, and saves it.
+    func updateState(_ itemID: Item.ID, _ change: @escaping @Sendable (inout ItemState) -> Void) async throws {
         try await writer.write { db in
-            var state = try ItemState.fetchOne(db, key: number) ?? ItemState(number: number)
+            var state = try ItemState.fetchOne(db, key: itemID) ?? ItemState(itemID: itemID)
             change(&state)
             try state.save(db)
         }
@@ -294,7 +360,7 @@ extension AppDatabase {
 /// Everything the list needs from the database, observed as one value.
 struct Snapshot: Equatable, Sendable {
     var items: [Item] = []
-    var states: [Int: ItemState] = [:]
+    var states: [Item.ID: ItemState] = [:]
     /// Unread before this moment is ignored, so a first sync doesn't mark everything unread.
     var baseline: Date?
     /// Votes by lowercased login.
@@ -314,7 +380,7 @@ extension AppDatabase {
                     .flatMap { try? Date($0, strategy: .iso8601) }
                 return try Snapshot(
                     items: Item.order(Item.Columns.updatedAt.desc).fetchAll(db),
-                    states: Dictionary(uniqueKeysWithValues: ItemState.fetchAll(db).map { ($0.number, $0) }),
+                    states: Dictionary(uniqueKeysWithValues: ItemState.fetchAll(db).map { ($0.itemID, $0) }),
                     baseline: baseline,
                     votes: Dictionary(uniqueKeysWithValues: AuthorVote.fetchAll(db).map { ($0.login, $0.vote) }),
                     board: Dictionary(uniqueKeysWithValues: BoardEntry.fetchAll(db).map { ($0.number, $0) })

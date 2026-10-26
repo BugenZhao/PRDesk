@@ -23,7 +23,10 @@ struct TimelineDocument {
 
     init(item: Item, detail: ItemDetail, previousSeenAt: Date?, showAutomated: Bool, people: some TimelinePeople) {
         let builder = Builder(people: people, previousSeenAt: previousSeenAt)
-        let groups = Self.group(detail.entries.filter { showAutomated || !$0.isAutomated })
+        // On a staging PR the parity agent is who the viewer is talking to.
+        let groups = Self.group(detail.entries.filter { entry in
+            showAutomated || !entry.isAutomated || item.isParityStaging && Parity.isBot(entry.actor)
+        })
         let cards = groups.compactMap { if case let .card(entry) = $0 { entry } else { nil } }
         // Cards without a body (most approvals) have nothing to expand, so don't use up the tail.
         let expandedIDs = Set(cards.filter(\.hasBody).map(\.id).suffix(Self.expandedTail))
@@ -59,12 +62,14 @@ struct TimelineDocument {
         }
 
         cardCount = cards.count
-        let document = Document(key: String(item.number), blocks: blocks, firstNew: firstNew)
+        let document = Document(key: item.id, url: item.url, blocks: blocks, firstNew: firstNew)
         payload = (try? String(decoding: JSONEncoder().encode(document), as: UTF8.self)) ?? "{}"
     }
 
     private struct Document: Encodable {
         var key: String
+        /// The item's own link, which tells links to it from links elsewhere.
+        var url: String
         var blocks: [Block]
         var firstNew: String?
     }

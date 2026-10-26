@@ -126,7 +126,8 @@ enum ItemColumn: String, CaseIterable {
 
         case .turn:
             // A pending review request is the most common reason it's the viewer's move; name it.
-            if item.isOpen, row.insight.isReviewRequestedFromMe {
+            // The parity agent requests review on every staging PR, parked ones too.
+            if item.isOpen, row.insight.isReviewRequestedFromMe, !item.isParityStaging || row.insight.turn == .me {
                 return [.text("review", color: .systemOrange, font: CellFont.smallBold)]
             }
             return switch row.insight.turn {
@@ -171,6 +172,9 @@ enum ItemColumn: String, CaseIterable {
         }
         if let reason = row.wakeReason {
             runs.append(.chip(reason, color: .systemPurple))
+        }
+        if let link = row.parityLink {
+            runs.append(.chip(link.label, color: link.kind == .landed ? .systemPurple : .secondaryLabelColor))
         }
         if let comment = row.comment {
             runs.append(.symbol("text.bubble", color: .tertiaryLabelColor))

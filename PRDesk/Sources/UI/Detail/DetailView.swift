@@ -21,7 +21,7 @@ struct DetailView: View {
                     Divider()
                     content(item)
                 }
-                .onChange(of: item.number) {
+                .onChange(of: item.id) {
                     if item.kind == .issue { model.detailTab = .conversation }
                 }
             } else {
@@ -42,7 +42,7 @@ struct DetailView: View {
 
     @ViewBuilder
     private func content(_ item: Item) -> some View {
-        if let detail = model.detail, detail.number == item.number {
+        if let detail = model.detail, detail.id == item.id {
             switch model.detailTab {
             case .conversation:
                 VStack(spacing: 0) {
@@ -125,6 +125,7 @@ private struct DetailHeader: View {
     let item: Item
     let state: ItemState
     @Binding var tab: DetailView.DetailTab
+    @State private var isParking = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
@@ -157,7 +158,7 @@ private struct DetailHeader: View {
 
             HStack(spacing: 6) {
                 Text("opened \(item.createdAt.compactAge()) ago · updated \(item.updatedAt.compactAge()) ago")
-                if let detail = model.detail, detail.number == item.number, let head = detail.headRef, let base = detail.baseRef {
+                if let detail = model.detail, detail.id == item.id, let head = detail.headRef, let base = detail.baseRef {
                     Text("·")
                     Text("\(head) → \(base)")
                         .font(.caption.monospaced())
@@ -196,9 +197,48 @@ private struct DetailHeader: View {
     }
 
     private var controls: some View {
+        HStack(spacing: 8) {
+            if item.isParityStaging {
+                parkButton
+            } else {
+                boardControls
+            }
+            Spacer()
+            if model.detailState == .loading || isParking {
+                ProgressView().controlSize(.small)
+            }
+            iconButton("Refresh", symbol: "arrow.clockwise") { model.loadDetail(force: true) }
+                .disabled(model.detailState == .loading)
+            iconButton("Open", symbol: "arrow.up.right") { model.perform(.openInBrowser, on: item.id) }
+                .help("Open on GitHub (o)")
+        }
+        .controlSize(.small)
+    }
+
+    /// A staging PR is parked as a draft, which the parity agent reads as "not now" (SPEC §3.2).
+    private var parkButton: some View {
+        Button(item.isDraft ? "Resume" : "Park", systemImage: item.isDraft ? "play" : "pause") {
+            let item = item
+            isParking = true
+            Task {
+                do {
+                    try await model.setParked(!item.isDraft, item)
+                } catch {
+                    model.writeError = "Couldn't \(item.isDraft ? "resume" : "park") #\(item.number): \(error.localizedDescription)"
+                }
+                isParking = false
+            }
+        }
+        .disabled(!item.isOpen || isParking)
+        .help(item.isDraft
+            ? "Mark ready for review: the parity agent picks the item up again"
+            : "Convert to a draft: the parity agent parks the item as backlog")
+    }
+
+    @ViewBuilder private var boardControls: some View {
         let board = model.board(for: item)
         let triage = model.triage(for: item)
-        return HStack(spacing: 8) {
+        Group {
             Picker("Status", selection: Binding(
                 get: { model.listedTriage(for: item) },
                 set: { status in
@@ -240,16 +280,7 @@ private struct DetailHeader: View {
                 model.perform(.togglePin, on: item.id)
             }
             .help(state.isPinned ? "Unpin (p)" : "Pin (p)")
-            Spacer()
-            if model.detailState == .loading {
-                ProgressView().controlSize(.small)
-            }
-            iconButton("Refresh", symbol: "arrow.clockwise") { model.loadDetail(force: true) }
-                .disabled(model.detailState == .loading)
-            iconButton("Open", symbol: "arrow.up.right") { model.perform(.openInBrowser, on: item.id) }
-                .help("Open on GitHub (o)")
         }
-        .controlSize(.small)
     }
 
     /// An icon-only button whose icon gets a fixed box: symbols differ in height, and the button

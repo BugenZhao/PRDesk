@@ -80,7 +80,11 @@ struct Item: Codable, Hashable, Identifiable, Sendable {
 
     /// GraphQL node id.
     var id: String
+    /// `owner/name`; numbers are only unique within a repository.
+    var repo: String
     var number: Int
+    /// A PR's head branch, which pairs parity staging PRs with the upstream PRs promoted from them.
+    var headRef: String?
     var kind: Kind
     var title: String
     var url: String
@@ -146,6 +150,15 @@ private func asciiLowercase(_ byte: UInt8) -> UInt8 {
 
 extension Item {
     var isOpen: Bool { state == .open }
+
+    /// In `vllm-project/vllm`, the repository the board and the dashboard are about.
+    var isUpstream: Bool { repo.caseInsensitiveCompare(SyncEngine.repo) == .orderedSame }
+
+    /// A staging PR of the parity agent on its fork (SPEC §3.2).
+    var isParityStaging: Bool { repo.caseInsensitiveCompare(Parity.repo) == .orderedSame }
+
+    /// Repository and number, which name an item across repositories (as notifications do).
+    var repoNumber: String { "\(repo.lowercased())#\(number)" }
 
     func review(by login: String) -> Review? {
         reviews.first { $0.login.caseInsensitiveCompare(login) == .orderedSame }

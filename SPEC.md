@@ -4,7 +4,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 
 ## 1. 范围
 
-- 仓库：仅 `vllm-project/vllm`
+- 仓库：`vllm-project/vllm`；另有 `BugenZhao/vllm` 上 parity agent 的 staging PR，只在 Parity tab 里出现（§3.2）
 - 条目：PR 与 Issue
 - 用户：当前 `gh` 登录用户（BugenZhao），所有 "me / you" 语义都以它为准
 - 分诊结果的 source of truth：GitHub Project **Bugen's Board**（`vllm-project` 的 #56），见 §3.1
@@ -36,7 +36,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 - **详情**：每次同步后在后台预取 Working、Good、Triage、Inbox、Pinned、Recently viewed 里条目的详情，只取缓存缺失或比条目旧的，并发 2；选中条目时先显示缓存，缓存比条目旧或超过 2 分钟再实时拉一次。一次详情是两个并行的 GraphQL 查询：正文和时间线一个，PR 的 checks 一个
 - **限流**：底部状态栏显示 GraphQL 剩余额度；低于 500 时自动降低轮询频率
 - **Board**：最多每 3 分钟拉一次 board 的全部条目（Status、Priority、Comment），⌘R 时必拉；board 上不在本地的条目按 id 补拉
-- **Inbox**：GitHub Notifications（仅本仓库、仅 participating，不含 watching），未读数显示在 tab、Dock 和菜单栏上；打开条目或按 `n` 即在 GitHub 上标记已读
+- **Inbox**：GitHub Notifications（仅本仓库和 parity 的 fork、仅 participating，不含 watching），未读数显示在 tab、Dock 和菜单栏上；打开条目或按 `n` 即在 GitHub 上标记已读
 
 ## 3.1 分诊（Bugen's Board）
 
@@ -70,10 +70,33 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 - **网页上改的 Status**：同步时发现 Status 在 app 之外变了（和本地缓存不同），订阅按上面的规则跟着改，和在 app 里改一样；只在变化的那一次改，之后在 GitHub 上手动改的订阅不会被改回去。Done（board 的 workflow 设的）、从 board 移除、archive 不算；第一次读 board 时没有可比较的，也不改
 - 写操作立即在本地生效，再写到 GitHub；同步时以 board 为准
 
+## 3.2 Parity（Rust parity agent）
+
+Rust frontend 的 parity agent（`richard` 仓库的 `notes/vllm-rust-parity-agent-runbook.md`）每天在 fork 上开 staging PR，我 review；approve 后我手动让 agent promote 成 upstream PR，upstream approve 后再让它 merge。app 只负责看这条流水线、在里面 review，不运行 agent，也不读 agent 的 ledger：阶段全部从 GitHub 上的状态算出来。
+
+- **staging PR**：`BugenZhao/vllm` 上 `richard-for-bugen[bot]` 开的 PR（`author:app/richard-for-bugen`），和主仓库一起增量同步，回溯同样 90 天
+- **对应关系**：按分支名。staging 是 `richard/parity-fix-<slug>`、`richard/parity-impl-<slug>` 或 `richard/parity-run-<slug>`，promote 出来的 upstream PR 是我开的 `bz/rust-parity-<slug>`（run PR 的 slug 带 `run-` 前缀，两边一样）。只认 open 或 merged 的 upstream PR；同一个 slug 有多个时取 open 的，其次最新的
+- **我的决定**就是 GitHub 上的动作，agent 下次运行时读取：
+  - Approve：可以 promote
+  - 评论或 Request changes：agent 下次运行时回复或修改
+  - Park（转成 draft）：以后再说，agent 把条目停放为 `backlog`；Resume（转回 ready for review）撤销
+  - Close：不要，agent 记为 `accepted-divergence`
+- staging PR 不上 board，没有 Status / Priority，`w` / `b` / `s` / `m` 和数字键对它们不生效；也不进 Dashboard（Recently viewed、Pinned 也不收）。upstream 的 parity PR 是我开的，照常在 Dashboard 里
+- **Turn**（staging PR）：approve 了是 `me`（等我让 agent promote）；draft 是 `them`；否则我从没评论或 review 过，或 agent 在我最后一次评论 / review 之后 push 或回复了，是 `me`，其余是 `them`
+- 未读、摘要、Turn 都把 agent 的评论和 push 当作对方的动作（不像别处的 bot 那样不计）；详情的时间线也总是显示 agent 的评论和 push，不受 "Show automated" 影响
+- **Parity tab** 的分组，从上到下：
+  - **Review**：open、非 draft、没 approve、Turn = me 的 staging PR
+  - **Discussing**：同上，但 Turn = them：我评论过，等 agent 回复
+  - **Approved**：我 approve 了、还没有 upstream PR：等 promote
+  - **Upstream**：open 的 upstream parity PR 本身（`bz/rust-parity-*`），所以 Review、CI、Turn 列都是 upstream 的；标题后带 staging PR 的编号。staging PR 这时不单独列出
+  - **Parked**：draft 的 staging PR，默认折叠
+  - **Closed**：14 天内关闭的 staging PR，以及 upstream 已合并、agent 还没来得及关的；upstream 合并了的标题后带 `landed #N`。默认折叠
+- tab 上显示 Review 组的数量（`Parity 3`）
+
 ## 4. 主界面
 
 ```
-┌ 顶栏：                    Dashboard | Inbox (n)        🔍 Filter (/)  ⟳  ▣ │ Conversation | Checks | Files ┐
+┌ 顶栏：                    Dashboard | Inbox (n) | Parity (n)  🔍 Filter (/)  ⟳  ▣ │ Conversation | Checks | Files ┐
 ├ 列表 ─────────────────────────────────────────────┬ 详情 ──────────────────────────────────────────────┤
 │                                                   │ #56492 [Core] Extensible KV cache                  │
 │ ▾ Recently viewed 8                               │ by njhill ◆◆  draft  CI ● 16 failed  conflicts     │
@@ -153,7 +176,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 | `+` / `-` | upvote / downvote 作者 |
 | `c` | 聚焦评论框 |
 | `⌘R` | 立即同步 |
-| `⌘1` / `⌘2` | 切换 Dashboard / Inbox |
+| `⌘1` / `⌘2` / `⌘3` | 切换 Dashboard / Inbox / Parity |
 | `⌥⌘1` / `⌥⌘2` / `⌥⌘3` | PR 详情切到 Conversation / Checks / Files |
 | `⌘B` | 显示 / 隐藏详情面板（重启后保持） |
 
@@ -195,7 +218,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 ## 6. 详情面板
 
 - **头部**：标题、作者和徽章、状态（draft / open / merged / closed）、CI 汇总、mergeable / conflicts、labels、创建和更新时间
-- **操作**：Status（Triage / Working / Backlog / Skipped / Muted）、Priority（H / M / L / –）、Pin、Open ↗
+- **操作**：Status（Triage / Working / Backlog / Skipped / Muted）、Priority（H / M / L / –）、Pin、Open ↗；parity 的 staging PR 换成 Park / Resume（§3.2）
 - **Conversation**：
   - 时间线包括评论、review（含行内评论的摘要和 diff hunk）、push、label、状态变化
   - "Show automated" 默认关闭，关闭时隐藏自动化内容：
@@ -217,8 +240,8 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 
 ## 7. 本地状态（SQLite）
 
-- `items`：PR / Issue 的快照字段 + 原始 JSON
-- `item_state`：pinned、viewed_at、seen_at（只存本地）
+- `items`：PR / Issue 的快照字段 + 原始 JSON，带所在仓库（编号只在仓库内唯一）
+- `item_state`：pinned、viewed_at、seen_at（只存本地，按条目的 node id）
 - `board_item`：board 条目的缓存（item id、Status 及其设置时间、Priority、Comment）
 - `users`：login、头像、company、orgs、邮箱域名、committer 领域、来源、fetched_at
 - `org_overrides`：手动设置的映射

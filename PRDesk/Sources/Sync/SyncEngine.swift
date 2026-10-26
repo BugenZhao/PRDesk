@@ -9,11 +9,11 @@ struct SyncResult: Sendable {
 }
 
 enum SyncError: LocalizedError {
-    case notFound(Int)
+    case notFound(repo: String, number: Int)
 
     var errorDescription: String? {
         switch self {
-        case let .notFound(number): "#\(number) was not found in \(SyncEngine.repo)."
+        case let .notFound(repo, number): "#\(number) was not found in \(repo)."
         }
     }
 }
@@ -71,23 +71,28 @@ actor SyncEngine {
         }
 
         // One advanced search for everything tracked; `involves:` covers author, assignee, mentions
-        // and commenters, but not review requests or reviews.
-        let qualifier = "(involves:\(viewer) OR review-requested:\(viewer) OR reviewed-by:\(viewer) OR label:rust)"
+        // and commenters, but not review requests or reviews. The parity agent's staging PRs on the
+        // fork are a second, small search.
+        let queries = [
+            "repo:\(Self.repo) (involves:\(viewer) OR review-requested:\(viewer) OR reviewed-by:\(viewer) OR label:rust)",
+            "repo:\(Parity.repo) \(Parity.qualifier)",
+        ]
         // Search pages are slow (GitHub computes mergeability and CI counts per PR), so long ranges
         // are cut into windows fetched in parallel; a short incremental range uses small pages.
         let windows = Self.windows(from: since, to: startedAt)
         let pageSize = windows.count > 1 ? ItemQuery.fullSyncPageSize : ItemQuery.incrementalPageSize
+        let jobs = queries.flatMap { query in windows.map { (query: query, from: $0.from, to: $0.to) } }
         var fetched = try await withThrowingTaskGroup(of: Int.self) { group in
-            var pending = windows.makeIterator()
+            var pending = jobs.makeIterator()
             var total = 0
             for _ in 0 ..< Self.maxConcurrentFetches {
-                guard let window = pending.next() else { break }
-                group.addTask { try await self.fetch(qualifier: qualifier, from: window.from, to: window.to, pageSize: pageSize) }
+                guard let job = pending.next() else { break }
+                group.addTask { try await self.fetch(query: job.query, from: job.from, to: job.to, pageSize: pageSize) }
             }
             while let count = try await group.next() {
                 total += count
-                if let window = pending.next() {
-                    group.addTask { try await self.fetch(qualifier: qualifier, from: window.from, to: window.to, pageSize: pageSize) }
+                if let job = pending.next() {
+                    group.addTask { try await self.fetch(query: job.query, from: job.from, to: job.to, pageSize: pageSize) }
                 }
             }
             return total
@@ -113,14 +118,15 @@ actor SyncEngine {
     }
 
     /// Fetches one item by number, storing it unless `store` is false.
-    func fetchItem(number: Int, store: Bool = true) async throws -> Item {
+    func fetchItem(repo: String = SyncEngine.repo, number: Int, store: Bool = true) async throws -> Item {
+        let (owner, name) = Self.split(repo)
         let response = try await client.query(
             ItemQuery.byNumber,
-            variables: ItemQuery.NumberVariables(owner: Self.owner, name: Self.name, number: number),
+            variables: ItemQuery.NumberVariables(owner: owner, name: name, number: number),
             as: ItemQuery.NumberResponse.self
         )
         guard let item = response.repository?.issueOrPullRequest?.item(fetchedAt: Date()) else {
-            throw SyncError.notFound(number)
+            throw SyncError.notFound(repo: repo, number: number)
         }
         if store { try await db.upsert([item]) }
         return item
@@ -151,11 +157,11 @@ actor SyncEngine {
         return try await refresh(ids: ids)
     }
 
-    /// Fetches every item matching `qualifier` updated in `[from, to]`, writing each page as it arrives.
+    /// Fetches every item matching `query` updated in `[from, to]`, writing each page as it arrives.
     /// Search caps results at 1000, so larger windows are split in half.
-    private func fetch(qualifier: String, from: Date, to: Date?, pageSize: Int) async throws -> Int {
+    private func fetch(query: String, from: Date, to: Date?, pageSize: Int) async throws -> Int {
         let range = if let to { "\(Self.format(from))..\(Self.format(to))" } else { ">=\(Self.format(from))" }
-        let q = "repo:\(Self.repo) \(qualifier) updated:\(range)"
+        let q = "\(query) updated:\(range)"
         var after: String?
         var count = 0
         repeat {
@@ -169,8 +175,8 @@ actor SyncEngine {
                 if end.timeIntervalSince(from) > 3600 {
                     let mid = from.addingTimeInterval(end.timeIntervalSince(from) / 2)
                     logger.info("\(page.issueCount) results for \(q, privacy: .public); splitting")
-                    return try await fetch(qualifier: qualifier, from: from, to: mid, pageSize: pageSize)
-                        + fetch(qualifier: qualifier, from: mid, to: to, pageSize: pageSize)
+                    return try await fetch(query: query, from: from, to: mid, pageSize: pageSize)
+                        + fetch(query: query, from: mid, to: to, pageSize: pageSize)
                 }
             }
             let now = Date()
@@ -194,6 +200,12 @@ actor SyncEngine {
         }
         result.append((start, nil))
         return result
+    }
+
+    /// `owner/name` as its two parts.
+    static func split(_ repo: String) -> (owner: String, name: String) {
+        let parts = repo.split(separator: "/", maxSplits: 1).map(String.init)
+        return (parts.first ?? repo, parts.count > 1 ? parts[1] : "")
     }
 
     static func format(_ date: Date) -> String {

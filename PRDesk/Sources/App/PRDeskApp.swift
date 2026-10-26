@@ -73,6 +73,8 @@ private struct AppCommands: Commands {
                 .keyboardShortcut("1")
             Button("Inbox") { model.mode = .inbox }
                 .keyboardShortcut("2")
+            Button("Parity") { model.mode = .parity }
+                .keyboardShortcut("3")
             Divider()
             // The detail pane's tabs, as Xcode numbers its inspectors.
             Button("Conversation") { model.detailTab = .conversation }

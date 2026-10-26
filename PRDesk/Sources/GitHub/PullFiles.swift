@@ -21,11 +21,11 @@ struct PullFile: Decodable, Equatable, Identifiable, Sendable {
 
 extension SyncEngine {
     /// Changed files of a PR (GitHub returns at most 3000).
-    func fetchFiles(number: Int) async throws -> [PullFile] {
+    func fetchFiles(repo: String, number: Int) async throws -> [PullFile] {
         var files: [PullFile] = []
         for page in 1 ... 30 {
             let batch = try await client.rest(
-                "GET", "/repos/\(Self.repo)/pulls/\(number)/files",
+                "GET", "/repos/\(repo)/pulls/\(number)/files",
                 query: [URLQueryItem(name: "per_page", value: "100"), URLQueryItem(name: "page", value: String(page))],
                 as: [PullFile].self
             )

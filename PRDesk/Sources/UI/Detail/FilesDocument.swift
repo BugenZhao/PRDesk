@@ -5,6 +5,8 @@ import Foundation
 enum FilesDocument {
     private struct Document: Encodable {
         var key: String
+        /// The PR's own link, which tells links to it from links elsewhere.
+        var url: String
         var files: [File]
     }
 
@@ -21,8 +23,8 @@ enum FilesDocument {
 
     /// JSON for `PRDesk.renderFiles`; built off the main thread, as patches can run to megabytes.
     @concurrent
-    static func payload(_ files: [PullFile], number: Int, pullURL: String) async -> String {
-        let document = Document(key: String(number), files: files.map { file in
+    static func payload(_ files: [PullFile], key: String, pullURL: String) async -> String {
+        let document = Document(key: key, url: pullURL, files: files.map { file in
             File(
                 name: file.filename, previous: file.previousFilename, symbol: symbol(for: file.status),
                 additions: file.additions, deletions: file.deletions, patch: file.patch,

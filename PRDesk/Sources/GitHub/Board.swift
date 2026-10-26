@@ -289,7 +289,7 @@ extension SyncEngine {
             return (id, FieldValue(singleSelectOptionId: option))
         }
         do {
-            try await followSubscription(from: previous, to: status, number: number, contentID: contentID)
+            try await followSubscription(from: previous, to: status, contentID: contentID)
         } catch {
             throw BoardError.subscription(status: status?.rawValue ?? "untriaged", underlying: error.localizedDescription)
         }
@@ -299,21 +299,21 @@ extension SyncEngine {
     /// subscription and unsubscribes; leaving puts the recorded one back (SUBSCRIBED if none was
     /// recorded), so undoing a skip restores exactly what was there. Setting the same status again
     /// (renewing a woken skip) unsubscribes again, since a mention may have subscribed the viewer.
-    private func followSubscription(from previous: TriageStatus?, to status: TriageStatus?, number: Int, contentID: String) async throws {
+    private func followSubscription(from previous: TriageStatus?, to status: TriageStatus?, contentID: String) async throws {
         let renewing = status != nil && status == previous
         if let quiet = status?.subscription {
             if previous?.isQuiet != true {
                 let current = try await viewerSubscription(subjectID: contentID)
-                try await db.updateState(number) { $0.subscriptionBeforeQuiet = current }
+                try await db.updateState(contentID) { $0.subscriptionBeforeQuiet = current }
             }
             if renewing || quiet != previous?.subscription {
                 try await setSubscription(quiet, subjectID: contentID)
             }
         } else if previous?.isQuiet == true {
             // GitHub no longer takes IGNORED on an issue or PR; unsubscribing comes closest.
-            let recorded = try await db.state(number)?.subscriptionBeforeQuiet
+            let recorded = try await db.state(contentID)?.subscriptionBeforeQuiet
             try await setSubscription(recorded.map { $0 == "IGNORED" ? "UNSUBSCRIBED" : $0 } ?? "SUBSCRIBED", subjectID: contentID)
-            try await db.updateState(number) { $0.subscriptionBeforeQuiet = nil }
+            try await db.updateState(contentID) { $0.subscriptionBeforeQuiet = nil }
         }
     }
 
@@ -339,7 +339,7 @@ extension SyncEngine {
             let before = previous[entry.number]
             guard before?.isForeign != true, before?.triage != entry.triage else { continue }
             do {
-                try await followSubscription(from: before?.triage, to: entry.triage, number: entry.number, contentID: entry.contentID)
+                try await followSubscription(from: before?.triage, to: entry.triage, contentID: entry.contentID)
             } catch {
                 Self.boardLogger.error("Failed to follow the Status of #\(entry.number) with its subscription: \(String(describing: error), privacy: .public)")
             }

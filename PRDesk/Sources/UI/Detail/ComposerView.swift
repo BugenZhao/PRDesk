@@ -16,7 +16,7 @@ struct ComposerView: View {
     @State private var pendingClose: PendingClose?
     @State private var error: String?
     /// The item whose draft `text` holds.
-    @State private var draftNumber: Int?
+    @State private var draftItemID: Item.ID?
     @FocusState private var focused: Bool
 
     private struct PendingClose: Equatable {
@@ -39,7 +39,7 @@ struct ComposerView: View {
             if isPreviewing {
                 ScrollView {
                     if let previewHTML {
-                        HTMLBodyView(id: "preview-\(item.number)-\(previewHTML.hashValue)", html: previewHTML)
+                        HTMLBodyView(id: "preview-\(item.id)-\(previewHTML.hashValue)", html: previewHTML)
                             .padding(6)
                     } else {
                         ProgressView().frame(maxWidth: .infinity)
@@ -104,15 +104,15 @@ struct ComposerView: View {
         .padding(8)
         // Load the draft only when the item really changes: reassigning `text` while typing
         // would reset the cursor.
-        .task(id: item.number) {
-            guard draftNumber != item.number else { return }
-            draftNumber = item.number
-            text = model.draft(for: item.number)
+        .task(id: item.id) {
+            guard draftItemID != item.id else { return }
+            draftItemID = item.id
+            text = model.draft(for: item.id)
             isPreviewing = false
             error = nil
         }
         .onChange(of: text) {
-            if draftNumber == item.number { model.setDraft(text, for: item.number) }
+            if draftItemID == item.id { model.setDraft(text, for: item.id) }
         }
         .onChange(of: isPreviewing) { renderPreview() }
         .onChange(of: model.composerFocusRequest) {
@@ -153,7 +153,9 @@ struct ComposerView: View {
         case .completed: "The issue will be closed as completed"
         case .notPlanned: "The issue will be closed as not planned"
         }
-        return trimmed.isEmpty ? "\(what)." : "\(what), after posting your comment."
+        let message = trimmed.isEmpty ? "\(what)." : "\(what), after posting your comment."
+        // The agent reads a closed staging PR as a no (SPEC §3.2).
+        return item.isParityStaging ? "\(message) The parity agent records the item as an accepted divergence." : message
     }
 
     private func close(reason: CloseReason?) {
@@ -178,7 +180,7 @@ struct ComposerView: View {
         let source = trimmed
         Task {
             do {
-                previewHTML = try await model.renderMarkdown(source)
+                previewHTML = try await model.renderMarkdown(source, in: item)
             } catch {
                 previewHTML = "<p><em>Preview failed: \(error.localizedDescription)</em></p>"
             }

@@ -54,7 +54,8 @@ enum ItemQuery {
 
     static let fragments = """
     fragment PRFields on PullRequest {
-      id number title url state isDraft createdAt updatedAt closedAt
+      id number title url state isDraft createdAt updatedAt closedAt headRefName
+      repository { nameWithOwner }
       author { login avatarUrl }
       additions deletions reviewDecision mergeable
       labels(first: 20) { nodes { name color } }
@@ -81,6 +82,7 @@ enum ItemQuery {
     }
     fragment IssueFields on Issue {
       id number title url state createdAt updatedAt closedAt
+      repository { nameWithOwner }
       author { login avatarUrl }
       labels(first: 20) { nodes { name color } }
       assignees(first: 10) { nodes { login } }
@@ -228,6 +230,10 @@ enum ItemQuery {
         let login: String
     }
 
+    struct Repository: Decodable, Sendable {
+        let nameWithOwner: String
+    }
+
     struct ReviewRequest: Decodable, Sendable {
         struct Reviewer: Decodable, Sendable {
             let login: String?
@@ -354,6 +360,8 @@ enum ItemQuery {
         let createdAt: Date
         let updatedAt: Date
         let closedAt: Date?
+        let headRefName: String
+        let repository: Repository
         let author: Actor?
         let additions: Int
         let deletions: Int
@@ -369,7 +377,9 @@ enum ItemQuery {
         func item(fetchedAt: Date) -> Item {
             Item(
                 id: id,
+                repo: repository.nameWithOwner,
                 number: number,
+                headRef: headRefName,
                 kind: .pullRequest,
                 title: title,
                 url: url,
@@ -409,6 +419,7 @@ enum ItemQuery {
         let createdAt: Date
         let updatedAt: Date
         let closedAt: Date?
+        let repository: Repository
         let author: Actor?
         let labels: Nodes<Label>
         let assignees: Nodes<Login>
@@ -418,7 +429,9 @@ enum ItemQuery {
         func item(fetchedAt: Date) -> Item {
             Item(
                 id: id,
+                repo: repository.nameWithOwner,
                 number: number,
+                headRef: nil,
                 kind: .issue,
                 title: title,
                 url: url,

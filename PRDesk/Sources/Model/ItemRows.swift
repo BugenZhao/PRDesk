@@ -11,6 +11,8 @@ struct ItemRow: Hashable, Sendable {
     var authorVote: Vote?
     /// The item's entry on the triage board, if it is on it.
     var board: BoardEntry?
+    /// In the Parity tab: the other end of the item's parity pipeline.
+    var parityLink: ParityLink?
 
     var triage: TriageStatus? { board?.triage }
     var priority: Priority? { board?.priorityValue }
@@ -33,6 +35,7 @@ struct ItemRow: Hashable, Sendable {
 
 enum ListSection: String, CaseIterable, Codable, Sendable {
     case opened, recent, pinned, working, good, triage, backlog, closed, skipped, muted, inbox
+    case parityReview, parityDiscussing, parityApproved, parityUpstream, parityParked, parityClosed
 
     var title: String {
         switch self {
@@ -47,6 +50,12 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
         case .skipped: "Skipped"
         case .muted: "Muted"
         case .inbox: "Inbox"
+        case .parityReview: "Review"
+        case .parityDiscussing: "Discussing"
+        case .parityApproved: "Approved"
+        case .parityUpstream: "Upstream"
+        case .parityParked: "Parked"
+        case .parityClosed: "Closed"
         }
     }
 
@@ -74,11 +83,23 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
         case .muted:
             "Status Muted: dropped for good. Never back in Triage, and the Inbox and unread counts leave it out. Unsubscribed like Skipped: GitHub can't ignore an item, so it still notifies on mentions and review requests."
         case .inbox:
-            "GitHub notifications for this repository where you take part. Not tied to the board."
+            "GitHub notifications for this repository and the parity fork where you take part. Not tied to the board."
+        case .parityReview:
+            "Staging PRs of the parity agent waiting on your review: new, or the agent pushed or replied since you last commented. Approve to let it promote; Park makes it a draft (later), Close means no."
+        case .parityDiscussing:
+            "Staging PRs you commented on or asked changes of; the agent answers on its next run."
+        case .parityApproved:
+            "Staging PRs you approved that have no upstream PR yet: ready for the agent's promote run."
+        case .parityUpstream:
+            "Open upstream PRs promoted from staging PRs (bz/rust-parity-*); review, CI and Turn are upstream's. Approved ones wait for the agent's merge run."
+        case .parityParked:
+            "Staging PRs marked draft: parked as backlog by the agent until you resume them."
+        case .parityClosed:
+            "Staging PRs closed in the last \(Int(Self.closedRetention / 86400)) days: landed upstream, or closed as a no (accepted divergence)."
         }
     }
 
-    static let defaultCollapsed: Set<ListSection> = [.backlog, .closed, .skipped, .muted]
+    static let defaultCollapsed: Set<ListSection> = [.backlog, .closed, .skipped, .muted, .parityParked, .parityClosed]
     /// Closed or merged items stay visible this long after closing.
     static let closedRetention: TimeInterval = 14 * 24 * 3600
     static let recentLimit = 8
@@ -86,7 +107,7 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
     /// The one triage section an item belongs to (besides Recently viewed and Pinned), or nil for
     /// items the app leaves alone.
     static func triageSection(of row: ItemRow) -> ListSection? {
-        if row.board?.isForeign == true { return nil }
+        if row.board?.isForeign == true || !row.item.isUpstream { return nil }
         guard row.item.isOpen else { return .closed }
         switch row.listedTriage {
         case nil: return .triage

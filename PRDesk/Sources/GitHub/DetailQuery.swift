@@ -369,18 +369,20 @@ enum DetailQuery {
 extension SyncEngine {
     /// Fetches the full detail of one item, following timeline pages. A PR's checks are fetched
     /// alongside the timeline rather than after it.
-    func fetchDetail(number: Int, isPullRequest: Bool) async throws -> ItemDetail {
-        async let checks = isPullRequest ? fetchChecks(number: number) : []
+    func fetchDetail(of item: Item) async throws -> ItemDetail {
+        let (owner, name) = Self.split(item.repo)
+        let number = item.number
+        async let checks = item.kind == .pullRequest ? fetchChecks(owner: owner, name: name, number: number) : []
         var after: String?
         var entries: [TimelineEntry] = []
         var first: DetailQuery.Subject?
         repeat {
             let response = try await client.query(
                 DetailQuery.text,
-                variables: DetailQuery.Variables(owner: Self.owner, name: Self.name, number: number, after: after),
+                variables: DetailQuery.Variables(owner: owner, name: name, number: number, after: after),
                 as: DetailQuery.Response.self
             )
-            guard let subject = response.repository?.issueOrPullRequest else { throw SyncError.notFound(number) }
+            guard let subject = response.repository?.issueOrPullRequest else { throw SyncError.notFound(repo: item.repo, number: number) }
             first = first ?? subject
             entries += subject.timelineItems.nodes.compactMap { $0?.entry }
             after = subject.timelineItems.pageInfo.hasNextPage ? subject.timelineItems.pageInfo.endCursor : nil
@@ -403,13 +405,13 @@ extension SyncEngine {
     }
 
     /// The checks on a PR's latest commit, following pages.
-    private func fetchChecks(number: Int) async throws -> [Check] {
+    private func fetchChecks(owner: String, name: String, number: Int) async throws -> [Check] {
         var checks: [Check] = []
         var after: String?
         repeat {
             let response = try await client.query(
                 DetailQuery.checks,
-                variables: DetailQuery.Variables(owner: Self.owner, name: Self.name, number: number, after: after),
+                variables: DetailQuery.Variables(owner: owner, name: name, number: number, after: after),
                 as: DetailQuery.ChecksResponse.self
             )
             let contexts = response.repository?.pullRequest?.commits.values.last?.commit.statusCheckRollup?.contexts

@@ -26,11 +26,17 @@ struct ItemInsight: Hashable, Sendable {
     var directAsk: DirectAsk?
     /// The viewer opened the item.
     var isMine: Bool
+    /// The viewer's latest opinionated review approves the PR.
+    var isApprovedByMe: Bool
 
     init(item: Item, state: ItemState?, viewer: String?, baseline: Date?) {
         let isMe = { (login: String?) in sameLogin(login, viewer) }
-        let human = item.events.filter { !$0.isAutomated && $0.actor != nil }
+        // On a staging PR the parity agent is the other side of the conversation, not noise.
+        let human = item.events.filter { event in
+            event.actor != nil && (!event.isAutomated || item.isParityStaging && Parity.isBot(event.actor))
+        }
         isMine = isMe(item.author)
+        isApprovedByMe = viewer.flatMap(item.review(by:))?.state == "APPROVED"
 
         let othersActivity = human.filter { event in
             guard !isMe(event.actor) else { return false }
@@ -54,10 +60,18 @@ struct ItemInsight: Hashable, Sendable {
             if event.kind == .reviewRequested { return isMe(event.target) }
             return !(item.state == .merged && event.kind == .closed)
         }
-        summary = latest.map { Self.describe($0, isMe: isMe($0.actor), isAuthor: sameLogin($0.actor, item.author)) }
+        // The agent's commits carry its `[bot]` login, its PRs the bare one.
+        let isAuthor = { (login: String?) in sameLogin(login, item.author) || item.isParityStaging && Parity.isBot(login) }
+        summary = latest.map { Self.describe($0, isMe: isMe($0.actor), isAuthor: isAuthor($0.actor)) }
         summaryAt = latest?.at
 
-        turn = item.isOpen ? Self.turn(item: item, human: human, myLast: myLast, isMe: isMe, requested: isReviewRequestedFromMe) : nil
+        turn = if !item.isOpen {
+            nil
+        } else if item.isParityStaging {
+            Self.parityTurn(item: item, human: human, myLast: myLast, isMe: isMe, approved: isApprovedByMe)
+        } else {
+            Self.turn(item: item, human: human, myLast: myLast, isMe: isMe, requested: isReviewRequestedFromMe)
+        }
     }
 
     /// Requests made by the author right when the PR was opened, marked ready or pushed to are
@@ -132,6 +146,16 @@ struct ItemInsight: Hashable, Sendable {
             if let othersTalkLast, othersTalkLast > (myLast ?? .distantPast) { return .me }
             return assigned && myLast == nil ? .me : .them
         }
+    }
+
+    /// A staging PR waits on the viewer when approved (to have it promoted), when never reviewed,
+    /// and when the agent pushed or replied after the viewer's last comment or review.
+    private static func parityTurn(item: Item, human: [Item.Event], myLast: Date?, isMe: (String?) -> Bool, approved: Bool) -> Turn {
+        if item.isDraft { return .them }
+        if approved { return .me }
+        guard let myLast else { return .me }
+        let answers: Set<Item.Event.Kind> = [.comment, .commit, .forcePush, .readyForReview, .reviewed]
+        return human.contains { !isMe($0.actor) && answers.contains($0.kind) && $0.at > myLast } ? .me : .them
     }
 
     /// "you" for the viewer, "author" for the item's author, "@login" for anyone else.

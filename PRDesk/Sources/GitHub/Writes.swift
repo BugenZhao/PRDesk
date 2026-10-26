@@ -22,15 +22,22 @@ enum CloseReason: String, Sendable {
     case notPlanned = "NOT_PLANNED"
 }
 
-/// A notification thread from the GitHub inbox, for an issue or PR in the repository.
+/// A notification thread from the GitHub inbox, for an issue or PR in the repository or the
+/// parity fork.
 struct InboxNote: Hashable, Sendable {
     var threadID: String
+    var repo: String
     var number: Int
     /// GitHub's reason, e.g. `mention`, `review_requested`, `comment`, `author`.
     var reason: String
     var updatedAt: Date
     /// Read in this session; stays listed (without the unread dot) until the next inbox sync.
     var isRead = false
+
+    /// As `Item.repoNumber`.
+    var repoNumber: String { "\(repo.lowercased())#\(number)" }
+
+    var isUpstream: Bool { repo.caseInsensitiveCompare(SyncEngine.repo) == .orderedSame }
 
     var reasonLabel: String {
         switch reason {
@@ -126,10 +133,10 @@ extension SyncEngine {
         )
     }
 
-    /// Renders Markdown the way GitHub would in this repository.
-    func renderMarkdown(_ text: String) async throws -> String {
+    /// Renders Markdown the way GitHub would in `repo`.
+    func renderMarkdown(_ text: String, repo: String) async throws -> String {
         struct Body: Encodable, Sendable { let text: String; let mode: String; let context: String }
-        let data = try await client.rest("POST", "/markdown", json: Body(text: text, mode: "gfm", context: Self.repo))
+        let data = try await client.rest("POST", "/markdown", json: Body(text: text, mode: "gfm", context: repo))
         return String(decoding: data, as: UTF8.self)
     }
 
@@ -145,12 +152,20 @@ extension SyncEngine {
         let subject: Subject
     }
 
-    /// Unread notifications in the repository that the viewer participates in.
+    /// Unread notifications in the repository and the parity fork that the viewer participates in.
     func fetchInbox() async throws -> [InboxNote] {
+        var notes: [InboxNote] = []
+        for repo in [Self.repo, Parity.repo] {
+            notes += try await fetchInbox(repo: repo)
+        }
+        return notes
+    }
+
+    private func fetchInbox(repo: String) async throws -> [InboxNote] {
         var notes: [InboxNote] = []
         for page in 1 ... 5 {
             let batch = try await client.rest(
-                "GET", "/repos/\(Self.repo)/notifications",
+                "GET", "/repos/\(repo)/notifications",
                 query: [
                     URLQueryItem(name: "participating", value: "true"),
                     URLQueryItem(name: "per_page", value: "50"),
@@ -162,11 +177,28 @@ extension SyncEngine {
                 guard ["PullRequest", "Issue"].contains(note.subject.type),
                       let number = note.subject.url?.split(separator: "/").last.flatMap({ Int($0) })
                 else { return nil }
-                return InboxNote(threadID: note.id, number: number, reason: note.reason, updatedAt: note.updated_at)
+                return InboxNote(threadID: note.id, repo: repo, number: number, reason: note.reason, updatedAt: note.updated_at)
             }
             if batch.count < 50 { break }
         }
         return notes
+    }
+
+    /// Converts a PR to a draft, or marks a draft ready for review: how a parity staging PR is
+    /// parked and resumed.
+    func setDraft(_ draft: Bool, pullRequestID: String) async throws {
+        if isDryRun("\(draft ? "convert \(pullRequestID) to draft" : "mark \(pullRequestID) ready for review")") { return }
+        struct Input: Encodable, Sendable { let pullRequestId: String }
+        struct Variables: Encodable, Sendable { let input: Input }
+        let mutation = draft
+            ? "mutation($input: ConvertPullRequestToDraftInput!) { convertPullRequestToDraft(input: $input) { clientMutationId } }"
+            : "mutation($input: MarkPullRequestReadyForReviewInput!) { markPullRequestReadyForReview(input: $input) { clientMutationId } }"
+        _ = try await client.query(
+            mutation,
+            variables: Variables(input: Input(pullRequestId: pullRequestID)),
+            as: [String: Ignored].self,
+            strict: true
+        )
     }
 
     func markThreadRead(_ threadID: String) async throws {

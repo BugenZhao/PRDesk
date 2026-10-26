@@ -82,7 +82,7 @@ final class AppModel {
     var detailTab: DetailTab = .conversation
 
     enum ListMode: String, Hashable, Codable {
-        case dashboard, inbox
+        case dashboard, inbox, parity
     }
 
     var mode: ListMode = Defaults.get(.mode) ?? .dashboard {
@@ -100,7 +100,16 @@ final class AppModel {
     }
 
     /// Muted items' notifications don't count; GitHub can't always be stopped from sending them.
-    var unreadInboxCount: Int { inbox.count { !$0.isRead && board[$0.number]?.triage != .muted } }
+    var unreadInboxCount: Int { inbox.count { !$0.isRead && !isMuted($0) } }
+
+    private func isMuted(_ note: InboxNote) -> Bool {
+        note.isUpstream && board[note.number]?.triage == .muted
+    }
+
+    /// Staging PRs in the Parity tab's Review section, for the tab's count.
+    private(set) var parityReviewCount = 0
+    /// Where each item of the Parity tab is listed, as of the last rebuild.
+    @ObservationIgnored private var paritySections: [Item.ID: ListSection] = [:]
 
     private func updateDockBadge() {
         NSApp.dockTile.badgeLabel = unreadInboxCount == 0 ? nil : String(unreadInboxCount)
@@ -147,14 +156,14 @@ final class AppModel {
 
     /// Recently shown details, so returning to an item shows it at once rather than after a
     /// database read.
-    @ObservationIgnored private var recentDetails: [Int: ItemDetail] = [:]
-    @ObservationIgnored private var recentDetailOrder: [Int] = []
+    @ObservationIgnored private var recentDetails: [Item.ID: ItemDetail] = [:]
+    @ObservationIgnored private var recentDetailOrder: [Item.ID] = []
     private static let recentDetailLimit = 20
 
     private func rememberDetail(_ detail: ItemDetail) {
-        recentDetails[detail.number] = detail
-        recentDetailOrder.removeAll { $0 == detail.number }
-        recentDetailOrder.append(detail.number)
+        recentDetails[detail.id] = detail
+        recentDetailOrder.removeAll { $0 == detail.id }
+        recentDetailOrder.append(detail.id)
         if recentDetailOrder.count > Self.recentDetailLimit {
             recentDetails[recentDetailOrder.removeFirst()] = nil
         }
@@ -209,14 +218,15 @@ final class AppModel {
     }
 
     func state(for item: Item) -> ItemState {
-        snapshot.states[item.number] ?? ItemState(number: item.number)
+        snapshot.states[item.id] ?? ItemState(itemID: item.id)
     }
 
     /// The triage board by item number; observed (unlike `snapshot`) so the detail pane follows it.
     private(set) var board: [Int: BoardEntry] = [:]
 
+    /// Only upstream items are on the board; its numbers are upstream ones.
     func board(for item: Item) -> BoardEntry? {
-        board[item.number]
+        item.isUpstream ? board[item.number] : nil
     }
 
     /// The item's Status on the board as the list treats it: none for a Skipped item that was
@@ -277,6 +287,7 @@ final class AppModel {
                 for try await snapshot in db.observeSnapshot() {
                     guard let self else { return }
                     self.snapshot = snapshot
+                    migrateDrafts()
                     if votes != snapshot.votes { votes = snapshot.votes }
                     if board != snapshot.board {
                         board = snapshot.board
@@ -284,7 +295,7 @@ final class AppModel {
                     }
                     rebuild()
                     restoreSelection()
-                    if let item = selectedItem, let detail, detail.number == item.number, detail.itemUpdatedAt < item.updatedAt {
+                    if let item = selectedItem, let detail, detail.id == item.id, detail.itemUpdatedAt < item.updatedAt {
                         loadDetail()
                     }
                 }
@@ -347,9 +358,11 @@ final class AppModel {
         do {
             let notes = try await engine.fetchInbox()
             // Notifications can be for items no tracking search found; fetch a few at a time.
-            let known = Set(snapshot.items.map(\.number))
-            for number in Set(notes.map(\.number)).subtracting(known).prefix(10) {
-                _ = try? await engine.fetchItem(number: number)
+            let known = Set(snapshot.items.map(\.repoNumber))
+            var seen = Set<String>()
+            let missing = notes.filter { !known.contains($0.repoNumber) && seen.insert($0.repoNumber).inserted }
+            for note in missing.prefix(10) {
+                _ = try? await engine.fetchItem(repo: note.repo, number: note.number)
             }
             inbox = notes.sorted { $0.updatedAt > $1.updatedAt }
             rebuild()
@@ -360,8 +373,8 @@ final class AppModel {
     }
 
     /// Marks the item's notification thread read on GitHub, if it has one.
-    private func markNotificationRead(number: Int) {
-        guard let index = inbox.firstIndex(where: { $0.number == number && !$0.isRead }) else { return }
+    private func markNotificationRead(_ item: Item) {
+        guard let index = inbox.firstIndex(where: { $0.repoNumber == item.repoNumber && !$0.isRead }) else { return }
         let note = inbox[index]
         // Keep the row in place so the selection doesn't jump; the next sync drops it.
         inbox[index].isRead = true
@@ -377,29 +390,40 @@ final class AppModel {
 
     // MARK: Writing
 
-    /// Unsent composer text per item number, kept across selection changes and launches.
-    @ObservationIgnored private var drafts: [Int: String] = Defaults.get(.drafts) ?? [:]
+    /// Unsent composer text per item, kept across selection changes and launches.
+    @ObservationIgnored private var drafts: [Item.ID: String] = Defaults.get(.itemDrafts) ?? [:]
 
-    func draft(for number: Int) -> String {
-        drafts[number] ?? ""
+    func draft(for itemID: Item.ID) -> String {
+        drafts[itemID] ?? ""
+    }
+
+    /// Drafts were once kept by number, which only names an upstream item; moves them over once
+    /// the items are known.
+    private func migrateDrafts() {
+        guard let old: [Int: String] = Defaults.get(.drafts), !snapshot.items.isEmpty else { return }
+        for item in snapshot.items where item.isUpstream {
+            if let text = old[item.number], drafts[item.id] == nil { drafts[item.id] = text }
+        }
+        Defaults.set(drafts, for: .itemDrafts)
+        Defaults.remove(.drafts)
     }
 
     @ObservationIgnored private var draftSaveTask: Task<Void, Never>?
 
     /// Updates the draft in memory at once and persists it shortly after typing pauses.
-    func setDraft(_ text: String, for number: Int) {
-        drafts[number] = text.isEmpty ? nil : text
+    func setDraft(_ text: String, for itemID: Item.ID) {
+        drafts[itemID] = text.isEmpty ? nil : text
         draftSaveTask?.cancel()
         draftSaveTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(500))
             guard !Task.isCancelled, let self else { return }
-            Defaults.set(drafts, for: .drafts)
+            Defaults.set(drafts, for: .itemDrafts)
         }
     }
 
     func submit(_ submission: Submission, body: String, item: Item, detail: ItemDetail) async throws {
         try await engine.submit(submission, body: body, subjectID: detail.id)
-        setDraft("", for: item.number)
+        setDraft("", for: item.id)
         // Our own action shouldn't make the item look unread.
         updateState(item) { $0.seenAt = Date() }
         _ = try? await engine.refresh(ids: [item.id])
@@ -431,7 +455,7 @@ final class AppModel {
     func close(_ item: Item, detail: ItemDetail, reason: CloseReason?, comment: String) async throws {
         if !comment.isEmpty {
             try await engine.submit(.comment, body: comment, subjectID: detail.id)
-            setDraft("", for: item.number)
+            setDraft("", for: item.id)
         }
         try await engine.close(subjectID: detail.id, isPullRequest: item.kind == .pullRequest, reason: reason)
         updateState(item) { $0.seenAt = Date() }
@@ -439,20 +463,28 @@ final class AppModel {
         loadDetail(force: true)
     }
 
-    func renderMarkdown(_ text: String) async throws -> String {
-        try await engine.renderMarkdown(text)
+    /// Parks a parity staging PR (makes it a draft) or resumes it (marks it ready for review).
+    func setParked(_ parked: Bool, _ item: Item) async throws {
+        try await engine.setDraft(parked, pullRequestID: item.id)
+        updateState(item) { $0.seenAt = Date() }
+        _ = try? await engine.refresh(ids: [item.id])
+        loadDetail(force: true)
+    }
+
+    func renderMarkdown(_ text: String, in item: Item) async throws -> String {
+        try await engine.renderMarkdown(text, repo: item.repo)
     }
 
     func requestComposerFocus() { composerFocusRequest += 1 }
 
-    @ObservationIgnored private var filesCache: [Int: (updatedAt: Date?, files: [PullFile])] = [:]
+    @ObservationIgnored private var filesCache: [Item.ID: (updatedAt: Date?, files: [PullFile])] = [:]
 
     /// Changed files of a PR, cached until the PR is updated.
-    func files(for number: Int) async throws -> [PullFile] {
-        let updatedAt = snapshot.items.first { $0.number == number }?.updatedAt
-        if let cached = filesCache[number], cached.updatedAt == updatedAt { return cached.files }
-        let files = try await engine.fetchFiles(number: number)
-        filesCache[number] = (updatedAt, files)
+    func files(for item: Item) async throws -> [PullFile] {
+        let updatedAt = itemsByID[item.id]?.updatedAt ?? item.updatedAt
+        if let cached = filesCache[item.id], cached.updatedAt == updatedAt { return cached.files }
+        let files = try await engine.fetchFiles(repo: item.repo, number: item.number)
+        filesCache[item.id] = (updatedAt, files)
         return files
     }
 
@@ -466,11 +498,12 @@ final class AppModel {
     /// Opens issue or PR `number` of the repository: selects it where the list shows it, reveals it
     /// if it is on the desk but hidden, and otherwise fetches it into Opened.
     func openItem(number: Int) {
-        if let selection = rows.lazy.compactMap(\.selectionID).first(where: { self.itemsByID[$0.itemID]?.number == number && $0.section != .recent }) {
+        let isTarget = { (item: Item) in item.isUpstream && item.number == number }
+        if let selection = rows.lazy.compactMap(\.selectionID).first(where: { self.itemsByID[$0.itemID].map(isTarget) == true && $0.section != .recent }) {
             self.selection = selection
-        } else if let item = snapshot.items.first(where: { $0.number == number }), isOnDesk(item) {
+        } else if let item = snapshot.items.first(where: isTarget), isOnDesk(item) {
             reveal(item.id)
-        } else if let item = snapshot.items.first(where: { $0.number == number }) ?? openedItems.first(where: { $0.number == number }) {
+        } else if let item = snapshot.items.first(where: isTarget) ?? openedItems.first(where: isTarget) {
             showOpened(item)
         } else {
             Task {
@@ -516,8 +549,10 @@ final class AppModel {
         }
     }
 
-    /// Listed in some dashboard section, rather than left out by age or as the other tracker's.
+    /// Listed in some dashboard section (or for a staging PR, in the Parity tab), rather than left
+    /// out by age or as the other tracker's.
     private func isOnDesk(_ item: Item) -> Bool {
+        if item.isParityStaging { return paritySections[item.id] != nil }
         let row = row(for: item)
         if row.board?.isForeign == true { return false }
         let cutoff = Date().addingTimeInterval(-ListSection.closedRetention)
@@ -587,9 +622,20 @@ final class AppModel {
         forwardHistory = []
     }
 
-    /// Shows an item in the dashboard section it belongs to, clearing anything that would hide it.
+    /// Shows an item in the section it belongs to (on the dashboard, or in the Parity tab for a
+    /// staging PR), clearing anything that would hide it.
     func reveal(_ itemID: Item.ID) {
-        guard let item = itemsByID[itemID], let section = ListSection.triageSection(of: row(for: item)) else { return }
+        guard let item = itemsByID[itemID] else { return }
+        if item.isParityStaging {
+            guard let section = paritySections[itemID] else { return }
+            mode = .parity
+            filterText = ""
+            collapsed.remove(section)
+            selection = TableSelection(section: section, itemID: itemID)
+            requestTableFocus()
+            return
+        }
+        guard let section = ListSection.triageSection(of: row(for: item)) else { return }
         mode = .dashboard
         filterText = ""
         collapsed.remove(section)
@@ -611,10 +657,13 @@ final class AppModel {
         let now = Date()
         switch action {
         case .triage, .priority:
-            // The other tracker's items stay its own; anything opened from a link joins the desk.
-            items = items.filter { board(for: $0)?.isForeign != true }
+            // The other tracker's items stay its own, and only upstream items go on the board;
+            // anything opened from a link joins the desk.
+            items = items.filter { $0.isUpstream && board(for: $0)?.isForeign != true }
             addToDesk(items)
         case .togglePin:
+            // Pinned is a dashboard section, which staging PRs stay out of.
+            items = items.filter(\.isUpstream)
             addToDesk(items)
         case .addToDesk:
             addToDesk(items.filter(canAddToDesk))
@@ -640,7 +689,7 @@ final class AppModel {
         case .markRead:
             for item in items {
                 updateState(item) { $0.seenAt = now }
-                markNotificationRead(number: item.number)
+                markNotificationRead(item)
             }
         case .openInBrowser:
             // Opening dozens of tabs is never what a stray keypress meant.
@@ -786,7 +835,7 @@ final class AppModel {
     private func updateState(_ item: Item, _ change: @escaping @Sendable (inout ItemState) -> Void) {
         Task {
             do {
-                try await db.updateState(item.number, change)
+                try await db.updateState(item.id, change)
             } catch {
                 logger.error("Failed to update state of #\(item.number): \(error)")
             }
@@ -801,12 +850,12 @@ final class AppModel {
             detailState = .idle
             return
         }
-        if detail?.number != item.number {
-            detail = recentDetails[item.number]
+        if detail?.id != item.id {
+            detail = recentDetails[item.id]
         }
         detailState = .idle
         detailTask = Task { [weak self, db, engine] in
-            if self?.detail == nil, let cached = try? await db.cachedDetail(number: item.number) {
+            if self?.detail == nil, let cached = try? await db.cachedDetail(itemID: item.id) {
                 guard !Task.isCancelled else { return }
                 self?.detail = cached
             }
@@ -818,7 +867,7 @@ final class AppModel {
             }
             self?.detailState = .loading
             do {
-                let fresh = try await engine.fetchDetail(number: item.number, isPullRequest: item.kind == .pullRequest)
+                let fresh = try await engine.fetchDetail(of: item)
                 try? await db.saveDetail(fresh)
                 guard !Task.isCancelled, let self else { return }
                 detail = fresh
@@ -838,26 +887,28 @@ final class AppModel {
     private static let prefetchConcurrency = 2
 
     /// Fetches ahead the details of items likely to be opened (Working, Good, Triage, the Inbox,
-    /// Pinned and Recently viewed) whose cache is missing or older than the item, so opening one
-    /// shows its cache at once. A round still running skips the next; the sync after picks it up.
+    /// Pinned, Recently viewed and the open parity staging PRs) whose cache is missing or older than
+    /// the item, so opening one shows its cache at once. A round still running skips the next; the
+    /// sync after picks it up.
     private func prefetchDetails() {
         guard prefetchTask == nil else { return }
-        let inboxNumbers = Set(inbox.filter { board[$0.number]?.triage != .muted }.map(\.number))
+        let inboxItems = Set(inbox.filter { !isMuted($0) }.map(\.repoNumber))
         let recent = Set(snapshot.items
             .filter { state(for: $0).viewedAt != nil }
             .sorted { state(for: $0).viewedAt! > state(for: $1).viewedAt! }
             .prefix(ListSection.recentLimit)
-            .map(\.number))
+            .map(\.id))
         let candidates = snapshot.items.filter { item in
             let row = row(for: item)
             if row.board?.isForeign == true { return false }
+            if item.isParityStaging, item.isOpen, !item.isDraft { return true }
             if let section = ListSection.triageSection(of: row), [.working, .good, .triage].contains(section) { return true }
-            return row.state.isPinned || inboxNumbers.contains(item.number) || recent.contains(item.number)
+            return row.state.isPinned || inboxItems.contains(item.repoNumber) || recent.contains(item.id)
         }
         prefetchTask = Task { [weak self, db, engine, logger] in
             defer { self?.prefetchTask = nil }
             let cached = (try? await db.cachedDetailTimes()) ?? [:]
-            let stale = candidates.filter { item in cached[item.number].map { $0 < item.updatedAt } ?? true }
+            let stale = candidates.filter { item in cached[item.id].map { $0 < item.updatedAt } ?? true }
             guard !stale.isEmpty else { return }
             logger.info("Prefetching \(stale.count) details")
             var actors: Set<String> = []
@@ -865,7 +916,7 @@ final class AppModel {
                 var queue = stale.makeIterator()
                 let fetch = { @Sendable (item: Item) async -> Set<String> in
                     do {
-                        let detail = try await engine.fetchDetail(number: item.number, isPullRequest: item.kind == .pullRequest)
+                        let detail = try await engine.fetchDetail(of: item)
                         try await db.saveDetail(detail)
                         return Set(detail.entries.compactMap(\.actor))
                     } catch {
@@ -927,7 +978,7 @@ final class AppModel {
                 state.viewedAt = now
                 state.seenAt = now
             }
-            markNotificationRead(number: item.number)
+            markNotificationRead(item)
         }
     }
 
@@ -964,13 +1015,23 @@ final class AppModel {
             affiliations.users[login.lowercased()]?.mergedCount.map { Contribution(merged: $0, threshold: threshold) }
         }
 
-        let candidates: [ItemRow] = snapshot.items.compactMap { item in
+        let all: [ItemRow] = snapshot.items.compactMap { item in
             let row = row(for: item)
             // Items of the other tracker sharing the board are none of the app's business.
             if row.board?.isForeign == true { return nil }
             if !item.isOpen, (item.closedAt ?? item.updatedAt) < cutoff, !row.state.isPinned { return nil }
             return row
         }
+        // Staging PRs only show in the Parity tab, which also lists the upstream PRs promoted from them.
+        let candidates = all.filter(\.item.isUpstream)
+        let parity = Parity.sections(of: all, viewer: viewer)
+        paritySections = [:]
+        for (section, rows) in parity {
+            for row in rows { paritySections[row.item.id] = section }
+        }
+        let reviewCount = parity[.parityReview]?.count ?? 0
+        if parityReviewCount != reviewCount { parityReviewCount = reviewCount }
+
         workingItems = Self.mineFirst(Self.yourMoveFirst(candidates
             .filter { [.working, .good].contains(ListSection.triageSection(of: $0)) }
             .sorted { $0.item.updatedAt > $1.item.updatedAt }))
@@ -978,10 +1039,29 @@ final class AppModel {
 
         visibleCount = visible.count
 
+        if mode == .parity {
+            var rows = openedRows
+            var count = 0
+            for section in Parity.sections {
+                let members = (parity[section] ?? [])
+                    .filter { filter.isEmpty || filter.matches($0, badges: badges, contribution: contribution) }
+                    .sorted(by: sort.areInIncreasingOrder)
+                count += members.count
+                let isCollapsed = filter.isEmpty && collapsed.contains(section)
+                rows.append(.header(section, count: members.count, collapsed: isCollapsed))
+                if !isCollapsed {
+                    rows += Self.yourMoveFirst(members).map { .item(section, $0) }
+                }
+            }
+            visibleCount = count
+            self.rows = rows
+            return
+        }
+
         if mode == .inbox {
-            let byNumber = Dictionary(uniqueKeysWithValues: snapshot.items.map { ($0.number, $0) })
+            let byRepoNumber = Dictionary(snapshot.items.map { ($0.repoNumber, $0) }, uniquingKeysWith: { a, _ in a })
             let rows: [ItemRow] = inbox.compactMap { note in
-                guard let item = byNumber[note.number] else { return nil }
+                guard let item = byRepoNumber[note.repoNumber] else { return nil }
                 var row = row(for: item)
                 if row.triage == .muted { return nil }
                 row.note = note
@@ -1037,7 +1117,10 @@ final class AppModel {
 /// Small typed wrapper over UserDefaults for UI preferences.
 enum Defaults {
     enum Key: String {
-        case sort, collapsed, drafts, mergedThreshold, syncInterval, selection, mode
+        case sort, collapsed, mergedThreshold, syncInterval, selection, mode
+        /// Composer drafts by item number, from before drafts were kept by item id.
+        case drafts
+        case itemDrafts
     }
 
     static func get<T: Decodable>(_ key: Key) -> T? {
@@ -1046,5 +1129,9 @@ enum Defaults {
 
     static func set(_ value: some Encodable, for key: Key) {
         UserDefaults.standard.set(try? JSONEncoder().encode(value), forKey: key.rawValue)
+    }
+
+    static func remove(_ key: Key) {
+        UserDefaults.standard.removeObject(forKey: key.rawValue)
     }
 }

@@ -93,6 +93,8 @@ const PRDesk = (() => {
 
   const timeline = {
     key: null,
+    /** The shown item's own link. */
+    url: null,
     blocks: new Map(),
     /** Expansion the user chose per card, over the default. */
     expanded: new Map(),
@@ -156,6 +158,7 @@ const PRDesk = (() => {
   }
 
   function renderTimeline(data) {
+    timeline.url = data.url;
     const reset = data.key !== timeline.key;
     const prior = reset ? timeline.saved.get(data.key) : null;
     if (reset) {
@@ -216,6 +219,7 @@ const PRDesk = (() => {
 
   const files = {
     key: null,
+    url: null,
     elements: new Map(),
     expanded: new Map(),
     all: null,
@@ -413,6 +417,7 @@ const PRDesk = (() => {
   }
 
   function renderFiles(data) {
+    files.url = data.url;
     const reset = data.key !== files.key;
     const prior = reset ? files.saved.get(data.key) : null;
     if (reset) {
@@ -507,8 +512,8 @@ const PRDesk = (() => {
     if (event.metaKey || event.shiftKey || event.altKey || link.closest(".icon-link")) return;
     const target = itemLink(link.href);
     if (!target) return;
-    const current = document.documentElement.dataset.page === "files" ? files.key : timeline.key;
-    if (target.number === current) {
+    const current = itemLink((document.documentElement.dataset.page === "files" ? files.url : timeline.url) || "");
+    if (current && target.number === current.number) {
       if (target.hash ? revealAnchor(target.hash) : !target.subpage) event.preventDefault();
       return;
     }

@@ -11,14 +11,14 @@ struct FilesView: View {
     @AppStorage("wrapDiffLines") private var wrapLines = true
 
     private struct Loaded {
-        var number: Int
+        var itemID: Item.ID
         var files: [PullFile]
         var payload: String
     }
 
     var body: some View {
         Group {
-            if let loaded, loaded.number == item.number {
+            if let loaded, loaded.itemID == item.id {
                 if loaded.files.isEmpty {
                     ContentUnavailableView("No Changes", systemImage: "doc")
                 } else {
@@ -27,7 +27,7 @@ struct FilesView: View {
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
                         Divider()
-                        WebDocumentView(document: page, key: String(loaded.number), payload: loaded.payload)
+                        WebDocumentView(document: page, key: loaded.itemID, payload: loaded.payload)
                     }
                 }
             } else if let error {
@@ -42,7 +42,7 @@ struct FilesView: View {
                 DelayedProgressView()
             }
         }
-        .task(id: "\(item.number)-\(item.updatedAt.timeIntervalSince1970)") { await load() }
+        .task(id: "\(item.id)-\(item.updatedAt.timeIntervalSince1970)") { await load() }
         .onChange(of: wrapLines, initial: true) { page.setting("wrap", "PRDesk.setWrap(\(wrapLines))") }
     }
 
@@ -65,13 +65,12 @@ struct FilesView: View {
 
     private func load() async {
         error = nil
-        let number = item.number
-        let url = item.url
+        let item = item
         do {
-            let files = try await model.files(for: number)
-            let payload = await FilesDocument.payload(files, number: number, pullURL: url)
+            let files = try await model.files(for: item)
+            let payload = await FilesDocument.payload(files, key: item.id, pullURL: item.url)
             guard !Task.isCancelled else { return }
-            loaded = Loaded(number: number, files: files, payload: payload)
+            loaded = Loaded(itemID: item.id, files: files, payload: payload)
         } catch {
             guard !Task.isCancelled else { return }
             self.error = error.localizedDescription

@@ -22,7 +22,7 @@ struct ConversationView: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
             Divider()
-            WebDocumentView(document: page, key: String(item.number), payload: document.payload)
+            WebDocumentView(document: page, key: item.id, payload: document.payload)
         }
         .onAppear {
             page.loginMenu = { [model] login in Self.loginMenu(login, model: model) }

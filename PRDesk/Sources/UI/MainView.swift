@@ -45,6 +45,7 @@ struct MainView: View {
                 Picker("View", selection: $model.mode) {
                     Text("Dashboard").tag(AppModel.ListMode.dashboard)
                     Text(model.unreadInboxCount == 0 ? "Inbox" : "Inbox \(model.unreadInboxCount)").tag(AppModel.ListMode.inbox)
+                    Text(model.parityReviewCount == 0 ? "Parity" : "Parity \(model.parityReviewCount)").tag(AppModel.ListMode.parity)
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -119,7 +120,7 @@ private struct StatusBar: View {
                     .layoutPriority(-1)
                     .help(Self.filterHelp)
                 Spacer(minLength: 12)
-                Text([model.viewer, SyncEngine.repo].compactMap(\.self).joined(separator: " · "))
+                Text([model.viewer, model.mode == .parity ? "\(Parity.repo) → \(SyncEngine.repo)" : SyncEngine.repo].compactMap(\.self).joined(separator: " · "))
                 Text("·")
                 Link("Board #\(BoardQuery.number)", destination: Self.boardURL)
                     .help("Open the triage board on GitHub")
