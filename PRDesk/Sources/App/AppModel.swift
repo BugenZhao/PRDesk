@@ -1109,12 +1109,21 @@ final class AppModel {
         let triage = members[.triage] ?? []
         members[.triage] = triage.filter { $0.authorVote != .down } + triage.filter { $0.authorVote == .down }
 
+        // Promoted parity PRs live in the Parity tab; the sections they'd be in say how many.
+        var inParity: [ListSection: Int] = [:]
+        for row in all where row.item.isParityUpstream && row.item.isOpen {
+            guard filter.isEmpty || filter.matches(row, badges: badges, contribution: contribution),
+                  let section = ListSection.statusSection(of: row)
+            else { continue }
+            inParity[section, default: 0] += 1
+        }
+
         var rows = openedRows
         for section in Self.dashboardSections {
             let items = members[section] ?? []
             // While filtering, show every match rather than hiding some in collapsed sections.
             let isCollapsed = filter.isEmpty && collapsed.contains(section)
-            rows.append(.header(section, count: items.count, collapsed: isCollapsed))
+            rows.append(.header(section, count: items.count, collapsed: isCollapsed, inParity: inParity[section] ?? 0))
             if !isCollapsed {
                 rows += items.map { .item(section, $0) }
             }

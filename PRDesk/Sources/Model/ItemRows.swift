@@ -109,9 +109,15 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
     static let recentLimit = 8
 
     /// The one triage section an item belongs to (besides Recently viewed and Pinned), or nil for
-    /// items the app leaves alone.
+    /// items the app leaves alone or lists in the Parity tab.
     static func triageSection(of row: ItemRow) -> ListSection? {
-        if row.board?.isForeign == true || !row.item.isUpstream || row.item.isParity { return nil }
+        row.item.isParity ? nil : statusSection(of: row)
+    }
+
+    /// The dashboard section an item's Status and state put it in, parity PRs included (which the
+    /// dashboard leaves to the Parity tab), or nil for items the app leaves alone.
+    static func statusSection(of row: ItemRow) -> ListSection? {
+        if row.board?.isForeign == true || !row.item.isUpstream { return nil }
         guard row.item.isOpen else { return .closed }
         switch row.listedTriage {
         case nil: return .triage
@@ -125,7 +131,8 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
 
 /// A row of the table: a section header or an item within a section.
 enum TableRow: Hashable {
-    case header(ListSection, count: Int, collapsed: Bool)
+    /// `inParity`: open parity PRs that would be in the section, listed in the Parity tab instead.
+    case header(ListSection, count: Int, collapsed: Bool, inParity: Int = 0)
     case item(ListSection, ItemRow)
 
     var selectionID: TableSelection? {

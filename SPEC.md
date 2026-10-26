@@ -81,7 +81,7 @@ Rust frontend 的 parity agent（`richard` 仓库的 `notes/vllm-rust-parity-age
   - 评论或 Request changes：agent 下次运行时回复或修改
   - Park（转成 draft）：以后再说，agent 把条目停放为 `backlog`；Resume（转回 ready for review）撤销
   - Close：不要，agent 记为 `accepted-divergence`
-- staging PR 不上 board，没有 Status / Priority，`w` / `b` / `s` / `m` 和数字键对它们不生效；也不进 Dashboard（Recently viewed、Pinned 也不收）。promote 出来的 upstream parity PR 虽然是我开的，也只在 Parity tab 里：它们由 agent 写、由 agent merge，混在 Working 里只是噪音；它们的 Status / Priority 照常可以设，通知照常进 Inbox，打开它们（链接、前进后退）会跳到 Parity tab
+- staging PR 不上 board，没有 Status / Priority，`w` / `b` / `s` / `m` 和数字键对它们不生效；也不进 Dashboard（Recently viewed、Pinned 也不收）。promote 出来的 upstream parity PR 虽然是我开的，也只在 Parity tab 里：它们由 agent 写、由 agent merge，混在 Working 里只是噪音；它们的 Status / Priority 照常可以设，通知照常进 Inbox，打开它们（链接、前进后退）会跳到 Parity tab。Dashboard 上它们本该在的分组标题后面注明数量，如 `Working 19 (+10 in Parity)`（open 的才算，跟着过滤走）
 - **Turn**（staging PR）：approve 了是 `me`（等我让 agent promote）；draft 是 `them`；否则我从没评论或 review 过，或 agent 在我最后一次评论 / review 之后 push 或回复了，是 `me`，其余是 `them`
 - 未读、摘要、Turn 都把 agent 的评论和 push 当作对方的动作（不像别处的 bot 那样不计）；详情的时间线也总是显示 agent 的评论和 push，不受 "Show automated" 影响
 - **Parity tab** 的分组，从上到下：

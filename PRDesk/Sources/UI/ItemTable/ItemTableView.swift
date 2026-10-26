@@ -251,7 +251,7 @@ struct ItemTableView: NSViewRepresentable {
         }
 
         private func isCollapsed(_ section: ListSection) -> Bool {
-            rows.contains { if case .header(section, _, true) = $0 { true } else { false } }
+            rows.contains { if case .header(section, _, true, _) = $0 { true } else { false } }
         }
 
         private func nearestItemRow(to index: Int) -> Int? {
@@ -489,14 +489,14 @@ struct ItemTableView: NSViewRepresentable {
 
         func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
             switch rows[row] {
-            case let .header(section, count, collapsed):
+            case let .header(section, count, collapsed, inParity):
                 let cell = reusableCell(tableView, id: "header")
                 cell.alignment = .leading
                 cell.runs = [
                     .symbol(collapsed ? "chevron.right" : "chevron.down", color: .secondaryLabelColor),
                     .text(section.title, font: CellFont.smallBold),
                     .text(String(count), color: .secondaryLabelColor, font: CellFont.digits),
-                ]
+                ] + (inParity == 0 ? [] : [.text("(+\(inParity) in Parity)", color: .tertiaryLabelColor, font: CellFont.small)])
                 cell.opacity = 1
                 return cell
 
@@ -523,8 +523,9 @@ struct ItemTableView: NSViewRepresentable {
         func toolTip(row: Int, column: Int) -> String? {
             guard let table, rows.indices.contains(row) else { return nil }
             switch rows[row] {
-            case let .header(section, _, _):
-                return section.help
+            case let .header(section, _, _, inParity):
+                guard inParity > 0 else { return section.help }
+                return "\(section.help)\n\n+\(inParity): parity PRs promoted upstream that would be here, listed in the Parity tab's Upstream section instead (⌘2)."
             case let .item(_, itemRow):
                 guard table.tableColumns.indices.contains(column),
                       let itemColumn = ItemColumn(rawValue: table.tableColumns[column].identifier.rawValue)
@@ -582,13 +583,13 @@ struct ItemTableView: NSViewRepresentable {
 
         /// Toggles the section if `row` is a header; see `ItemNSTableView.mouseDown`.
         func toggleHeader(at row: Int) -> Bool {
-            guard rows.indices.contains(row), case let .header(section, _, _) = rows[row] else { return false }
+            guard rows.indices.contains(row), case let .header(section, _, _, _) = rows[row] else { return false }
             parent.onToggleSection(section)
             return true
         }
 
         func tableView(_: NSTableView, shouldSelectRow row: Int) -> Bool {
-            guard case let .header(section, _, _) = rows[row] else { return true }
+            guard case let .header(section, _, _, _) = rows[row] else { return true }
             // A click on the header floating at the top lands here (one in place is taken by
             // `ItemNSTableView.mouseDown`); keyboard navigation just skips over headers.
             if let type = NSApp.currentEvent?.type, type == .leftMouseDown || type == .leftMouseUp {
@@ -625,7 +626,7 @@ private extension TableRow {
 
     var animationKey: AnimationKey {
         switch self {
-        case let .header(section, _, _): .header(section)
+        case let .header(section, _, _, _): .header(section)
         case let .item(section, row): .item([.recent, .pinned, .inbox].contains(section) ? section : nil, row.item.id)
         }
     }
