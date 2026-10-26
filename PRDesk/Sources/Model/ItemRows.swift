@@ -36,7 +36,7 @@ struct ItemRow: Hashable, Sendable {
 
 enum ListSection: String, CaseIterable, Codable, Sendable {
     case opened, recent, pinned, working, good, triage, backlog, closed, skipped, muted, inbox
-    case parityReview, parityDiscussing, parityApproved, parityPromoted, parityParked, parityLanded, parityRejected
+    case parityReview, parityDiscussing, parityApproved, parityUpstream, parityParked, parityLanded, parityRejected
 
     var title: String {
         switch self {
@@ -54,7 +54,7 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
         case .parityReview: "Review"
         case .parityDiscussing: "Discussing"
         case .parityApproved: "Approved"
-        case .parityPromoted: "Promoted"
+        case .parityUpstream: "Upstream"
         case .parityParked: "Parked"
         case .parityLanded: "Landed"
         case .parityRejected: "Rejected"
@@ -92,8 +92,8 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
             "Staging PRs you commented on or asked changes of; the agent answers on its next run."
         case .parityApproved:
             "Staging PRs you approved that have no upstream PR yet: ready for the agent's promote run."
-        case .parityPromoted:
-            "Open upstream PRs promoted from staging PRs (bz/rust-parity-*); review, CI and Turn are upstream's, Link is the staging PR. Approved ones wait for the agent's merge run."
+        case .parityUpstream:
+            "Open upstream PRs promoted from staging PRs (bz/rust-parity-*), listed here rather than on the dashboard; review, CI and Turn are upstream's, Link is the staging PR. Approved ones wait for the agent's merge run."
         case .parityParked:
             "Staging PRs marked draft: parked as backlog by the agent until you resume them."
         case .parityLanded:
@@ -111,7 +111,7 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
     /// The one triage section an item belongs to (besides Recently viewed and Pinned), or nil for
     /// items the app leaves alone.
     static func triageSection(of row: ItemRow) -> ListSection? {
-        if row.board?.isForeign == true || !row.item.isUpstream { return nil }
+        if row.board?.isForeign == true || !row.item.isUpstream || row.item.isParity { return nil }
         guard row.item.isOpen else { return .closed }
         switch row.listedTriage {
         case nil: return .triage

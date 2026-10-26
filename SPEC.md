@@ -81,19 +81,19 @@ Rust frontend 的 parity agent（`richard` 仓库的 `notes/vllm-rust-parity-age
   - 评论或 Request changes：agent 下次运行时回复或修改
   - Park（转成 draft）：以后再说，agent 把条目停放为 `backlog`；Resume（转回 ready for review）撤销
   - Close：不要，agent 记为 `accepted-divergence`
-- staging PR 不上 board，没有 Status / Priority，`w` / `b` / `s` / `m` 和数字键对它们不生效；也不进 Dashboard（Recently viewed、Pinned 也不收）。upstream 的 parity PR 是我开的，照常在 Dashboard 里
+- staging PR 不上 board，没有 Status / Priority，`w` / `b` / `s` / `m` 和数字键对它们不生效；也不进 Dashboard（Recently viewed、Pinned 也不收）。promote 出来的 upstream parity PR 虽然是我开的，也只在 Parity tab 里：它们由 agent 写、由 agent merge，混在 Working 里只是噪音；它们的 Status / Priority 照常可以设，通知照常进 Inbox，打开它们（链接、前进后退）会跳到 Parity tab
 - **Turn**（staging PR）：approve 了是 `me`（等我让 agent promote）；draft 是 `them`；否则我从没评论或 review 过，或 agent 在我最后一次评论 / review 之后 push 或回复了，是 `me`，其余是 `them`
 - 未读、摘要、Turn 都把 agent 的评论和 push 当作对方的动作（不像别处的 bot 那样不计）；详情的时间线也总是显示 agent 的评论和 push，不受 "Show automated" 影响
 - **Parity tab** 的分组，从上到下：
   - **Review**：open、非 draft、没 approve、Turn = me 的 staging PR
   - **Discussing**：同上，但 Turn = them：我评论过，等 agent 回复
   - **Approved**：我 approve 了、还没有 upstream PR：等 promote
-  - **Promoted**：open 的 upstream parity PR 本身（`bz/rust-parity-*`），所以 Review、CI、Turn 列都是 upstream 的。staging PR 这时不单独列出
+  - **Upstream**：open 的 upstream parity PR 本身（`bz/rust-parity-*`），所以 Review、CI、Turn 列都是 upstream 的。staging PR 这时不单独列出
   - **Parked**：draft 的 staging PR，默认折叠
   - **Landed**：upstream PR 已合并的 staging PR（14 天内关闭的，以及 agent 还没来得及关的），默认折叠
   - **Rejected**：14 天内没合并就关闭的 staging PR，默认折叠
-- tab 在 Dashboard 和 Inbox 之间，显示 Review 组的数量（`Parity 3`）
-- 列：Author（总是 agent 或我）换成 **Link**，显示另一端 PR 的状态图标和编号：staging PR 显示它的 upstream PR，Promoted 里的 upstream PR 显示它的 staging PR；悬停显示仓库和标题
+- tab 在 Dashboard 和 Inbox 之间，显示等我处理的数量（`Parity 3`）：Review 组，加上 Upstream 组里 Turn = me 的（upstream 有人 review、CI 失败、冲突）
+- 列：Author（总是 agent 或我）换成 **Link**，显示另一端 PR 的状态图标和编号：staging PR 显示它的 upstream PR，Upstream 里的 upstream PR 显示它的 staging PR；悬停显示仓库和标题
 - GitHub App（如 agent）的头像不能按用户名取，用同步时拿到的头像 URL
 
 ## 4. 主界面

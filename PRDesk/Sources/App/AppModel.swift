@@ -106,8 +106,9 @@ final class AppModel {
         note.isUpstream && board[note.number]?.triage == .muted
     }
 
-    /// Staging PRs in the Parity tab's Review section, for the tab's count.
-    private(set) var parityReviewCount = 0
+    /// What waits on the viewer in the Parity tab, for the tab's count: staging PRs to review, and
+    /// upstream PRs whose Turn is the viewer's.
+    private(set) var parityWaitingCount = 0
     /// Where each item of the Parity tab is listed, as of the last rebuild.
     @ObservationIgnored private var paritySections: [Item.ID: ListSection] = [:]
 
@@ -570,7 +571,7 @@ final class AppModel {
     /// Listed in some dashboard section (or for a staging PR, in the Parity tab), rather than left
     /// out by age or as the other tracker's.
     private func isOnDesk(_ item: Item) -> Bool {
-        if item.isParityStaging { return paritySections[item.id] != nil }
+        if item.isParity { return paritySections[item.id] != nil }
         let row = row(for: item)
         if row.board?.isForeign == true { return false }
         let cutoff = Date().addingTimeInterval(-ListSection.closedRetention)
@@ -641,10 +642,10 @@ final class AppModel {
     }
 
     /// Shows an item in the section it belongs to (on the dashboard, or in the Parity tab for a
-    /// staging PR), clearing anything that would hide it.
+    /// parity PR), clearing anything that would hide it.
     func reveal(_ itemID: Item.ID) {
         guard let item = itemsByID[itemID] else { return }
-        if item.isParityStaging {
+        if item.isParity {
             guard let section = paritySections[itemID] else { return }
             mode = .parity
             filterText = ""
@@ -681,7 +682,7 @@ final class AppModel {
             addToDesk(items)
         case .togglePin:
             // Pinned is a dashboard section, which staging PRs stay out of.
-            items = items.filter(\.isUpstream)
+            items = items.filter { $0.isUpstream && !$0.isParity }
             addToDesk(items)
         case .addToDesk:
             addToDesk(items.filter(canAddToDesk))
@@ -919,7 +920,7 @@ final class AppModel {
         let candidates = snapshot.items.filter { item in
             let row = row(for: item)
             if row.board?.isForeign == true { return false }
-            if item.isParityStaging, item.isOpen, !item.isDraft { return true }
+            if item.isParity, item.isOpen, !item.isDraft { return true }
             if let section = ListSection.triageSection(of: row), [.working, .good, .triage].contains(section) { return true }
             return row.state.isPinned || inboxItems.contains(item.repoNumber) || recent.contains(item.id)
         }
@@ -1040,15 +1041,15 @@ final class AppModel {
             if !item.isOpen, (item.closedAt ?? item.updatedAt) < cutoff, !row.state.isPinned { return nil }
             return row
         }
-        // Staging PRs only show in the Parity tab, which also lists the upstream PRs promoted from them.
-        let candidates = all.filter(\.item.isUpstream)
-        let parity = Parity.sections(of: all, viewer: viewer)
+        // Staging PRs and the upstream PRs promoted from them show in the Parity tab, not the dashboard.
+        let candidates = all.filter { $0.item.isUpstream && !$0.item.isParity }
+        let parity = Parity.sections(of: all)
         paritySections = [:]
         for (section, rows) in parity {
             for row in rows { paritySections[row.item.id] = section }
         }
-        let reviewCount = parity[.parityReview]?.count ?? 0
-        if parityReviewCount != reviewCount { parityReviewCount = reviewCount }
+        let waiting = (parity[.parityReview]?.count ?? 0) + (parity[.parityUpstream] ?? []).count { $0.insight.turn == .me }
+        if parityWaitingCount != waiting { parityWaitingCount = waiting }
 
         workingItems = Self.mineFirst(Self.yourMoveFirst(candidates
             .filter { [.working, .good].contains(ListSection.triageSection(of: $0)) }

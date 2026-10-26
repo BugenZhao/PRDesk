@@ -36,15 +36,12 @@ enum Parity {
     }
 
     /// The sections of the Parity tab, top to bottom.
-    static let sections: [ListSection] = [.parityReview, .parityDiscussing, .parityApproved, .parityPromoted, .parityParked, .parityLanded, .parityRejected]
+    static let sections: [ListSection] = [.parityReview, .parityDiscussing, .parityApproved, .parityUpstream, .parityParked, .parityLanded, .parityRejected]
 
-    /// Groups staging PRs and the viewer's upstream parity PRs into the Parity tab's sections,
+    /// Groups staging PRs and the upstream PRs promoted from them into the Parity tab's sections,
     /// each row paired with its other end. Rows keep their order within a section.
-    static func sections(of rows: [ItemRow], viewer: String?) -> [ListSection: [ItemRow]] {
-        let upstreamRows = rows.filter { row in
-            row.item.isUpstream && row.item.kind == .pullRequest && sameLogin(row.item.author, viewer)
-                && upstreamSlug(row.item.headRef) != nil
-        }
+    static func sections(of rows: [ItemRow]) -> [ListSection: [ItemRow]] {
+        let upstreamRows = rows.filter(\.item.isParityUpstream)
         // Several upstream PRs can share a slug (one closed and promoted again): the open one wins,
         // then the newest. Closed ones without a merge pair with nothing.
         var upstreamBySlug: [String: Item] = [:]
@@ -86,7 +83,7 @@ enum Parity {
                 }
             } else if upstreamIDs.contains(item.id), item.isOpen {
                 row.paired = upstreamSlug(item.headRef).flatMap { stagingBySlug[$0] }
-                section = .parityPromoted
+                section = .parityUpstream
             } else {
                 section = nil
             }

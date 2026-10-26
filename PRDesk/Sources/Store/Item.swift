@@ -157,6 +157,12 @@ extension Item {
     /// A staging PR of the parity agent on its fork (SPEC §3.2).
     var isParityStaging: Bool { repo.caseInsensitiveCompare(Parity.repo) == .orderedSame }
 
+    /// An upstream PR promoted from a staging PR (`bz/rust-parity-*`).
+    var isParityUpstream: Bool { isUpstream && kind == .pullRequest && Parity.upstreamSlug(headRef) != nil }
+
+    /// Listed in the Parity tab rather than on the dashboard.
+    var isParity: Bool { isParityStaging || isParityUpstream }
+
     /// Repository and number, which name an item across repositories (as notifications do).
     var repoNumber: String { "\(repo.lowercased())#\(number)" }
 

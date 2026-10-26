@@ -45,7 +45,7 @@ struct MainView: View {
             ToolbarItem(placement: .principal) {
                 Picker("View", selection: $model.mode) {
                     Text("Dashboard").tag(AppModel.ListMode.dashboard)
-                    Text(model.parityReviewCount == 0 ? "Parity" : "Parity \(model.parityReviewCount)").tag(AppModel.ListMode.parity)
+                    Text(model.parityWaitingCount == 0 ? "Parity" : "Parity \(model.parityWaitingCount)").tag(AppModel.ListMode.parity)
                     Text(model.unreadInboxCount == 0 ? "Inbox" : "Inbox \(model.unreadInboxCount)").tag(AppModel.ListMode.inbox)
                 }
                 .pickerStyle(.segmented)
