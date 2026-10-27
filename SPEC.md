@@ -205,13 +205,13 @@ Rust frontend 的 parity agent（`richard` 仓库的 `notes/vllm-rust-parity-age
 判定来源按优先级从高到低，命中即生效，悬停显示命中来源：
 
 1. 手动设置：设置页里的"用户 → 组织"表，可添加，也可强制排除
-2. vLLM committer：解析仓库里的 `docs/governance/committers.md`，悬停时显示负责领域（如 "Rust frontend"）。其次是灰色档：`vllm-project` 组织成员，再其次是仓库 collaborator（列 collaborator 需要 push 权限，没有就跳过）。不用 `author_association`：它挂在单个条目上，不按人，也随查看者权限变化
+2. vLLM committer：解析仓库里的 `docs/governance/committers.md`，悬停时显示负责领域（如 "Rust frontend"）；不在其中、但在 `.github/CODEOWNERS` 里的人（code owner，需要 write 权限）也拿彩色徽章，悬停显示负责的路径（前 3 条，其余计数），`org:committer` 同样匹配。其次是灰色档：`vllm-project` 组织成员，再其次是仓库 collaborator（列 collaborator 需要 push 权限，没有就跳过）。不用 `author_association`：它挂在单个条目上，不按人，也随查看者权限变化
 3. GitHub 组织成员：每天拉 `Inferact`、`NVIDIA` / `ai-dynamo`、`RedHatOfficial` / `redhat-et` / `neuralmagic` 的成员列表（你所在的组织如 Inferact 能看到全部成员，其余只能看到公开成员）；大公司（`amd`、`intel`、`google` 等）公开成员太多，不拉列表，只看用户自己公开的组织
 4. 个人资料的 company 字段，按整词匹配（`intel` 匹配 `@intel`、`Intel Corporation`，不匹配 `Intelligence`），例如 `@Inferact`、`Red Hat`、`AMD`、`@ROCm`
 5. 该用户 PR commit 的作者邮箱域名（含子域名，如 `us.ibm.com`）：`redhat.com`、`nvidia.com`、`amd.com`、`intel.com` 等
 6. 用户名后缀，例如 `-redhat`、`-nv`、`-amd`、`-intel`、`-ibm`
 
-用户信息缓存 7 天；committers.md、组织成员和 collaborator 每天刷新一次。
+用户信息缓存 7 天；committers.md、CODEOWNERS、组织成员和 collaborator 每天刷新一次。
 
 过滤：`org:vllm` 匹配两档，`org:committer` 只匹配 committer，`org:member` 只匹配灰色档。
 

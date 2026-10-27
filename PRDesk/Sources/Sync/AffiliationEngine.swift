@@ -3,7 +3,7 @@ import os
 
 /// Collects the public data that affiliation badges are inferred from.
 ///
-/// Daily: the committers list, members of the relevant GitHub organizations (all members for
+/// Daily: the committers list and CODEOWNERS, members of the relevant GitHub organizations (all members for
 /// orgs the viewer belongs to, such as Inferact; public members otherwise), and the repository's
 /// collaborators (listing them needs push access, so without it they're skipped).
 /// Weekly per user: profile company and public org memberships, plus commit email
@@ -39,8 +39,11 @@ actor AffiliationEngine {
         defer { isRefreshing = false }
 
         let committersStale = try await isStale(Self.committersFetchedKey, Self.listRefreshInterval)
-        if force || committersStale {
+        // No code owners entry means the lists predate them; fetch them now.
+        let predatesCodeOwners = try await db.meta(Affiliations.codeOwnersKey) == nil
+        if force || committersStale || predatesCodeOwners {
             try await db.setMetaJSON(Affiliations.committersKey, fetchCommitters())
+            try await db.setMetaJSON(Affiliations.codeOwnersKey, fetchCodeOwners())
             try await db.setMeta(Self.committersFetchedKey, SyncEngine.format(Date()))
         }
         let membersStale = try await isStale(Self.membersFetchedKey, Self.listRefreshInterval)
@@ -134,6 +137,25 @@ actor AffiliationEngine {
             }
         }
         logger.info("Parsed \(result.count) committers")
+        return result
+    }
+
+    /// People named in `.github/CODEOWNERS` and the paths they own, in file order; teams
+    /// (`@org/team`) are left out.
+    private func fetchCodeOwners() async throws -> [String: [String]] {
+        let file = try await client.rest("GET", "/repos/\(SyncEngine.repo)/contents/.github/CODEOWNERS", as: FileContent.self)
+        guard let data = Data(base64Encoded: file.content, options: .ignoreUnknownCharacters) else { return [:] }
+        var result: [String: [String]] = [:]
+        for line in String(decoding: data, as: UTF8.self).split(separator: "\n") {
+            let fields = line.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false)[0].split(whereSeparator: \.isWhitespace)
+            guard let pattern = fields.first else { continue }
+            let path = pattern.hasPrefix("/") ? String(pattern.dropFirst()) : String(pattern)
+            for owner in fields.dropFirst() where owner.hasPrefix("@") && !owner.contains("/") {
+                let login = owner.dropFirst().lowercased()
+                if result[login]?.contains(path) != true { result[login, default: []].append(path) }
+            }
+        }
+        logger.info("Parsed \(result.count) code owners")
         return result
     }
 

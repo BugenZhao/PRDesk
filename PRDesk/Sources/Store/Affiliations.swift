@@ -62,9 +62,11 @@ struct Badge: Hashable, Sendable {
     /// Set for a lesser tie to the org, drawn in gray: a vLLM org member or collaborator who isn't
     /// a committer.
     var secondaryName: String?
+    /// A name for a full badge other than the org's, e.g. a vLLM code owner who isn't a committer.
+    var fullName: String?
 
     var isSecondary: Bool { secondaryName != nil }
-    var name: String { secondaryName ?? org.displayName }
+    var name: String { secondaryName ?? fullName ?? org.displayName }
 
     /// Names accepted by the `org:` filter token: `org:vllm` matches both vLLM tiers,
     /// `org:committer` and `org:member` one each.
@@ -75,6 +77,8 @@ struct Badge: Hashable, Sendable {
 struct Affiliations: Equatable, Sendable {
     /// Lowercased login → area, from committers.md.
     var committers: [String: String] = [:]
+    /// Lowercased login → paths they own, from CODEOWNERS.
+    var codeOwners: [String: [String]] = [:]
     /// Lowercased members of each org's GitHub organizations, as visible to the viewer.
     var members: [Org: Set<String>] = [:]
     /// Lowercased login → role (triage and up), for collaborators on the repository.
@@ -83,11 +87,12 @@ struct Affiliations: Equatable, Sendable {
     var overrides: [OrgOverride] = []
 
     static let committersKey = "committers"
+    static let codeOwnersKey = "codeOwners"
     static let membersKey = "orgMembers"
     static let collaboratorsKey = "collaborators"
 
-    /// Sources in priority order: manual, committers.md, org membership, profile company,
-    /// commit email domain, username suffix.
+    /// Sources in priority order: manual, committers.md (and CODEOWNERS for vLLM), org membership,
+    /// profile company, commit email domain, username suffix.
     func badges(for login: String) -> [Badge] {
         let key = login.lowercased()
         return Org.allCases.compactMap { org in
@@ -99,10 +104,17 @@ struct Affiliations: Equatable, Sendable {
         }
     }
 
-    /// Committers get the full badge; other org members and collaborators a gray one.
+    private static let codeOwnerPathsShown = 3
+
+    /// Committers and code owners get the full badge; other org members and collaborators a gray one.
     private func vllmBadge(for key: String) -> Badge? {
         if let area = committers[key] {
             return Badge(org: .vllm, source: "committers.md: \(area)")
+        }
+        if let paths = codeOwners[key], !paths.isEmpty {
+            let shown = paths.prefix(Self.codeOwnerPathsShown).joined(separator: ", ")
+            let more = paths.count > Self.codeOwnerPathsShown ? " (+\(paths.count - Self.codeOwnerPathsShown))" : ""
+            return Badge(org: .vllm, source: "CODEOWNERS: \(shown)\(more)", fullName: "vLLM code owner")
         }
         if members[.vllm]?.contains(key) == true || users[key]?.orgs.contains(where: { sameLogin($0, "vllm-project") }) == true {
             return Badge(org: .vllm, source: "member of vllm-project", secondaryName: "vLLM member")
@@ -161,6 +173,7 @@ extension AppDatabase {
                 let members: [String: [String]] = try meta(Affiliations.membersKey) ?? [:]
                 return try Affiliations(
                     committers: meta(Affiliations.committersKey) ?? [:],
+                    codeOwners: meta(Affiliations.codeOwnersKey) ?? [:],
                     members: Dictionary(uniqueKeysWithValues: members.compactMap { key, logins in
                         Org(rawValue: key).map { ($0, Set(logins)) }
                     }),

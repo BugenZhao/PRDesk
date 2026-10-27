@@ -170,7 +170,7 @@ private struct AffiliationSettingsView: View {
             }
 
             Section {
-                LabeledContent("vLLM committers", value: "\(affiliations.committers.count) from committers.md")
+                LabeledContent("vLLM committers", value: "\(affiliations.committers.count) from committers.md, \(affiliations.codeOwners.count) code owners")
                 LabeledContent("vLLM members", value: "\(affiliations.members[.vllm]?.count ?? 0) in vllm-project, \(affiliations.collaborators.count) collaborators")
                 ForEach([Org.inferact, .redhat, .nvidia]) { org in
                     LabeledContent(org.displayName, value: "\(affiliations.members[org]?.count ?? 0) members")
@@ -191,7 +191,7 @@ private struct AffiliationSettingsView: View {
             } header: {
                 Text("Inferred from public data")
             } footer: {
-                Text("Also matched: profile company, commit email domains and username suffixes such as -redhat. vLLM members and collaborators (triage access or more) who aren't committers get a gray vLLM badge; filter with org:committer, org:member, or org:vllm for both.")
+                Text("Also matched: profile company, commit email domains and username suffixes such as -redhat. Code owners in CODEOWNERS get the full vLLM badge like committers; vLLM members and collaborators (triage access or more) who are neither get a gray one; filter with org:committer, org:member, or org:vllm for both.")
                     .foregroundStyle(.secondary)
             }
 
