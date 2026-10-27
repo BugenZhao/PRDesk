@@ -232,7 +232,10 @@ enum ItemColumn: String, CaseIterable {
         guard item.kind == .pullRequest else { return [] }
         let mine = viewer.flatMap(item.review(by:))?.state
         let count = item.approvalCount
-        let color: NSColor = mine == "APPROVED" ? .systemGreen : .secondaryLabelColor
+        // Green on the viewer's own PRs once the approvals are enough to merge (they can't approve
+        // their own); on others' once the viewer approved.
+        let isGreen = sameLogin(item.author, viewer) ? item.reviewDecision == "APPROVED" : mine == "APPROVED"
+        let color: NSColor = isGreen ? .systemGreen : .secondaryLabelColor
         let check: CellRun? = count > 0 ? .symbol("checkmark", color: color, pointSize: Self.markPointSize) : nil
         let approvals: CellRun? = count > 0 ? .text(String(count), color: color, font: CellFont.digits) : nil
         var runs: [CellRun] = [.slot(check, width: Self.markSlot), .slot(approvals, width: Self.countSlot)]

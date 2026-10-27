@@ -140,7 +140,7 @@ Rust frontend 的 parity agent（`richard` 仓库的 `notes/vllm-rust-parity-age
 | # | 编号；PR / Issue 用不同的小图标区分 |
 | Title | 状态图标 + 标题（开头的 `[..]` / `xx:` 标签变淡），被唤醒的条目带原因标签；有 board Comment 时接着显示备注；灰色的最新事件摘要（如 `@xx commented 2h`、`you reviewed 2d`）始终靠右对齐；被截断的文字（标题、备注、摘要）悬停时 tooltip 显示全文 |
 | Author | 头像 + 用户名（首次贡献者为斜体）+ 投票图标；可信标记（seal、组织徽章，见 §5、§5.2）靠右对齐 |
-| Review | 裸 ✓ + approve 总数（含我）：我 approve 过时为绿色，只有别人 approve 时为灰色；我 request changes 时后面多一个红 ✗。和 CI 列同样的结构：小标记 + 数字，固定位置 |
+| Review | 裸 ✓ + approve 总数（含我）：别人的 PR，我 approve 过时为绿色，只有别人 approve 时为灰色；我自己的 PR（自己不能 approve）在 reviewDecision = APPROVED（approve 已满足合并要求，和 Good 分组同一条件）时为绿色，否则灰色；我 request changes 时后面多一个红 ✗。和 CI 列同样的结构：小标记 + 数字，固定位置 |
 | Turn | `review`（请求我 review 且未完成）/ `me` / `them` / 空（已关闭） |
 | CI | 色点：绿 通过 / 红 失败 / 黄 运行中 / 灰 被取消；带 `ready` label 时实心，否则空心；失败 / 运行中的数量在悬停提示里 |
 | Size | `+add` 靠左、`−del` 靠右；用比系统绿 / 红深一档的颜色（GitHub diff 配色），和 Review / CI 区分（Issue 为空）；至少放得下 `+8888 −8888` |
