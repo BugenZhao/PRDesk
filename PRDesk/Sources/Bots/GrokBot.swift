@@ -39,13 +39,32 @@ enum BotRequest: String, CaseIterable, Codable, Sendable {
     }
 }
 
-/// An agent session from the board's Session field.
+/// An agent session from the board's Session field: a link to any agent's session. Agents listed
+/// in `known` get a name and, when their desktop app takes the link, open there; any other link
+/// is named by its host and opens in the browser.
 enum AgentSession {
-    /// Claude Code sessions open in the Claude app rather than the browser:
-    /// `https://claude.ai/code/session_…` becomes `claude://code/session_…`. Others open as they are.
+    private struct Agent: Sendable {
+        var name: String
+        var host: String
+        var pathPrefix: String
+        /// The link for the agent's desktop app, if it has one that takes session links.
+        var appURL: (@Sendable (URL) -> URL?)?
+
+        func matches(_ url: URL) -> Bool { url.host() == host && url.path().hasPrefix(pathPrefix) }
+    }
+
+    private static let known = [
+        // `https://claude.ai/code/session_…` opens in the Claude app as `claude://code/session_…`.
+        Agent(name: "Claude Code", host: "claude.ai", pathPrefix: "/code/", appURL: { URL(string: "claude:/\($0.path())") }),
+    ]
+
+    /// The agent's name, or the link's host for agents not listed.
+    static func agentName(for url: URL) -> String {
+        known.first { $0.matches(url) }?.name ?? url.host() ?? url.absoluteString
+    }
+
     static func open(_ url: URL) {
-        let appURL = url.host() == "claude.ai" && url.path().hasPrefix("/code/")
-            ? URL(string: "claude:/\(url.path())") : nil
+        let appURL = known.first { $0.matches(url) }?.appURL?(url)
         NSWorkspace.shared.open(appURL ?? url)
     }
 }

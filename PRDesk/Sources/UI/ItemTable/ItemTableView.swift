@@ -574,7 +574,7 @@ struct ItemTableView: NSViewRepresentable {
                         if itemRow.sending.contains(request) { return "\(request.emoji) Sending to \(request.bot)…\(note)" }
                         return "\(request.emoji) Sent to \(request.bot) \(age == "now" ? "just now" : "\(age) ago")\(note)"
                     }
-                    let sessions = (itemRow.board?.sessionLinks ?? []).map { "Session: \($0.absoluteString)" }
+                    let sessions = (itemRow.board?.sessionLinks ?? []).map { "\(AgentSession.agentName(for: $0)) session: \($0.absoluteString)" }
                     let lines = [truncated].compactMap(\.self) + sent + sessions
                     return lines.isEmpty ? nil : lines.joined(separator: "\n")
                 case .author: return authorTooltip(itemRow.item.author)

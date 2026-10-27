@@ -222,11 +222,11 @@ private struct DetailHeader: View {
         let links = model.board(for: item)?.sessionLinks ?? []
         if links.count == 1 {
             iconButton("Agent Session", symbol: "terminal") { AgentSession.open(links[0]) }
-                .help("Open the agent session (t)")
+                .help("Open the \(AgentSession.agentName(for: links[0])) session (t)")
         } else if links.count > 1 {
             Menu {
                 ForEach(Array(links.enumerated().reversed()), id: \.offset) { index, link in
-                    Button(index == links.count - 1 ? "Session \(index + 1) (latest)" : "Session \(index + 1)") {
+                    Button("\(AgentSession.agentName(for: link)) session \(index + 1)\(index == links.count - 1 ? " (latest)" : "")") {
                         AgentSession.open(link)
                     }
                 }
