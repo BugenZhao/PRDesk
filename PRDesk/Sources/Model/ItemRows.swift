@@ -97,7 +97,7 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
         case .parityParked:
             "Staging PRs marked draft: parked as backlog by the agent until you resume them."
         case .parityLanded:
-            "Staging PRs whose upstream PR (Link) merged, in the last \(Int(Self.closedRetention / 86400)) days."
+            "Upstream parity PRs merged in the last \(Int(Self.closedRetention / 86400)) days; Link is the staging PR they were promoted from."
         case .parityRejected:
             "Staging PRs closed without landing in the last \(Int(Self.closedRetention / 86400)) days: a no, which the agent records as an accepted divergence."
         }

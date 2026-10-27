@@ -91,10 +91,10 @@ Rust frontend 的 parity agent（`richard` 仓库的 `notes/vllm-rust-parity-age
   - **Approved**：我 approve 了、还没有 upstream PR：等 promote
   - **Upstream**：open 的 upstream parity PR 本身（`bz/rust-parity-*`），所以 Review、CI、Turn 列都是 upstream 的。staging PR 这时不单独列出
   - **Parked**：draft 的 staging PR，默认折叠
-  - **Landed**：upstream PR 已合并的 staging PR（14 天内关闭的，以及 agent 还没来得及关的），默认折叠
+  - **Landed**：14 天内合并的 upstream parity PR 本身（和 Upstream 一样列 upstream PR，合并后同一行从 Upstream 移到 Landed），默认折叠
   - **Rejected**：14 天内没合并就关闭的 staging PR，默认折叠
 - tab 在 Dashboard 和 Inbox 之间，显示等我处理的数量（`Parity 3`）：Review 组，加上 Upstream 组里 Turn = me 的（upstream 有人 review、CI 失败、冲突）
-- 列：Author（总是 agent 或我）换成 **Link**，显示另一端 PR 的状态图标和编号：staging PR 显示它的 upstream PR，Upstream 里的 upstream PR 显示它的 staging PR；悬停显示仓库和标题
+- 列：Author（总是 agent 或我）换成 **Link**，显示另一端 PR 的状态图标和编号：Upstream 和 Landed 里的 upstream PR 显示它的 staging PR；悬停显示仓库和标题
 - GitHub App（如 agent）的头像不能按用户名取，用同步时拿到的头像 URL
 
 ## 3.3 派给 Grok Bot

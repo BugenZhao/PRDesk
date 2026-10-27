@@ -67,23 +67,21 @@ enum Parity {
             if item.isParityStaging {
                 let upstream = stagingSlug(item.headRef).flatMap { upstreamBySlug[$0] }
                 row.paired = upstream
-                if upstream?.state == .merged {
-                    section = .parityLanded
+                if upstream != nil {
+                    // Listed through its upstream PR, where the work is now (Upstream, then Landed).
+                    section = nil
                 } else if !item.isOpen {
                     section = .parityRejected
                 } else if item.isDraft {
                     section = .parityParked
-                } else if upstream != nil {
-                    // Listed through its upstream PR, where the work is now.
-                    section = nil
                 } else if row.insight.isApprovedByMe {
                     section = .parityApproved
                 } else {
                     section = row.insight.turn == .me ? .parityReview : .parityDiscussing
                 }
-            } else if upstreamIDs.contains(item.id), item.isOpen {
+            } else if upstreamIDs.contains(item.id), item.state != .closed {
                 row.paired = upstreamSlug(item.headRef).flatMap { stagingBySlug[$0] }
-                section = .parityUpstream
+                section = item.isOpen ? .parityUpstream : .parityLanded
             } else {
                 section = nil
             }
