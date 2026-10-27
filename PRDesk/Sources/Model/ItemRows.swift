@@ -14,6 +14,8 @@ struct ItemRow: Hashable, Sendable {
     /// In the Parity tab, the other end of the item's pipeline: the upstream PR promoted from a
     /// staging PR, or the staging PR of an upstream one.
     var paired: Item?
+    /// Grok Bot sends still on their way; `state` already shows them as sent.
+    var sending: Set<BotRequest> = []
 
     var triage: TriageStatus? { board?.triage }
     var priority: Priority? { board?.priorityValue }

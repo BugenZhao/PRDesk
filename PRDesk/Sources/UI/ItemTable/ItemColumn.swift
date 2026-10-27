@@ -175,10 +175,10 @@ enum ItemColumn: String, CaseIterable {
             .icon(item.stateIcon, color: item.stateColor),
             titleRun(item.title, bold: row.insight.isUnread),
         ]
-        // What the item was sent to a Grok Bot for.
-        let sent = row.state.sentRequests.map(\.emoji).joined()
-        if !sent.isEmpty {
-            runs.append(.text(sent, font: CellFont.small))
+        // What the item was sent to a Grok Bot for; faint while the send is under way.
+        for request in row.state.sentRequests {
+            let mark: CellRun = .text(request.emoji, font: CellFont.small)
+            runs.append(row.sending.contains(request) ? .faded(mark, opacity: 0.35) : mark)
         }
         if row.board?.sessionLinks.isEmpty == false {
             runs.append(.symbol("terminal", color: .secondaryLabelColor, pointSize: 10))

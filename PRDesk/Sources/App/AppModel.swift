@@ -135,6 +135,48 @@ final class AppModel {
     var writeError: String?
     /// The last send to a Grok Bot that failed, shown until dismissed.
     var botError: String?
+
+    /// A write the status bar reports: under way, then done for a few seconds. Failures clear it
+    /// and are reported on their own.
+    struct Activity: Equatable {
+        let id: UUID
+        var text: String
+        var isDone = false
+    }
+
+    private(set) var activity: Activity?
+
+    /// Runs `work` while the status bar shows `text`, then shows it done (unless a newer write
+    /// took the status bar meanwhile).
+    func withActivity<T>(_ text: String, _ work: () async throws -> T) async rethrows -> T {
+        let id = UUID()
+        activity = Activity(id: id, text: text)
+        do {
+            let result = try await work()
+            if activity?.id == id {
+                activity?.isDone = true
+                Task {
+                    try? await Task.sleep(for: .seconds(3))
+                    if activity?.id == id { activity = nil }
+                }
+            }
+            return result
+        } catch {
+            if activity?.id == id { activity = nil }
+            throw error
+        }
+    }
+
+    /// Grok Bot sends shown on rows before the database has them: under way (drawn faint), or sent
+    /// and waiting for the stored state to catch up. Nothing is stored until the send succeeds,
+    /// so a failure only drops the entry.
+    private struct BotSendOverlay {
+        var at: Date
+        var note: String?
+        var isSent = false
+    }
+
+    @ObservationIgnored private var botSends: [Item.ID: [BotRequest: BotSendOverlay]] = [:]
     var pendingBotSend: PendingBotSend?
 
     /// Bumped to move keyboard focus to the filter field or back to the table.
@@ -271,12 +313,18 @@ final class AppModel {
     }
 
     private func row(for item: Item) -> ItemRow {
-        let state = state(for: item)
+        var state = state(for: item)
+        var sending: Set<BotRequest> = []
+        for (request, send) in botSends[item.id] ?? [:] {
+            state.setSent(at: send.at, note: send.note, for: request)
+            if !send.isSent { sending.insert(request) }
+        }
         return ItemRow(
             item: item, state: state,
             insight: insight(for: item, state: state),
             authorVote: vote(for: item.author),
-            board: board(for: item)
+            board: board(for: item),
+            sending: sending
         )
     }
 
@@ -455,7 +503,14 @@ final class AppModel {
     }
 
     func submit(_ submission: Submission, body: String, item: Item, detail: ItemDetail) async throws {
-        try await engine.submit(submission, body: body, subjectID: detail.id)
+        let verb = switch submission {
+        case .comment: "Comment on"
+        case .approve: "Approve"
+        case .requestChanges: "Request changes on"
+        }
+        try await withActivity("\(verb) #\(item.number)") {
+            try await engine.submit(submission, body: body, subjectID: detail.id)
+        }
         setDraft("", for: item.id)
         // Our own action shouldn't make the item look unread.
         updateState(item) { $0.seenAt = Date() }
@@ -486,11 +541,13 @@ final class AppModel {
 
     /// Closes the item, posting `comment` on it first unless it is empty.
     func close(_ item: Item, detail: ItemDetail, reason: CloseReason?, comment: String) async throws {
-        if !comment.isEmpty {
-            try await engine.submit(.comment, body: comment, subjectID: detail.id)
-            setDraft("", for: item.id)
+        try await withActivity(comment.isEmpty ? "Close #\(item.number)" : "Comment on and close #\(item.number)") {
+            if !comment.isEmpty {
+                try await engine.submit(.comment, body: comment, subjectID: detail.id)
+                setDraft("", for: item.id)
+            }
+            try await engine.close(subjectID: detail.id, isPullRequest: item.kind == .pullRequest, reason: reason)
         }
-        try await engine.close(subjectID: detail.id, isPullRequest: item.kind == .pullRequest, reason: reason)
         updateState(item) { $0.seenAt = Date() }
         _ = try? await engine.refresh(ids: [item.id])
         loadDetail(force: true)
@@ -498,7 +555,9 @@ final class AppModel {
 
     /// Parks a parity staging PR (makes it a draft) or resumes it (marks it ready for review).
     func setParked(_ parked: Bool, _ item: Item) async throws {
-        try await engine.setDraft(parked, pullRequestID: item.id)
+        try await withActivity("\(parked ? "Park" : "Resume") #\(item.number)") {
+            try await engine.setDraft(parked, pullRequestID: item.id)
+        }
         updateState(item) { $0.seenAt = Date() }
         _ = try? await engine.refresh(ids: [item.id])
         loadDetail(force: true)
@@ -756,7 +815,7 @@ final class AppModel {
         case .addToDesk:
             break
         case let .sendToBot(request, withNote):
-            let resends = items.count { state(for: $0).sentAt(request) != nil }
+            let resends = items.count { state(for: $0).sentAt(request) != nil || botSends[$0.id]?[request] != nil }
             if withNote || request == .merge || resends > 0 {
                 pendingBotSend = PendingBotSend(request: request, items: items, resends: resends)
             } else {
@@ -765,23 +824,39 @@ final class AppModel {
         }
     }
 
-    /// Sends `items` to the request's bot in one message, with the viewer's note if any, then marks
-    /// them sent.
+    /// Sends `items` to the request's bot in one message, with the viewer's note if any. The marks
+    /// show at once, faint until the send is through; they are stored only then, and dropped if
+    /// it fails.
     func sendToBot(_ request: BotRequest, items: [Item], note: String? = nil) {
         let note = note.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.flatMap { $0.isEmpty ? nil : $0 }
         let text = GrokBot.message(request, items: items, note: note)
         let bot = request.bot
+        let now = Date()
+        for item in items {
+            botSends[item.id, default: [:]][request] = BotSendOverlay(at: now, note: note)
+        }
+        rebuild()
+        let what = items.count == 1 ? "#\(items[0].number)" : "\(items.count) items"
         Task {
             do {
-                try await GrokBot.send(text, to: bot)
+                try await withActivity("\(request.emoji) \(what) → \(bot)") {
+                    try await GrokBot.send(text, to: bot)
+                }
             } catch {
                 logger.error("Failed to send to \(bot, privacy: .public): \(String(describing: error), privacy: .public)")
+                for item in items { botSends[item.id]?[request] = nil }
+                rebuild()
                 botError = "Couldn't send \(request.emoji) to \(bot): \(error.localizedDescription)"
                 return
             }
-            let now = Date()
+            for item in items { botSends[item.id]?[request]?.isSent = true }
+            rebuild()
             for item in items {
-                updateState(item) { $0.setSent(at: now, note: note, for: request) }
+                do {
+                    try await db.updateState(item.id) { $0.setSent(at: now, note: note, for: request) }
+                } catch {
+                    logger.error("Failed to store the send of #\(item.number): \(error)")
+                }
             }
         }
     }
@@ -815,7 +890,9 @@ final class AppModel {
         let previous = changes.map { (item: $0.item, status: board(for: $0.item)?.triage) }
         registerUndo("Set Status") { $0.setTriage(previous) }
         let what = changes.count == 1 ? "#\(changes[0].item.number)" : "\(changes.count) items"
-        writeBoard("set the status of \(what)", numbers: changes.map(\.item.number)) { engine in
+        let statuses = Set(changes.map(\.status))
+        let to = statuses.count == 1 ? (statuses.first!?.rawValue ?? "Triage") : "Status"
+        writeBoard("set the status of \(what)", activity: "\(what) → \(to)", numbers: changes.map(\.item.number)) { engine in
             for change in changes {
                 try await engine.setTriage(change.status, number: change.item.number, contentID: change.item.id)
             }
@@ -827,7 +904,9 @@ final class AppModel {
         let previous = changes.map { (item: $0.item, priority: board(for: $0.item)?.priorityValue) }
         registerUndo("Set Priority") { $0.setPriority(previous) }
         let what = changes.count == 1 ? "#\(changes[0].item.number)" : "\(changes.count) items"
-        writeBoard("set the priority of \(what)", numbers: changes.map(\.item.number)) { engine in
+        let priorities = Set(changes.map(\.priority))
+        let to = priorities.count == 1 ? (priorities.first!.map { "\($0.optionName) priority" } ?? "no priority") : "Priority"
+        writeBoard("set the priority of \(what)", activity: "\(what) → \(to)", numbers: changes.map(\.item.number)) { engine in
             for change in changes {
                 try await engine.setPriority(change.priority, number: change.item.number, contentID: change.item.id)
             }
@@ -857,12 +936,13 @@ final class AppModel {
     /// undo never reaches GitHub ahead of what it undoes; other items' writes don't wait.
     @ObservationIgnored private var pendingBoardWrites: [Int: Task<Void, Never>] = [:]
 
-    private func writeBoard(_ what: String, numbers: [Int], _ write: @escaping @Sendable (SyncEngine) async throws -> Void) {
+    /// `activity` is what the status bar says meanwhile.
+    private func writeBoard(_ what: String, activity: String, numbers: [Int], _ write: @escaping @Sendable (SyncEngine) async throws -> Void) {
         let earlier = numbers.compactMap { pendingBoardWrites[$0] }
         let task = Task { [engine, logger] in
             for task in earlier { await task.value }
             do {
-                try await write(engine)
+                try await withActivity(activity) { try await write(engine) }
             } catch {
                 logger.error("Failed to \(what, privacy: .public): \(String(describing: error), privacy: .public)")
                 self.writeError = if case BoardError.subscription = error {
@@ -1056,6 +1136,14 @@ final class AppModel {
 
     private func rebuild() {
         itemsByID = Dictionary(uniqueKeysWithValues: snapshot.items.map { ($0.id, $0) })
+        // Sent marks the database now has need no overlay. Stored dates keep milliseconds only.
+        for (id, sends) in botSends {
+            let stored = snapshot.states[id]
+            let left = sends.filter { request, send in
+                !(send.isSent && stored?.sentAt(request).map { abs($0.timeIntervalSince(send.at)) < 0.01 } == true)
+            }
+            botSends[id] = left.isEmpty ? nil : left
+        }
         // Opened items that were added since are on the desk now; follow the selection there.
         let added = openedItems.filter { item in itemsByID[item.id].map(isOnDesk) ?? false }
         if !added.isEmpty {

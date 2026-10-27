@@ -107,7 +107,7 @@ Rust frontend 的 parity agent（`richard` 仓库的 `notes/vllm-rust-parity-age
 
 👀 和 🔥 都会让 Richard 开 Claude Code（或 Codex）session，它把链接追加到 board 的 **Session** 文本字段里（空格分隔，旧的在前；👀 的条目不在 board 上时它会加上，但不设 Status）。app 只读这个字段：有 session 的条目在标题后显示 `terminal` 图标，悬停列出链接；详情顶部的按钮打开最新的一个（有多个时按钮带菜单列出全部），`t`（或右键菜单 Open Agent Session）打开选中条目各自最新的一个。`https://claude.ai/code/session_…` 改写成 `claude://code/session_…`，在 Claude app 里打开而不是浏览器。
 
-消息是 `[Sent from PR Desk] <emoji> <链接> <标题>`，多选时一条消息、每条目一行（🚀 即一个批次）。按住 ⌥（`⌥E` / `⌥F` / `⌥R`，或右键菜单里按住 ⌥ 出现的「…」项）先打开发送面板，可以附一段给 bot 的备注，放在消息最后、空一行之后原样发出；🚀 和重发也总是先打开这个面板（备注可空，`⌘↩` 发送，`esc` 取消）。发过的条目在标题后显示对应的 emoji，悬停显示发给谁、多久之前和当时的备注（每种请求只记最后一次）。bot 名字在 Settings → Grok Bot 里改（名字、唯一前缀或 id）；CLI 的登录和其他 grokbot 共用（`grokbot login`）。构建时 `scripts/embed-grokbot.sh` 按脚本里固定的 commit 编译 grokbot-cli（按 commit 缓存），签名后放进 `Contents/Helpers/`。测试时 dry-run 只记日志不发。
+消息是 `[Sent from PR Desk] <emoji> <链接> <标题>`，多选时一条消息、每条目一行（🚀 即一个批次）。按住 ⌥（`⌥E` / `⌥F` / `⌥R`，或右键菜单里按住 ⌥ 出现的「…」项）先打开发送面板，可以附一段给 bot 的备注，放在消息最后、空一行之后原样发出；🚀 和重发也总是先打开这个面板（备注可空，`⌘↩` 发送，`esc` 取消）。按下就在标题后画出 emoji：发送中半透明，CLI 返回成功后变实并存进本地数据库，失败则撤掉（不留痕迹）。发过的条目在标题后显示对应的 emoji，悬停显示发给谁、多久之前和当时的备注（每种请求只记最后一次）。bot 名字在 Settings → Grok Bot 里改（名字、唯一前缀或 id）；CLI 的登录和其他 grokbot 共用（`grokbot login`）。构建时 `scripts/embed-grokbot.sh` 按脚本里固定的 commit 编译 grokbot-cli（按 commit 缓存），签名后放进 `Contents/Helpers/`。测试时 dry-run 只记日志不发。
 
 ## 4. 主界面
 
@@ -125,6 +125,8 @@ Rust frontend 的 parity agent（`richard` 仓库的 `notes/vllm-rust-parity-age
 ├───────────────────────────────────────────────────┴────────────────────────────────────────────────────┤
 └ 状态栏：j/k move · w/b/s/m … (快捷键提示)   BugenZhao · vllm-project/vllm · Board #56 · 403 items · Synced 12s ago · API quota 4,821 left ┘
 ```
+
+状态栏左侧平时是快捷键提示；写操作进行中时换成这次写入（转圈 + 如 `#63887 → Working`、`🔥 #63887 → Richard Loop`、`Approve #63887`），完成后打勾停 3 秒再恢复；失败时直接恢复，错误照旧弹框。覆盖 board 的 Status / Priority、发给 Grok Bot、评论 / review、Close、Park / Resume；同时有多个时显示最新的一个。
 
 重启后回到上次的样子：Dashboard / Inbox、选中的条目（只是选中，不算打开：不标已读、不进 Recently viewed）、详情面板是否显示。
 

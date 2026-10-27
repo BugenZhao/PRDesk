@@ -571,6 +571,7 @@ struct ItemTableView: NSViewRepresentable {
                     let sent = itemRow.state.sentRequests.map { request in
                         let age = itemRow.state.sentAt(request)!.compactAge()
                         let note = itemRow.state.note(request).map { ": \($0)" } ?? ""
+                        if itemRow.sending.contains(request) { return "\(request.emoji) Sending to \(request.bot)…\(note)" }
                         return "\(request.emoji) Sent to \(request.bot) \(age == "now" ? "just now" : "\(age) ago")\(note)"
                     }
                     let sessions = (itemRow.board?.sessionLinks ?? []).map { "Session: \($0.absoluteString)" }

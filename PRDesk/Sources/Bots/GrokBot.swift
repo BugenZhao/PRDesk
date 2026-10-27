@@ -87,7 +87,11 @@ enum GrokBot {
     /// Sends `text` to `bot` without waiting for the reply, which arrives in the Grok Bot app.
     @concurrent
     static func send(_ text: String, to bot: String) async throws {
-        if isDryRun("send to \(bot): \(text)") { return }
+        if isDryRun("send to \(bot): \(text)") {
+            // About as long as the CLI takes, so the faint in-flight marks can be seen in tests.
+            try? await Task.sleep(for: .seconds(2))
+            return
+        }
         let output = try await run(["ask", "--no-wait", "-q", "-a", bot, text])
         Logger(subsystem: "com.bugenzhao.PRDesk", category: "GrokBot")
             .notice("Sent to \(bot, privacy: .public) as message \(output, privacy: .public)")

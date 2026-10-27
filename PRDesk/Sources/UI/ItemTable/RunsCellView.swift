@@ -24,6 +24,9 @@ indirect enum CellRun {
     case avatar(NSImage?)
     /// Takes whatever width is left over, pushing the runs after it to the far edge.
     case spring
+    /// A run drawn see-through, e.g. a mark for a write still under way. Only the run fades,
+    /// not the cell (see `RunsCellView.opacity`).
+    case faded(CellRun, opacity: CGFloat)
 }
 
 /// NSFont is immutable, so sharing these across isolation domains is safe.
@@ -158,6 +161,8 @@ final class RunsCellView: NSTableCellView {
             Self.dotSize
         case let .slot(_, width, _):
             width
+        case let .faded(run, _):
+            naturalWidth(run)
         case .symbol, .icon:
             Self.symbolSize
         case .image, .tile, .avatar:
@@ -229,6 +234,13 @@ final class RunsCellView: NSTableCellView {
             let size = Self.dotSize
             (emphasized ? NSColor.alternateSelectedControlTextColor : color).setFill()
             NSBezierPath(ovalIn: NSRect(x: rect.minX, y: rect.midY - size / 2, width: size, height: size)).fill()
+
+        case let .faded(run, opacity):
+            guard let context = NSGraphicsContext.current?.cgContext else { return draw(run, in: rect) }
+            context.saveGState()
+            context.setAlpha(opacity)
+            draw(run, in: rect)
+            context.restoreGState()
 
         case let .slot(run, _, trailing):
             guard let run else { return }
@@ -440,7 +452,7 @@ private extension CellRun {
         switch self {
         case let .text(string, _, _, _, _), let .chip(string, _), let .tile(string, _): string
         case let .segments(parts, _, _): parts.map(\.text).joined()
-        case let .slot(run?, _, _): run.spokenText
+        case let .slot(run?, _, _), let .faded(run, _): run.spokenText
         default: nil
         }
     }

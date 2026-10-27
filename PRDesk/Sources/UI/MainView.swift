@@ -123,12 +123,18 @@ private struct StatusBar: View {
         VStack(spacing: 0) {
             Divider()
             HStack(spacing: 6) {
-                // Shortcuts give way first when the window is narrow.
-                Text(Self.shortcuts)
-                    .foregroundStyle(.tertiary)
-                    .truncationMode(.tail)
-                    .layoutPriority(-1)
-                    .help(Self.filterHelp)
+                // The latest write while it is under way and just after; otherwise the shortcuts,
+                // which give way first when the window is narrow.
+                if let activity = model.activity {
+                    ActivityLine(activity: activity)
+                        .layoutPriority(-1)
+                } else {
+                    Text(Self.shortcuts)
+                        .foregroundStyle(.tertiary)
+                        .truncationMode(.tail)
+                        .layoutPriority(-1)
+                        .help(Self.filterHelp)
+                }
                 Spacer(minLength: 12)
                 Text([model.viewer, model.mode == .parity ? "\(Parity.repo) → \(SyncEngine.repo)" : SyncEngine.repo].compactMap(\.self).joined(separator: " · "))
                 Text("·")
@@ -147,6 +153,25 @@ private struct StatusBar: View {
             .frame(height: Self.height)
         }
         .background(.bar)
+    }
+}
+
+/// A write in the status bar: a spinner while it is under way, a check once it is done.
+private struct ActivityLine: View {
+    let activity: AppModel.Activity
+
+    var body: some View {
+        HStack(spacing: 5) {
+            if activity.isDone {
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+            } else {
+                ProgressView().controlSize(.mini)
+            }
+            Text(activity.text)
+                .foregroundStyle(activity.isDone ? .secondary : .primary)
+                .truncationMode(.tail)
+        }
+        .transition(.opacity)
     }
 }
 

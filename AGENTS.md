@@ -104,7 +104,8 @@ are used off the main actor); no glass on content (cards, chips, rows).
   (502s and truncated JSON); keep the list query lean and fetch detail on selection.
 - Never post to GitHub (comments, reviews, marking notifications read, board fields,
   subscriptions) or message Grok Bots while testing; use the dry-run flag above. A dry-run send
-  still marks the item sent in the shared database; clear the `*SentAt` columns of `itemState`
+  waits about as long as the CLI (so the faint in-flight mark shows) and still marks the item
+  sent in the shared database; clear the `*SentAt` columns of `itemState`
   afterwards.
 - `scripts/embed-grokbot.sh` runs cargo with `env -i`: under Xcode's environment proc-macro
   crates fail to build ("can't find crate for `serde_derive`"), and the half-built target dir
