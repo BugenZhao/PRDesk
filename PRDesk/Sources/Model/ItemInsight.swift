@@ -164,7 +164,7 @@ struct ItemInsight: Hashable, Sendable {
         return switch event.kind {
         case .comment: "\(who) commented"
         case .approved: "\(who) approved"
-        case .changesRequested: "\(who) requested changes"
+        case .changesRequested: "\(who) rejected"
         case .reviewed: "\(who) reviewed"
         case .commit, .forcePush: "\(who) pushed"
         case .merged: "merged by \(who)"
