@@ -698,9 +698,8 @@ final class AppModel {
             addToDesk(items)
         case .addToDesk:
             addToDesk(items.filter(canAddToDesk))
-        case .sendToBot(.merge):
-            // Merger merges open upstream PRs; staging PRs go through the parity agent.
-            items = items.filter { $0.kind == .pullRequest && $0.isOpen && $0.isUpstream }
+        case let .sendToBot(request):
+            items = items.filter(request.applies)
         default:
             break
         }

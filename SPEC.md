@@ -103,7 +103,7 @@ Rust frontend 的 parity agent（`richard` 仓库的 `notes/vllm-rust-parity-age
 
 - 👀 Investigate（`e`）→ Richard Loop：让 agent 进一步调查
 - 🔥 Track（`f`）→ Richard Loop：加到 Notion tracker 下一个工作日；Richard 会把它在 board 上设为 Working，所以 app 不动 board
-- 🚀 Merge（`r`）→ Merger：按 merge skill 走 CI 并合并；只对仓库里 open 的 PR 生效（staging PR 走 parity agent），给 PR 号就是授权，所以发之前总要确认
+- 🚀 Merge（`r`）→ Merger：按 merge skill 走 CI 并合并；只对仓库里 open 且 approved（reviewDecision = APPROVED，和 Good 分组同一条件）的 PR 生效，其余条目右键菜单里是灰的、按键忽略（staging PR 走 parity agent）；给 PR 号就是授权，所以发之前总要确认
 
 消息是 `[Sent from PR Desk] <emoji> <链接> <标题>`，多选时一条消息、每条目一行（🚀 即一个批次）。发过的条目在标题后显示对应的 emoji，悬停显示发给谁、多久之前；同一 emoji 再发一次要先确认。bot 名字在 Settings → Grok Bot 里改（名字、唯一前缀或 id）；CLI 的登录和其他 grokbot 共用（`grokbot login`）。构建时 `scripts/embed-grokbot.sh` 按脚本里固定的 commit 编译 grokbot-cli（按 commit 缓存），签名后放进 `Contents/Helpers/`。测试时 dry-run 只记日志不发。
 

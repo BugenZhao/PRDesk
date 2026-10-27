@@ -25,6 +25,12 @@ enum BotRequest: String, CaseIterable, Codable, Sendable {
         }
     }
 
+    /// Whether the request applies to `item`: Merger only takes open, approved PRs of the
+    /// repository (as in Good); staging PRs go through the parity agent.
+    func applies(to item: Item) -> Bool {
+        self != .merge || item.kind == .pullRequest && item.isOpen && item.isUpstream && item.reviewDecision == "APPROVED"
+    }
+
     /// The bot it goes to, by name (or a unique prefix of one), set in Settings.
     var bot: String {
         let key = self == .merge ? GrokBot.mergeBotKey : GrokBot.assistantBotKey
