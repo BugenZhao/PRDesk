@@ -222,7 +222,7 @@ private struct DetailHeader: View {
         let links = model.board(for: item)?.sessionLinks ?? []
         if links.count == 1 {
             iconButton("Agent Session", symbol: "terminal") { AgentSession.open(links[0]) }
-                .help("Open the agent session")
+                .help("Open the agent session (t)")
         } else if links.count > 1 {
             Menu {
                 ForEach(Array(links.enumerated().reversed()), id: \.offset) { index, link in
@@ -237,7 +237,7 @@ private struct DetailHeader: View {
             }
             .menuIndicator(.visible)
             .fixedSize()
-            .help("Open the latest agent session; the menu lists all \(links.count)")
+            .help("Open the latest agent session (t); the menu lists all \(links.count)")
         }
     }
 

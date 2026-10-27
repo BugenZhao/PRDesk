@@ -307,6 +307,7 @@ struct ItemTableView: NSViewRepresentable {
                 case "e": .sendToBot(.investigate)
                 case "f": .sendToBot(.track)
                 case "r": .sendToBot(.merge)
+                case "t": .openSession
                 default: nil
                 }
                 guard let action else { return false }
@@ -393,7 +394,7 @@ struct ItemTableView: NSViewRepresentable {
             MenuAction(title: "👀 Investigate", action: .sendToBot(.investigate), key: "e"),
             MenuAction(title: "🔥 Track", action: .sendToBot(.track), key: "f"),
             MenuAction(title: "🚀 Merge…", action: .sendToBot(.merge), key: "r"),
-            MenuAction(title: "Open Agent Session", action: .openSession, symbol: "terminal", key: ""),
+            MenuAction(title: "Open Agent Session", action: .openSession, symbol: "terminal", key: "t"),
         ]
         /// Indices of `menuActions` after which a separator goes.
         private static let menuSeparatorsAfter: Set = [1, 5, 9, 11, 13]
