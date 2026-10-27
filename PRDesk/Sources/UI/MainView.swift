@@ -179,8 +179,10 @@ private struct ActivityLine: View {
                 }
             }
             .frame(width: 12)
+            // Dimmed by opacity rather than .secondary: hierarchical styles switch without animating.
             Text(activity.text)
-                .foregroundStyle(activity.isDone ? .secondary : .primary)
+                .foregroundStyle(.primary)
+                .opacity(activity.isDone ? 0.6 : 1)
                 .truncationMode(.tail)
         }
     }
