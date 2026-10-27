@@ -369,7 +369,7 @@ struct ItemTableView: NSViewRepresentable {
         private struct MenuAction {
             var title: String
             var action: ItemAction
-            /// An SF Symbol; Grok Bot requests show their emoji instead.
+            /// An SF Symbol; Grok Bot requests have their emoji in the title instead.
             var symbol: String?
             /// The list's single-key shortcut, shown beside the item.
             var key: String
@@ -390,9 +390,9 @@ struct ItemTableView: NSViewRepresentable {
             MenuAction(title: "Mark as Read", action: .markRead, symbol: "envelope.open", key: "n"),
             MenuAction(title: "Upvote Author", action: .voteAuthor(.up), symbol: "hand.thumbsup", key: "+"),
             MenuAction(title: "Downvote Author", action: .voteAuthor(.down), symbol: "hand.thumbsdown", key: "-"),
-            MenuAction(title: "Investigate", action: .sendToBot(.investigate), key: "e"),
-            MenuAction(title: "Track", action: .sendToBot(.track), key: "f"),
-            MenuAction(title: "Merge…", action: .sendToBot(.merge), key: "r"),
+            MenuAction(title: "👀 Investigate", action: .sendToBot(.investigate), key: "e"),
+            MenuAction(title: "🔥 Track", action: .sendToBot(.track), key: "f"),
+            MenuAction(title: "🚀 Merge…", action: .sendToBot(.merge), key: "r"),
         ]
         /// Indices of `menuActions` after which a separator goes.
         private static let menuSeparatorsAfter: Set = [1, 5, 9, 11, 13]
@@ -402,11 +402,7 @@ struct ItemTableView: NSViewRepresentable {
             for (index, entry) in Self.menuActions.enumerated() {
                 let item = NSMenuItem(title: entry.title, action: #selector(performMenuAction(_:)), keyEquivalent: entry.key)
                 item.keyEquivalentModifierMask = []
-                item.image = if case let .sendToBot(request) = entry.action {
-                    Self.emojiImage(request.emoji)
-                } else {
-                    entry.symbol.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
-                }
+                item.image = entry.symbol.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
                 item.tag = index
                 item.target = self
                 menu.addItem(item)
@@ -422,16 +418,6 @@ struct ItemTableView: NSViewRepresentable {
             // Merge is disabled for rows it doesn't apply to; see `menuNeedsUpdate`.
             menu.autoenablesItems = false
             return menu
-        }
-
-        /// An emoji drawn as a menu item image, the size of the symbols beside it.
-        private static func emojiImage(_ emoji: String) -> NSImage {
-            let attributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 12)]
-            let size = (emoji as NSString).size(withAttributes: attributes)
-            return NSImage(size: size, flipped: false) { rect in
-                (emoji as NSString).draw(in: rect, withAttributes: attributes)
-                return true
-            }
         }
 
         /// Rows a context-menu command applies to: the whole selection when the right-clicked row is
