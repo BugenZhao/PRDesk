@@ -125,16 +125,21 @@ private struct StatusBar: View {
             HStack(spacing: 6) {
                 // The latest write while it is under way and just after; otherwise the shortcuts,
                 // which give way first when the window is narrow.
-                if let activity = model.activity {
-                    ActivityLine(activity: activity)
-                        .layoutPriority(-1)
-                } else {
-                    Text(Self.shortcuts)
-                        .foregroundStyle(.tertiary)
-                        .truncationMode(.tail)
-                        .layoutPriority(-1)
-                        .help(Self.filterHelp)
+                ZStack(alignment: .leading) {
+                    if let activity = model.activity {
+                        ActivityLine(activity: activity)
+                            .id(activity.id)
+                            .transition(.opacity)
+                    } else {
+                        Text(Self.shortcuts)
+                            .foregroundStyle(.tertiary)
+                            .truncationMode(.tail)
+                            .help(Self.filterHelp)
+                            .transition(.opacity)
+                    }
                 }
+                .layoutPriority(-1)
+                .animation(.easeInOut(duration: 0.25), value: model.activity)
                 Spacer(minLength: 12)
                 Text([model.viewer, model.mode == .parity ? "\(Parity.repo) → \(SyncEngine.repo)" : SyncEngine.repo].compactMap(\.self).joined(separator: " · "))
                 Text("·")
@@ -162,16 +167,22 @@ private struct ActivityLine: View {
 
     var body: some View {
         HStack(spacing: 5) {
-            if activity.isDone {
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-            } else {
-                ProgressView().controlSize(.mini)
+            // Spinner and check share one slot and cross-fade.
+            ZStack {
+                if activity.isDone {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                        .transition(.opacity)
+                } else {
+                    ProgressView().controlSize(.mini)
+                        .transition(.opacity)
+                }
             }
+            .frame(width: 12)
             Text(activity.text)
                 .foregroundStyle(activity.isDone ? .secondary : .primary)
                 .truncationMode(.tail)
         }
-        .transition(.opacity)
     }
 }
 
