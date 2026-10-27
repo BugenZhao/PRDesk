@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import os
 
 /// What the viewer asks a Grok Bot to do with items, sent as the emoji the bots already know from
@@ -36,6 +36,17 @@ enum BotRequest: String, CaseIterable, Codable, Sendable {
         let key = self == .merge ? GrokBot.mergeBotKey : GrokBot.assistantBotKey
         let name = UserDefaults.standard.string(forKey: key)?.trimmingCharacters(in: .whitespaces) ?? ""
         return name.isEmpty ? (self == .merge ? GrokBot.defaultMergeBot : GrokBot.defaultAssistantBot) : name
+    }
+}
+
+/// An agent session from the board's Session field.
+enum AgentSession {
+    /// Claude Code sessions open in the Claude app rather than the browser:
+    /// `https://claude.ai/code/session_…` becomes `claude://code/session_…`. Others open as they are.
+    static func open(_ url: URL) {
+        let appURL = url.host() == "claude.ai" && url.path().hasPrefix("/code/")
+            ? URL(string: "claude:/\(url.path())") : nil
+        NSWorkspace.shared.open(appURL ?? url)
     }
 }
 

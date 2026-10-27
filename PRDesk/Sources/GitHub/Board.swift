@@ -2,7 +2,7 @@ import Foundation
 import os
 
 /// The triage board: a GitHub Project whose Status, Priority and Comment fields are the source of
-/// truth for triage (SPEC §3.1).
+/// truth for triage (SPEC §3.1). Its Session field holds links the assistant bot writes (SPEC §3.3).
 enum BoardQuery {
     static let owner = "vllm-project"
     static let number = 56
@@ -34,6 +34,9 @@ enum BoardQuery {
                 ... on ProjectV2ItemFieldSingleSelectValue { name }
               }
               comment: fieldValueByName(name: "Comment") {
+                ... on ProjectV2ItemFieldTextValue { text }
+              }
+              session: fieldValueByName(name: "Session") {
                 ... on ProjectV2ItemFieldTextValue { text }
               }
             }
@@ -86,6 +89,7 @@ enum BoardQuery {
             let status: SelectValue?
             let priority: SelectValue?
             let comment: TextValue?
+            let session: TextValue?
 
             var entry: BoardEntry? {
                 guard let content, let contentID = content.id, let number = content.number,
@@ -94,7 +98,7 @@ enum BoardQuery {
                 return BoardEntry(
                     number: number, itemID: id, contentID: contentID,
                     status: status?.name, statusAt: status?.updatedAt,
-                    priority: priority?.name, comment: comment?.text,
+                    priority: priority?.name, comment: comment?.text, session: session?.text,
                     isArchived: isArchived
                 )
             }

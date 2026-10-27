@@ -233,6 +233,11 @@ final class AppDatabase: Sendable {
                 t.add(column: "mergeSentAt", .datetime)
             }
         }
+        migrator.registerMigration("v16") { db in
+            try db.alter(table: "boardItem") { t in
+                t.add(column: "session", .text)
+            }
+        }
         return migrator
     }
 }

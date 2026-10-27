@@ -21,6 +21,8 @@ enum ItemAction {
     case addToDesk
     /// Sends the items to a Grok Bot with the request's emoji.
     case sendToBot(BotRequest)
+    /// Opens the latest agent session of each item, from the board's Session field.
+    case openSession
 }
 
 /// A send to a Grok Bot waiting for the viewer's go-ahead: every merge, and any request the items
@@ -728,6 +730,11 @@ final class AppModel {
             // Opening dozens of tabs is never what a stray keypress meant.
             for item in items.prefix(Self.maxTabsAtOnce) {
                 if let url = URL(string: item.url) { NSWorkspace.shared.open(url) }
+            }
+        case .openSession:
+            let links = items.compactMap { board(for: $0)?.sessionLinks.last }
+            for link in links.prefix(Self.maxTabsAtOnce) {
+                AgentSession.open(link)
             }
         case .openAuthorProfile:
             var seen = Set<String>()

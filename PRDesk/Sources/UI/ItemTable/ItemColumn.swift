@@ -180,6 +180,9 @@ enum ItemColumn: String, CaseIterable {
         if !sent.isEmpty {
             runs.append(.text(sent, font: CellFont.small))
         }
+        if row.board?.sessionLinks.isEmpty == false {
+            runs.append(.symbol("terminal", color: .secondaryLabelColor, pointSize: 10))
+        }
         if let note = row.note {
             runs.append(.chip(note.reasonLabel, color: .controlAccentColor))
             // The Inbox has no triage sections, so say where the item stands.

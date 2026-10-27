@@ -207,12 +207,38 @@ private struct DetailHeader: View {
             if model.detailState == .loading || isParking {
                 ProgressView().controlSize(.small)
             }
+            sessionButton
             iconButton("Refresh", symbol: "arrow.clockwise") { model.loadDetail(force: true) }
                 .disabled(model.detailState == .loading)
             iconButton("Open", symbol: "arrow.up.right") { model.perform(.openInBrowser, on: item.id) }
                 .help("Open on GitHub (o)")
         }
         .controlSize(.small)
+    }
+
+    /// Opens the agent sessions the assistant bot wrote to the board's Session field: the latest
+    /// one, or any of them from a menu when there are several.
+    @ViewBuilder private var sessionButton: some View {
+        let links = model.board(for: item)?.sessionLinks ?? []
+        if links.count == 1 {
+            iconButton("Agent Session", symbol: "terminal") { AgentSession.open(links[0]) }
+                .help("Open the agent session")
+        } else if links.count > 1 {
+            Menu {
+                ForEach(Array(links.enumerated().reversed()), id: \.offset) { index, link in
+                    Button(index == links.count - 1 ? "Session \(index + 1) (latest)" : "Session \(index + 1)") {
+                        AgentSession.open(link)
+                    }
+                }
+            } label: {
+                Image(systemName: "terminal")
+            } primaryAction: {
+                AgentSession.open(links[links.count - 1])
+            }
+            .menuIndicator(.visible)
+            .fixedSize()
+            .help("Open the latest agent session; the menu lists all \(links.count)")
+        }
     }
 
     /// A staging PR is parked as a draft, which the parity agent reads as "not now" (SPEC §3.2).

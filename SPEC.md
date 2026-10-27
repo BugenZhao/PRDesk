@@ -105,6 +105,8 @@ Rust frontend 的 parity agent（`richard` 仓库的 `notes/vllm-rust-parity-age
 - 🔥 Track（`f`）→ Richard Loop：加到 Notion tracker 下一个工作日；Richard 会把它在 board 上设为 Working，所以 app 不动 board
 - 🚀 Merge（`r`）→ Merger：按 merge skill 走 CI 并合并；只对仓库里 open 且 approved（reviewDecision = APPROVED，和 Good 分组同一条件）的 PR 生效，其余条目右键菜单里是灰的、按键忽略（staging PR 走 parity agent）；给 PR 号就是授权，所以发之前总要确认
 
+👀 和 🔥 都会让 Richard 开 Claude Code（或 Codex）session，它把链接追加到 board 的 **Session** 文本字段里（空格分隔，旧的在前；👀 的条目不在 board 上时它会加上，但不设 Status）。app 只读这个字段：有 session 的条目在标题后显示 `terminal` 图标，悬停列出链接；详情顶部的按钮打开最新的一个（有多个时按钮带菜单列出全部），右键菜单 Open Agent Session 打开选中条目各自最新的一个。`https://claude.ai/code/session_…` 改写成 `claude://code/session_…`，在 Claude app 里打开而不是浏览器。
+
 消息是 `[Sent from PR Desk] <emoji> <链接> <标题>`，多选时一条消息、每条目一行（🚀 即一个批次）。发过的条目在标题后显示对应的 emoji，悬停显示发给谁、多久之前；同一 emoji 再发一次要先确认。bot 名字在 Settings → Grok Bot 里改（名字、唯一前缀或 id）；CLI 的登录和其他 grokbot 共用（`grokbot login`）。构建时 `scripts/embed-grokbot.sh` 按脚本里固定的 commit 编译 grokbot-cli（按 commit 缓存），签名后放进 `Contents/Helpers/`。测试时 dry-run 只记日志不发。
 
 ## 4. 主界面
@@ -149,7 +151,7 @@ Rust frontend 的 parity agent（`richard` 仓库的 `notes/vllm-rust-parity-age
 | （整行） | 已关闭的条目整行变淡；draft PR 也整行变淡（只保留未读点），一眼和待 review 的 PR 分开 |
 | P | 优先级（来自 board），用 SF Symbol：H 双感叹号（红）、M 单感叹号（橙）、L 横杠（灰） |
 | # | 编号；PR / Issue 用不同的小图标区分 |
-| Title | 状态图标 + 标题（开头的 `[..]` / `xx:` 标签变淡），被唤醒的条目带原因标签；发给过 Grok Bot 的条目带对应 emoji（§3.3）；有 board Comment 时接着显示备注；灰色的最新事件摘要（如 `@xx commented 2h`、`you reviewed 2d`）始终靠右对齐；被截断的文字（标题、备注、摘要）悬停时 tooltip 显示全文 |
+| Title | 状态图标 + 标题（开头的 `[..]` / `xx:` 标签变淡），被唤醒的条目带原因标签；发给过 Grok Bot 的条目带对应 emoji，board 上有 Session 的带 `terminal` 图标（§3.3）；有 board Comment 时接着显示备注；灰色的最新事件摘要（如 `@xx commented 2h`、`you reviewed 2d`）始终靠右对齐；被截断的文字（标题、备注、摘要）悬停时 tooltip 显示全文 |
 | Author | 头像 + 用户名（首次贡献者为斜体）+ 投票图标；可信标记（seal、组织徽章，见 §5、§5.2）靠右对齐 |
 | Review | 裸 ✓ + approve 总数（含我）：别人的 PR，我 approve 过时为绿色，只有别人 approve 时为灰色；我自己的 PR（自己不能 approve）在 reviewDecision = APPROVED（approve 已满足合并要求，和 Good 分组同一条件）时为绿色，否则灰色；我 request changes 时后面多一个红 ✗。和 CI 列同样的结构：小标记 + 数字，固定位置 |
 | Turn | `review`（请求我 review 且未完成）/ `me` / `them` / 空（已关闭） |
@@ -257,7 +259,7 @@ Rust frontend 的 parity agent（`richard` 仓库的 `notes/vllm-rust-parity-age
 
 - `items`：PR / Issue 的快照字段 + 原始 JSON，带所在仓库（编号只在仓库内唯一）
 - `item_state`：pinned、viewed_at、seen_at、各 Grok Bot 请求的发送时间（只存本地，按条目的 node id）
-- `board_item`：board 条目的缓存（item id、Status 及其设置时间、Priority、Comment）
+- `board_item`：board 条目的缓存（item id、Status 及其设置时间、Priority、Comment、Session）
 - `users`：login、头像、company、orgs、邮箱域名、committer 领域、来源、fetched_at
 - `org_overrides`：手动设置的映射
 - `timeline_cache`：详情缓存（附条目的更新时间，预取据此判断是否过期）

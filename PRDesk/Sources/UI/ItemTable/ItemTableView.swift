@@ -393,6 +393,7 @@ struct ItemTableView: NSViewRepresentable {
             MenuAction(title: "👀 Investigate", action: .sendToBot(.investigate), key: "e"),
             MenuAction(title: "🔥 Track", action: .sendToBot(.track), key: "f"),
             MenuAction(title: "🚀 Merge…", action: .sendToBot(.merge), key: "r"),
+            MenuAction(title: "Open Agent Session", action: .openSession, symbol: "terminal", key: ""),
         ]
         /// Indices of `menuActions` after which a separator goes.
         private static let menuSeparatorsAfter: Set = [1, 5, 9, 11, 13]
@@ -448,8 +449,10 @@ struct ItemTableView: NSViewRepresentable {
                 case let .sendToBot(request): state { $0.state.sentAt(request) != nil }
                 default: .off
                 }
-                if case let .sendToBot(request) = Self.menuActions[item.tag].action {
-                    item.isEnabled = targets.contains { request.applies(to: $0.item) }
+                switch Self.menuActions[item.tag].action {
+                case let .sendToBot(request): item.isEnabled = targets.contains { request.applies(to: $0.item) }
+                case .openSession: item.isEnabled = targets.contains { $0.board?.sessionLinks.isEmpty == false }
+                default: break
                 }
             }
         }
@@ -550,7 +553,8 @@ struct ItemTableView: NSViewRepresentable {
                         let age = itemRow.state.sentAt(request)!.compactAge()
                         return "\(request.emoji) Sent to \(request.bot) \(age == "now" ? "just now" : "\(age) ago")"
                     }
-                    let lines = [truncated].compactMap(\.self) + sent
+                    let sessions = (itemRow.board?.sessionLinks ?? []).map { "Session: \($0.absoluteString)" }
+                    let lines = [truncated].compactMap(\.self) + sent + sessions
                     return lines.isEmpty ? nil : lines.joined(separator: "\n")
                 case .author: return authorTooltip(itemRow.item.author)
                 case .link: return itemRow.paired.map { "\($0.repo)#\($0.number) \($0.title)" }
