@@ -238,6 +238,13 @@ final class AppDatabase: Sendable {
                 t.add(column: "session", .text)
             }
         }
+        migrator.registerMigration("v17") { db in
+            try db.alter(table: "itemState") { t in
+                t.add(column: "investigateNote", .text)
+                t.add(column: "trackNote", .text)
+                t.add(column: "mergeNote", .text)
+            }
+        }
         return migrator
     }
 }

@@ -19,14 +19,15 @@ enum ItemAction {
     case voteAuthor(Vote)
     /// Brings an item opened from a link onto the desk.
     case addToDesk
-    /// Sends the items to a Grok Bot with the request's emoji.
-    case sendToBot(BotRequest)
+    /// Sends the items to a Grok Bot with the request's emoji; `withNote` (⌥) opens the send sheet
+    /// first to add a note for the bot.
+    case sendToBot(BotRequest, withNote: Bool = false)
     /// Opens the latest agent session of each item, from the board's Session field.
     case openSession
 }
 
-/// A send to a Grok Bot waiting for the viewer's go-ahead: every merge, and any request the items
-/// were already sent with.
+/// A send to a Grok Bot waiting in the send sheet: every merge, any request the items were
+/// already sent with, and any the viewer asked to add a note to.
 struct PendingBotSend: Identifiable {
     let id = UUID()
     var request: BotRequest
@@ -700,7 +701,7 @@ final class AppModel {
             addToDesk(items)
         case .addToDesk:
             addToDesk(items.filter(canAddToDesk))
-        case let .sendToBot(request):
+        case let .sendToBot(request, _):
             items = items.filter(request.applies)
         default:
             break
@@ -754,9 +755,9 @@ final class AppModel {
             setVotes(authors.map { ($0, clear ? nil : vote) })
         case .addToDesk:
             break
-        case let .sendToBot(request):
+        case let .sendToBot(request, withNote):
             let resends = items.count { state(for: $0).sentAt(request) != nil }
-            if request == .merge || resends > 0 {
+            if withNote || request == .merge || resends > 0 {
                 pendingBotSend = PendingBotSend(request: request, items: items, resends: resends)
             } else {
                 sendToBot(request, items: items)
@@ -764,9 +765,11 @@ final class AppModel {
         }
     }
 
-    /// Sends `items` to the request's bot in one message, then marks them sent.
-    func sendToBot(_ request: BotRequest, items: [Item]) {
-        let text = GrokBot.message(request, items: items)
+    /// Sends `items` to the request's bot in one message, with the viewer's note if any, then marks
+    /// them sent.
+    func sendToBot(_ request: BotRequest, items: [Item], note: String? = nil) {
+        let note = note.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.flatMap { $0.isEmpty ? nil : $0 }
+        let text = GrokBot.message(request, items: items, note: note)
         let bot = request.bot
         Task {
             do {
@@ -778,7 +781,7 @@ final class AppModel {
             }
             let now = Date()
             for item in items {
-                updateState(item) { $0.setSentAt(now, for: request) }
+                updateState(item) { $0.setSent(at: now, note: note, for: request) }
             }
         }
     }

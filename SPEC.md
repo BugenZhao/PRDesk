@@ -107,7 +107,7 @@ Rust frontend 的 parity agent（`richard` 仓库的 `notes/vllm-rust-parity-age
 
 👀 和 🔥 都会让 Richard 开 Claude Code（或 Codex）session，它把链接追加到 board 的 **Session** 文本字段里（空格分隔，旧的在前；👀 的条目不在 board 上时它会加上，但不设 Status）。app 只读这个字段：有 session 的条目在标题后显示 `terminal` 图标，悬停列出链接；详情顶部的按钮打开最新的一个（有多个时按钮带菜单列出全部），`t`（或右键菜单 Open Agent Session）打开选中条目各自最新的一个。`https://claude.ai/code/session_…` 改写成 `claude://code/session_…`，在 Claude app 里打开而不是浏览器。
 
-消息是 `[Sent from PR Desk] <emoji> <链接> <标题>`，多选时一条消息、每条目一行（🚀 即一个批次）。发过的条目在标题后显示对应的 emoji，悬停显示发给谁、多久之前；同一 emoji 再发一次要先确认。bot 名字在 Settings → Grok Bot 里改（名字、唯一前缀或 id）；CLI 的登录和其他 grokbot 共用（`grokbot login`）。构建时 `scripts/embed-grokbot.sh` 按脚本里固定的 commit 编译 grokbot-cli（按 commit 缓存），签名后放进 `Contents/Helpers/`。测试时 dry-run 只记日志不发。
+消息是 `[Sent from PR Desk] <emoji> <链接> <标题>`，多选时一条消息、每条目一行（🚀 即一个批次）。按住 ⌥（`⌥E` / `⌥F` / `⌥R`，或右键菜单里按住 ⌥ 出现的「…」项）先打开发送面板，可以附一段给 bot 的备注，放在消息最后、空一行之后原样发出；🚀 和重发也总是先打开这个面板（备注可空，`⌘↩` 发送，`esc` 取消）。发过的条目在标题后显示对应的 emoji，悬停显示发给谁、多久之前和当时的备注（每种请求只记最后一次）。bot 名字在 Settings → Grok Bot 里改（名字、唯一前缀或 id）；CLI 的登录和其他 grokbot 共用（`grokbot login`）。构建时 `scripts/embed-grokbot.sh` 按脚本里固定的 commit 编译 grokbot-cli（按 commit 缓存），签名后放进 `Contents/Helpers/`。测试时 dry-run 只记日志不发。
 
 ## 4. 主界面
 
@@ -190,7 +190,7 @@ Rust frontend 的 parity agent（`richard` 仓库的 `notes/vllm-rust-parity-age
 | `u`，`⇧⌘O` | 打开作者的 GitHub 主页（也在行的右键菜单里；`⇧⌘O` 在任何焦点下都可用） |
 | `⇧⌘C`，`⌘C` | 复制 GitHub 链接，多条一行一个（`⇧⌘C` 在任何焦点下都可用：列表有焦点时是所有选中条目，否则是详情里的条目；`⌘C` 只在列表里）。行也可以横向拖出去，作为带标题的链接 |
 | `+` / `-` | upvote / downvote 作者 |
-| `e` / `f` / `r` | 发给 Grok Bot：👀 Investigate / 🔥 Track / 🚀 Merge（§3.3；🚀 和重发要确认） |
+| `e` / `f` / `r` | 发给 Grok Bot：👀 Investigate / 🔥 Track / 🚀 Merge（§3.3；🚀 和重发先打开发送面板）；加 `⌥` 先打开面板写备注 |
 | `t` | 在 Claude app 里打开 agent session（board 的 Session 字段，最新的一个；§3.3） |
 | `c` | 聚焦评论框 |
 | `⌘R` | 立即同步 |
@@ -259,7 +259,7 @@ Rust frontend 的 parity agent（`richard` 仓库的 `notes/vllm-rust-parity-age
 ## 7. 本地状态（SQLite）
 
 - `items`：PR / Issue 的快照字段 + 原始 JSON，带所在仓库（编号只在仓库内唯一）
-- `item_state`：pinned、viewed_at、seen_at、各 Grok Bot 请求的发送时间（只存本地，按条目的 node id）
+- `item_state`：pinned、viewed_at、seen_at、各 Grok Bot 请求最后一次的发送时间和备注（只存本地，按条目的 node id）
 - `board_item`：board 条目的缓存（item id、Status 及其设置时间、Priority、Comment、Session）
 - `users`：login、头像、company、orgs、邮箱域名、committer 领域、来源、fetched_at
 - `org_overrides`：手动设置的映射

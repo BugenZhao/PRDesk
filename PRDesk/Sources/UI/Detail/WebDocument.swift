@@ -242,10 +242,10 @@ final class DocumentWebView: WKWebView {
     /// Read-only, so the find bar offers no Replace.
     override var isEditable: Bool { false }
 
-    /// The list's single-key shortcuts (j/k, w/b/s/m, 1/2/3, …) keep working while reading the
+    /// The list's single-key shortcuts (j/k, w/b/s/m, 1/2/3, ⌥e, …) keep working while reading the
     /// page; the page has no text fields of its own to type into.
     override func keyDown(with event: NSEvent) {
-        if event.modifierFlags.intersection([.command, .control, .option]).isEmpty,
+        if event.modifierFlags.intersection([.command, .control]).isEmpty,
            event.charactersIgnoringModifiers != "\u{1b}",
            let table = window?.contentView?.firstDescendant(of: ItemNSTableView.self),
            table.keyHandler?(event) == true

@@ -77,11 +77,11 @@ enum GrokBot {
     }
 
     /// The message for `request` on `items`: the emoji, then one line per item with its link and
-    /// title, as the viewer would paste them into the chat.
-    static func message(_ request: BotRequest, items: [Item]) -> String {
+    /// title, as the viewer would paste them into the chat; the viewer's note last, after a blank line.
+    static func message(_ request: BotRequest, items: [Item], note: String? = nil) -> String {
         let lines = items.map { "\($0.url) \($0.title)" }
         let body = lines.count == 1 ? " \(lines[0])" : "\n" + lines.map { "- \($0)" }.joined(separator: "\n")
-        return "[Sent from PR Desk] \(request.emoji)\(body)"
+        return "[Sent from PR Desk] \(request.emoji)\(body)" + (note.map { "\n\n\($0)" } ?? "")
     }
 
     /// Sends `text` to `bot` without waiting for the reply, which arrives in the Grok Bot app.

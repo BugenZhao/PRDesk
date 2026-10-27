@@ -15,6 +15,10 @@ struct ItemState: Codable, Hashable, Sendable {
     var investigateSentAt: Date?
     var trackSentAt: Date?
     var mergeSentAt: Date?
+    /// The viewer's note with the last send of each request.
+    var investigateNote: String?
+    var trackNote: String?
+    var mergeNote: String?
 
     init(itemID: Item.ID) {
         self.itemID = itemID
@@ -30,11 +34,19 @@ struct ItemState: Codable, Hashable, Sendable {
         }
     }
 
-    mutating func setSentAt(_ date: Date?, for request: BotRequest) {
+    func note(_ request: BotRequest) -> String? {
         switch request {
-        case .investigate: investigateSentAt = date
-        case .track: trackSentAt = date
-        case .merge: mergeSentAt = date
+        case .investigate: investigateNote
+        case .track: trackNote
+        case .merge: mergeNote
+        }
+    }
+
+    mutating func setSent(at date: Date?, note: String?, for request: BotRequest) {
+        switch request {
+        case .investigate: (investigateSentAt, investigateNote) = (date, note)
+        case .track: (trackSentAt, trackNote) = (date, note)
+        case .merge: (mergeSentAt, mergeNote) = (date, note)
         }
     }
 

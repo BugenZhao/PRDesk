@@ -275,9 +275,22 @@ struct ItemTableView: NSViewRepresentable {
         // MARK: Keyboard
 
         func handleKey(_ event: NSEvent) -> Bool {
-            guard event.modifierFlags.intersection([.command, .control, .option]).isEmpty,
+            guard event.modifierFlags.intersection([.command, .control]).isEmpty,
                   let key = event.charactersIgnoringModifiers
             else { return false }
+            // ⌥ with a Grok Bot key opens the send sheet to add a note.
+            if event.modifierFlags.contains(.option) {
+                let request: BotRequest? = switch key {
+                case "e": .investigate
+                case "f": .track
+                case "r": .merge
+                default: nil
+                }
+                guard let request else { return false }
+                let ids = selectedItemIDs
+                if !ids.isEmpty { parent.onAction(.sendToBot(request, withNote: true), ids) }
+                return true
+            }
             switch key {
             case "\u{1b}":
                 // Escape clears the selection, returning the detail pane to its empty state.
@@ -374,6 +387,8 @@ struct ItemTableView: NSViewRepresentable {
             var symbol: String?
             /// The list's single-key shortcut, shown beside the item.
             var key: String
+            /// Shown instead of the item before it while ⌥ is held, with the shortcut ⌥`key`.
+            var isAlternate = false
         }
 
         private static let menuActions: [MenuAction] = [
@@ -392,7 +407,9 @@ struct ItemTableView: NSViewRepresentable {
             MenuAction(title: "Upvote Author", action: .voteAuthor(.up), symbol: "hand.thumbsup", key: "+"),
             MenuAction(title: "Downvote Author", action: .voteAuthor(.down), symbol: "hand.thumbsdown", key: "-"),
             MenuAction(title: "👀 Investigate", action: .sendToBot(.investigate), key: "e"),
+            MenuAction(title: "👀 Investigate…", action: .sendToBot(.investigate, withNote: true), key: "e", isAlternate: true),
             MenuAction(title: "🔥 Track", action: .sendToBot(.track), key: "f"),
+            MenuAction(title: "🔥 Track…", action: .sendToBot(.track, withNote: true), key: "f", isAlternate: true),
             MenuAction(title: "🚀 Merge…", action: .sendToBot(.merge), key: "r"),
             MenuAction(title: "Open Agent Session", action: .openSession, symbol: "terminal", key: "t"),
         ]
@@ -403,7 +420,8 @@ struct ItemTableView: NSViewRepresentable {
             let menu = NSMenu()
             for (index, entry) in Self.menuActions.enumerated() {
                 let item = NSMenuItem(title: entry.title, action: #selector(performMenuAction(_:)), keyEquivalent: entry.key)
-                item.keyEquivalentModifierMask = []
+                item.keyEquivalentModifierMask = entry.isAlternate ? [.option] : []
+                item.isAlternate = entry.isAlternate
                 item.image = entry.symbol.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
                 item.tag = index
                 item.target = self
@@ -447,11 +465,11 @@ struct ItemTableView: NSViewRepresentable {
                 case let .triage(status): state { $0.listedTriage == status }
                 case let .priority(priority?): state { $0.priority == priority }
                 case let .voteAuthor(vote): state { $0.authorVote == vote }
-                case let .sendToBot(request): state { $0.state.sentAt(request) != nil }
+                case let .sendToBot(request, _): state { $0.state.sentAt(request) != nil }
                 default: .off
                 }
                 switch Self.menuActions[item.tag].action {
-                case let .sendToBot(request): item.isEnabled = targets.contains { request.applies(to: $0.item) }
+                case let .sendToBot(request, _): item.isEnabled = targets.contains { request.applies(to: $0.item) }
                 case .openSession: item.isEnabled = targets.contains { $0.board?.sessionLinks.isEmpty == false }
                 default: break
                 }
@@ -552,7 +570,8 @@ struct ItemTableView: NSViewRepresentable {
                     let truncated = (table.view(atColumn: column, row: row, makeIfNecessary: false) as? RunsCellView)?.truncatedText
                     let sent = itemRow.state.sentRequests.map { request in
                         let age = itemRow.state.sentAt(request)!.compactAge()
-                        return "\(request.emoji) Sent to \(request.bot) \(age == "now" ? "just now" : "\(age) ago")"
+                        let note = itemRow.state.note(request).map { ": \($0)" } ?? ""
+                        return "\(request.emoji) Sent to \(request.bot) \(age == "now" ? "just now" : "\(age) ago")\(note)"
                     }
                     let sessions = (itemRow.board?.sessionLinks ?? []).map { "Session: \($0.absoluteString)" }
                     let lines = [truncated].compactMap(\.self) + sent + sessions
