@@ -588,14 +588,26 @@ struct ItemTableView: NSViewRepresentable {
             return true
         }
 
-        func tableView(_: NSTableView, shouldSelectRow row: Int) -> Bool {
+        func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
             guard case let .header(section, _, _, _) = rows[row] else { return true }
             // A click on the header floating at the top lands here (one in place is taken by
-            // `ItemNSTableView.mouseDown`); keyboard navigation just skips over headers.
-            if let type = NSApp.currentEvent?.type, type == .leftMouseDown || type == .leftMouseUp {
+            // `ItemNSTableView.mouseDown`); keyboard navigation just skips over headers. The table
+            // also asks about headers it never clicked, such as those around a Shift-click range,
+            // so only a plain click on the floating header toggles its section.
+            if let event = NSApp.currentEvent, event.type == .leftMouseDown || event.type == .leftMouseUp,
+               event.modifierFlags.intersection([.shift, .command]).isEmpty,
+               row == floatingHeaderRow(in: tableView)
+            {
                 DispatchQueue.main.async { self.parent.onToggleSection(section) }
             }
             return false
+        }
+
+        /// The header floating at the top: that of the section the topmost visible row is in.
+        private func floatingHeaderRow(in table: NSTableView) -> Int? {
+            let top = table.rows(in: table.visibleRect).location
+            guard rows.indices.contains(top) else { return nil }
+            return rows[...top].lastIndex { if case .header = $0 { true } else { false } }
         }
 
         func tableViewSelectionDidChange(_ notification: Notification) {
