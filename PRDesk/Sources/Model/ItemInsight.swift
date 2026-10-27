@@ -171,7 +171,8 @@ struct ItemInsight: Hashable, Sendable {
         case .closed: "closed by \(who)"
         case .reopened: "reopened by \(who)"
         case .readyForReview: "\(who) marked ready"
-        case .reviewRequested: "\(who) requested your review"
+        // Only requests to the viewer are named, and Turn already says `review`.
+        case .reviewRequested: "\(who) requested"
         case .mentioned: "you were mentioned"
         }
     }
