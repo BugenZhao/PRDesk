@@ -40,8 +40,6 @@ final class AppModel {
     @ObservationIgnored private var lastSyncAttemptAt: Date?
     /// How often the poll loop checks whether a sync is due, so a new interval applies promptly.
     private static let pollTick: Duration = .seconds(15)
-    /// How long an item must stay selected before it counts as viewed.
-    private static let dwellBeforeViewed: Duration = .milliseconds(1200)
 
     private(set) var viewer: String?
     private(set) var syncState: SyncState = .idle
@@ -181,7 +179,6 @@ final class AppModel {
     @ObservationIgnored let engine: SyncEngine
     @ObservationIgnored let affiliationEngine: AffiliationEngine
     @ObservationIgnored private var tasks: [Task<Void, Never>] = []
-    @ObservationIgnored private var dwellTask: Task<Void, Never>?
     @ObservationIgnored private var detailTask: Task<Void, Never>?
     /// Cached details older than this are refreshed when shown, even if the item looks unchanged.
     private static let detailMaxAge: TimeInterval = 120
@@ -981,24 +978,23 @@ final class AppModel {
     private func selectionChanged(from old: TableSelection?) {
         guard selection?.itemID != old?.itemID else { return }
         recordHistory(from: old)
-        dwellTask?.cancel()
         loadDetail()
         guard let item = selectedItem else {
             selectedItemPreviousSeenAt = nil
             return
         }
         selectedItemPreviousSeenAt = [state(for: item).seenAt, snapshot.baseline].compactMap(\.self).max()
+        // Opening counts at once; only the user's own selections open anything.
         guard !isAutoSelecting else { return }
-        dwellTask = Task { [weak self] in
-            try? await Task.sleep(for: Self.dwellBeforeViewed)
-            guard !Task.isCancelled, let self else { return }
-            let now = Date()
-            updateState(item) { state in
-                state.viewedAt = now
-                state.seenAt = now
-            }
-            markNotificationRead(item)
+        let now = Date()
+        // Recently viewed is ordered by this time, so moving through it doesn't reorder it under the
+        // selection (where j would bounce between the top two rows).
+        let bumpsRecent = selection?.section != .recent
+        updateState(item) { state in
+            if bumpsRecent { state.viewedAt = now }
+            state.seenAt = now
         }
+        markNotificationRead(item)
     }
 
     // MARK: Rows

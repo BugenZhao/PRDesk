@@ -119,7 +119,7 @@ Rust frontend 的 parity agent（`richard` 仓库的 `notes/vllm-rust-parity-age
 
 从上到下：
 
-- **Recently viewed**：最近查看的 8 条（本地）
+- **Recently viewed**：最近查看的 8 条（本地）。选中一条即算查看并标已读，没有延迟；只算我自己的选中，列表自己选中的（比如所在行离开列表后选中邻行、启动时恢复选中）不算。在 Recently viewed 里选中只标已读、不改它的顺序，免得 `j` 在最上面两行间来回跳
 - **Pinned**：`p` 置顶的条目（本地）
 - **Working**：Status = Working 的 open 条目，加上我自己开的、没有 Status 的 open 条目；approve 了的 PR 除外；我自己开的排最前，其次 Turn = me 的
 - **Good**：同上，已 approve 的 open PR；我自己开的排最前
