@@ -85,6 +85,25 @@ struct MainView: View {
             actions: { Button("OK") {} },
             message: { Text(model.writeError ?? "") }
         )
+        .alert(
+            "Grok Bot not reached",
+            isPresented: Binding(get: { model.botError != nil }, set: { if !$0 { model.botError = nil } }),
+            actions: { Button("OK") {} },
+            message: { Text(model.botError ?? "") }
+        )
+        .alert(
+            model.pendingBotSend.map(Self.confirmTitle) ?? "",
+            isPresented: Binding(get: { model.pendingBotSend != nil }, set: { if !$0 { model.pendingBotSend = nil } }),
+            presenting: model.pendingBotSend,
+            actions: { pending in
+                Button("Send") { model.sendToBot(pending.request, items: pending.items) }
+                    .keyboardShortcut(.defaultAction)
+                Button("Cancel", role: .cancel) {}
+            },
+            message: { pending in
+                Text(pending.items.map { "#\($0.number) \($0.title)" }.joined(separator: "\n"))
+            }
+        )
         .task {
             #if DEBUG
                 // `-PRDeskAppearance dark|light` forces an appearance, for checking both without
@@ -95,6 +114,12 @@ struct MainView: View {
             #endif
             model.start()
         }
+    }
+
+    private static func confirmTitle(_ pending: PendingBotSend) -> String {
+        let what = pending.items.count == 1 ? "#\(pending.items[0].number)" : "\(pending.items.count) items"
+        let again = pending.resends == 0 ? "" : pending.resends == pending.items.count ? " again" : " (\(pending.resends) again)"
+        return "Send \(what) to \(pending.request.bot) \(pending.request.emoji)\(again)?"
     }
 }
 

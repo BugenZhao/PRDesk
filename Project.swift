@@ -16,6 +16,16 @@ let project = Project(
             infoPlist: .file(path: "PRDesk/Info.plist"),
             sources: ["PRDesk/Sources/**"],
             resources: ["PRDesk/AppIcon.icon", "PRDesk/Assets.xcassets", "PRDesk/Web/**"],
+            scripts: [
+                // The grokbot CLI, for sending items to Grok Bots. Its build is cached by commit.
+                .post(
+                    path: "scripts/embed-grokbot.sh",
+                    name: "Embed grokbot",
+                    inputPaths: ["$(SRCROOT)/scripts/embed-grokbot.sh"],
+                    outputPaths: ["$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/grokbot"],
+                    basedOnDependencyAnalysis: true
+                ),
+            ],
             dependencies: [
                 .package(product: "GRDB"),
             ],

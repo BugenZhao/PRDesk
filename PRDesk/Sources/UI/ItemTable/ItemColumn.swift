@@ -175,6 +175,11 @@ enum ItemColumn: String, CaseIterable {
             .icon(item.stateIcon, color: item.stateColor),
             titleRun(item.title, bold: row.insight.isUnread),
         ]
+        // What the item was sent to a Grok Bot for.
+        let sent = row.state.sentRequests.map(\.emoji).joined()
+        if !sent.isEmpty {
+            runs.append(.text(sent, font: CellFont.small))
+        }
         if let note = row.note {
             runs.append(.chip(note.reasonLabel, color: .controlAccentColor))
             // The Inbox has no triage sections, so say where the item stands.

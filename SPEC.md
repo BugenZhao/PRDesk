@@ -9,6 +9,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 - 用户：当前 `gh` 登录用户（BugenZhao），所有 "me / you" 语义都以它为准
 - 分诊结果的 source of truth：GitHub Project **Bugen's Board**（`vllm-project` 的 #56），见 §3.1
 - 不做：Claude / 终端面板、Task 类条目、Collection、Notes、IDE / worktree 集成
+- Grok Bot：只把条目派给 bot（§3.3），不运行 agent，也不读 bot 的对话或状态
 
 ## 2. 技术栈
 
@@ -96,6 +97,16 @@ Rust frontend 的 parity agent（`richard` 仓库的 `notes/vllm-rust-parity-age
 - 列：Author（总是 agent 或我）换成 **Link**，显示另一端 PR 的状态图标和编号：staging PR 显示它的 upstream PR，Upstream 里的 upstream PR 显示它的 staging PR；悬停显示仓库和标题
 - GitHub App（如 agent）的头像不能按用户名取，用同步时拿到的头像 URL
 
+## 3.3 派给 Grok Bot
+
+我在 Grok Bot 聊天里用 emoji 给 bot 派活；app 用同样的说法，把选中的条目发给 bot（经 app 内置的 grokbot CLI，`grokbot ask --no-wait`），结果照旧回到 Grok Bot 里：
+
+- 👀 Investigate（`e`）→ Richard Loop：让 agent 进一步调查
+- 🔥 Track（`f`）→ Richard Loop：加到 Notion tracker 下一个工作日；Richard 会把它在 board 上设为 Working，所以 app 不动 board
+- 🚀 Merge（`r`）→ Merger：按 merge skill 走 CI 并合并；只对仓库里 open 的 PR 生效（staging PR 走 parity agent），给 PR 号就是授权，所以发之前总要确认
+
+消息是 `[Sent from PR Desk] <emoji> <链接> <标题>`，多选时一条消息、每条目一行（🚀 即一个批次）。发过的条目在标题后显示对应的 emoji，悬停显示发给谁、多久之前；同一 emoji 再发一次要先确认。bot 名字在 Settings → Grok Bot 里改（名字、唯一前缀或 id）；CLI 的登录和其他 grokbot 共用（`grokbot login`）。构建时 `scripts/embed-grokbot.sh` 按脚本里固定的 commit 编译 grokbot-cli（按 commit 缓存），签名后放进 `Contents/Helpers/`。测试时 dry-run 只记日志不发。
+
 ## 4. 主界面
 
 ```
@@ -138,7 +149,7 @@ Rust frontend 的 parity agent（`richard` 仓库的 `notes/vllm-rust-parity-age
 | （整行） | 已关闭的条目整行变淡；draft PR 也整行变淡（只保留未读点），一眼和待 review 的 PR 分开 |
 | P | 优先级（来自 board），用 SF Symbol：H 双感叹号（红）、M 单感叹号（橙）、L 横杠（灰） |
 | # | 编号；PR / Issue 用不同的小图标区分 |
-| Title | 状态图标 + 标题（开头的 `[..]` / `xx:` 标签变淡），被唤醒的条目带原因标签；有 board Comment 时接着显示备注；灰色的最新事件摘要（如 `@xx commented 2h`、`you reviewed 2d`）始终靠右对齐；被截断的文字（标题、备注、摘要）悬停时 tooltip 显示全文 |
+| Title | 状态图标 + 标题（开头的 `[..]` / `xx:` 标签变淡），被唤醒的条目带原因标签；发给过 Grok Bot 的条目带对应 emoji（§3.3）；有 board Comment 时接着显示备注；灰色的最新事件摘要（如 `@xx commented 2h`、`you reviewed 2d`）始终靠右对齐；被截断的文字（标题、备注、摘要）悬停时 tooltip 显示全文 |
 | Author | 头像 + 用户名（首次贡献者为斜体）+ 投票图标；可信标记（seal、组织徽章，见 §5、§5.2）靠右对齐 |
 | Review | 裸 ✓ + approve 总数（含我）：别人的 PR，我 approve 过时为绿色，只有别人 approve 时为灰色；我自己的 PR（自己不能 approve）在 reviewDecision = APPROVED（approve 已满足合并要求，和 Good 分组同一条件）时为绿色，否则灰色；我 request changes 时后面多一个红 ✗。和 CI 列同样的结构：小标记 + 数字，固定位置 |
 | Turn | `review`（请求我 review 且未完成）/ `me` / `them` / 空（已关闭） |
@@ -177,6 +188,7 @@ Rust frontend 的 parity agent（`richard` 仓库的 `notes/vllm-rust-parity-age
 | `u`，`⇧⌘O` | 打开作者的 GitHub 主页（也在行的右键菜单里；`⇧⌘O` 在任何焦点下都可用） |
 | `⇧⌘C`，`⌘C` | 复制 GitHub 链接，多条一行一个（`⇧⌘C` 在任何焦点下都可用：列表有焦点时是所有选中条目，否则是详情里的条目；`⌘C` 只在列表里）。行也可以横向拖出去，作为带标题的链接 |
 | `+` / `-` | upvote / downvote 作者 |
+| `e` / `f` / `r` | 发给 Grok Bot：👀 Investigate / 🔥 Track / 🚀 Merge（§3.3；🚀 和重发要确认） |
 | `c` | 聚焦评论框 |
 | `⌘R` | 立即同步 |
 | `⌘1` / `⌘2` / `⌘3` | 切换 Dashboard / Parity / Inbox |
@@ -244,7 +256,7 @@ Rust frontend 的 parity agent（`richard` 仓库的 `notes/vllm-rust-parity-age
 ## 7. 本地状态（SQLite）
 
 - `items`：PR / Issue 的快照字段 + 原始 JSON，带所在仓库（编号只在仓库内唯一）
-- `item_state`：pinned、viewed_at、seen_at（只存本地，按条目的 node id）
+- `item_state`：pinned、viewed_at、seen_at、各 Grok Bot 请求的发送时间（只存本地，按条目的 node id）
 - `board_item`：board 条目的缓存（item id、Status 及其设置时间、Priority、Comment）
 - `users`：login、头像、company、orgs、邮箱域名、committer 领域、来源、fetched_at
 - `org_overrides`：手动设置的映射

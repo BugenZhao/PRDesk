@@ -19,6 +19,18 @@ enum ItemAction {
     case voteAuthor(Vote)
     /// Brings an item opened from a link onto the desk.
     case addToDesk
+    /// Sends the items to a Grok Bot with the request's emoji.
+    case sendToBot(BotRequest)
+}
+
+/// A send to a Grok Bot waiting for the viewer's go-ahead: every merge, and any request the items
+/// were already sent with.
+struct PendingBotSend: Identifiable {
+    let id = UUID()
+    var request: BotRequest
+    var items: [Item]
+    /// How many of `items` were sent with this request before.
+    var resends: Int
 }
 
 @MainActor
@@ -118,6 +130,9 @@ final class AppModel {
 
     /// The last write to the board that failed, shown until dismissed.
     var writeError: String?
+    /// The last send to a Grok Bot that failed, shown until dismissed.
+    var botError: String?
+    var pendingBotSend: PendingBotSend?
 
     /// Bumped to move keyboard focus to the filter field or back to the table.
     private(set) var filterFocusRequest = 0
@@ -683,6 +698,9 @@ final class AppModel {
             addToDesk(items)
         case .addToDesk:
             addToDesk(items.filter(canAddToDesk))
+        case .sendToBot(.merge):
+            // Merger merges open upstream PRs; staging PRs go through the parity agent.
+            items = items.filter { $0.kind == .pullRequest && $0.isOpen && $0.isUpstream }
         default:
             break
         }
@@ -730,6 +748,32 @@ final class AppModel {
             setVotes(authors.map { ($0, clear ? nil : vote) })
         case .addToDesk:
             break
+        case let .sendToBot(request):
+            let resends = items.count { state(for: $0).sentAt(request) != nil }
+            if request == .merge || resends > 0 {
+                pendingBotSend = PendingBotSend(request: request, items: items, resends: resends)
+            } else {
+                sendToBot(request, items: items)
+            }
+        }
+    }
+
+    /// Sends `items` to the request's bot in one message, then marks them sent.
+    func sendToBot(_ request: BotRequest, items: [Item]) {
+        let text = GrokBot.message(request, items: items)
+        let bot = request.bot
+        Task {
+            do {
+                try await GrokBot.send(text, to: bot)
+            } catch {
+                logger.error("Failed to send to \(bot, privacy: .public): \(String(describing: error), privacy: .public)")
+                botError = "Couldn't send \(request.emoji) to \(bot): \(error.localizedDescription)"
+                return
+            }
+            let now = Date()
+            for item in items {
+                updateState(item) { $0.setSentAt(now, for: request) }
+            }
         }
     }
 

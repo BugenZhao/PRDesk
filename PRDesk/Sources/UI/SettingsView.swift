@@ -12,6 +12,9 @@ struct SettingsView: View {
             Tab("Votes", systemImage: "hand.thumbsup") {
                 VoteSettingsView()
             }
+            Tab("Grok Bot", systemImage: "paperplane") {
+                GrokBotSettingsView()
+            }
         }
         .frame(width: 520)
     }
@@ -64,6 +67,52 @@ private struct TokenSettingsView: View {
         }
         .formStyle(.grouped)
         .task { hasSavedToken = Keychain.readToken() != nil }
+    }
+}
+
+private struct GrokBotSettingsView: View {
+    @AppStorage(GrokBot.assistantBotKey) private var assistant = GrokBot.defaultAssistantBot
+    @AppStorage(GrokBot.mergeBotKey) private var merger = GrokBot.defaultMergeBot
+    /// nil while checking; the account, or why there is none.
+    @State private var account: Result<String?, any Error>?
+
+    var body: some View {
+        Form {
+            Section {
+                TextField("👀 Investigate, 🔥 Track", text: $assistant, prompt: Text(GrokBot.defaultAssistantBot))
+                TextField("🚀 Merge", text: $merger, prompt: Text(GrokBot.defaultMergeBot))
+            } header: {
+                Text("Bots")
+            } footer: {
+                Text("A bot's name, a unique prefix of it, or its id. e, f and r in the list send the selected items; merging asks first.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                LabeledContent("Account") {
+                    switch account {
+                    case nil: ProgressView().controlSize(.small)
+                    case let .success(name?): Text(name)
+                    case .success(nil): Text("Not signed in").foregroundStyle(.secondary)
+                    case let .failure(error): Text(error.localizedDescription).foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("grokbot CLI")
+            } footer: {
+                Text("Built into the app, and signed in like any other grokbot: run `grokbot login` in Terminal.")
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+        }
+        .formStyle(.grouped)
+        .task {
+            do {
+                account = .success(try await GrokBot.whoami())
+            } catch {
+                account = .failure(error)
+            }
+        }
     }
 }
 

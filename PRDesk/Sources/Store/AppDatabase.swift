@@ -226,6 +226,13 @@ final class AppDatabase: Sendable {
             // Head branches weren't fetched before, and the fork's PRs not at all; start over.
             try db.execute(sql: "DELETE FROM meta WHERE key = 'lastSyncStartedAt'")
         }
+        migrator.registerMigration("v15") { db in
+            try db.alter(table: "itemState") { t in
+                t.add(column: "investigateSentAt", .datetime)
+                t.add(column: "trackSentAt", .datetime)
+                t.add(column: "mergeSentAt", .datetime)
+            }
+        }
         return migrator
     }
 }

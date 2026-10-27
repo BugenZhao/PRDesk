@@ -304,6 +304,9 @@ struct ItemTableView: NSViewRepresentable {
                 case "-": .voteAuthor(.down)
                 case "o", "\r": .openInBrowser
                 case "u": .openAuthorProfile
+                case "e": .sendToBot(.investigate)
+                case "f": .sendToBot(.track)
+                case "r": .sendToBot(.merge)
                 default: nil
                 }
                 guard let action else { return false }
@@ -386,9 +389,12 @@ struct ItemTableView: NSViewRepresentable {
             MenuAction(title: "Mark as Read", action: .markRead, symbol: "envelope.open", key: "n"),
             MenuAction(title: "Upvote Author", action: .voteAuthor(.up), symbol: "hand.thumbsup", key: "+"),
             MenuAction(title: "Downvote Author", action: .voteAuthor(.down), symbol: "hand.thumbsdown", key: "-"),
+            MenuAction(title: "Investigate", action: .sendToBot(.investigate), symbol: "eyes", key: "e"),
+            MenuAction(title: "Track", action: .sendToBot(.track), symbol: "flame", key: "f"),
+            MenuAction(title: "Merge…", action: .sendToBot(.merge), symbol: "arrow.triangle.merge", key: "r"),
         ]
         /// Indices of `menuActions` after which a separator goes.
-        private static let menuSeparatorsAfter: Set = [1, 5, 9, 11]
+        private static let menuSeparatorsAfter: Set = [1, 5, 9, 11, 13]
 
         func makeContextMenu() -> NSMenu {
             let menu = NSMenu()
@@ -436,6 +442,7 @@ struct ItemTableView: NSViewRepresentable {
                 case let .triage(status): state { $0.listedTriage == status }
                 case let .priority(priority?): state { $0.priority == priority }
                 case let .voteAuthor(vote): state { $0.authorVote == vote }
+                case let .sendToBot(request): state { $0.state.sentAt(request) != nil }
                 default: .off
                 }
             }
@@ -531,7 +538,14 @@ struct ItemTableView: NSViewRepresentable {
                       let itemColumn = ItemColumn(rawValue: table.tableColumns[column].identifier.rawValue)
                 else { return nil }
                 switch itemColumn {
-                case .title: return (table.view(atColumn: column, row: row, makeIfNecessary: false) as? RunsCellView)?.truncatedText
+                case .title:
+                    let truncated = (table.view(atColumn: column, row: row, makeIfNecessary: false) as? RunsCellView)?.truncatedText
+                    let sent = itemRow.state.sentRequests.map { request in
+                        let age = itemRow.state.sentAt(request)!.compactAge()
+                        return "\(request.emoji) Sent to \(request.bot) \(age == "now" ? "just now" : "\(age) ago")"
+                    }
+                    let lines = [truncated].compactMap(\.self) + sent
+                    return lines.isEmpty ? nil : lines.joined(separator: "\n")
                 case .author: return authorTooltip(itemRow.item.author)
                 case .link: return itemRow.paired.map { "\($0.repo)#\($0.number) \($0.title)" }
                 case .ci: return ItemColumn.ciTooltip(itemRow.item)
