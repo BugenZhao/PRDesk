@@ -51,7 +51,9 @@ struct DetailView: View {
                     ComposerView(item: item, detail: detail)
                 }
             case .checks:
+                // A list of its own per item, so scroll and expanded groups don't carry over.
                 ChecksView(checks: detail.checks)
+                    .id(item.id)
             case .files:
                 FilesView(item: item, page: filesPage)
             }
