@@ -9,7 +9,9 @@ enum ItemAction {
     /// Sets the board Priority; choosing the current one again clears it.
     case priority(Priority?)
     case togglePin
-    case markRead
+    /// Marks the items read; if all are read already, makes each unread again from its latest
+    /// activity by others. Only local: GitHub can't mark a notification unread.
+    case toggleRead
     case openInBrowser
     /// Opens the GitHub profiles of the items' authors.
     case openAuthorProfile
@@ -781,10 +783,20 @@ final class AppModel {
         case .togglePin:
             let pin = !items.allSatisfy { state(for: $0).isPinned }
             setPins(items.map { ($0, pin ? state(for: $0).pinnedAt ?? now : nil) })
-        case .markRead:
-            for item in items {
-                updateState(item) { $0.seenAt = now }
-                markNotificationRead(item)
+        case .toggleRead:
+            let rows = items.map { ($0, insight(for: $0, state: state(for: $0))) }
+            if rows.contains(where: { $0.1.isUnread }) {
+                for item in items {
+                    updateState(item) { $0.seenAt = now }
+                    markNotificationRead(item)
+                }
+            } else {
+                // GitHub times are whole seconds: a second before the latest activity by others
+                // leaves just that unread.
+                for (item, insight) in rows {
+                    guard let latest = insight.othersActivityAt else { continue }
+                    updateState(item) { $0.seenAt = latest.addingTimeInterval(-1) }
+                }
             }
         case .openInBrowser:
             // Opening dozens of tabs is never what a stray keypress meant.
@@ -1116,7 +1128,7 @@ final class AppModel {
             selectedItemPreviousSeenAt = nil
             return
         }
-        selectedItemPreviousSeenAt = [state(for: item).seenAt, snapshot.baseline].compactMap(\.self).max()
+        selectedItemPreviousSeenAt = state(for: item).seenAt ?? snapshot.baseline
         // Opening counts at once; only the user's own selections open anything.
         guard !isAutoSelecting else { return }
         let now = Date()

@@ -7,7 +7,8 @@ struct ItemState: Codable, Hashable, Sendable {
     var pinnedAt: Date?
     /// Last time the item was opened in the detail pane (for Recently viewed).
     var viewedAt: Date?
-    /// Activity by others after this is unread. Opening an item or `n` moves it forward.
+    /// Activity by others after this is unread. Opening an item or `n` moves it forward;
+    /// `n` on a read item moves it back to just before the latest activity by others.
     var seenAt: Date?
     /// The viewer's subscription when the item went Skipped or Muted, put back when it leaves them.
     var subscriptionBeforeQuiet: String?

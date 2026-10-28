@@ -311,7 +311,7 @@ struct ItemTableView: NSViewRepresentable {
                 case "3": .priority(.low)
                 case "0": .priority(nil)
                 case "p": .togglePin
-                case "n": .markRead
+                case "n": .toggleRead
                 case "a": .addToDesk
                 case "+", "=": .voteAuthor(.up)
                 case "-": .voteAuthor(.down)
@@ -403,7 +403,7 @@ struct ItemTableView: NSViewRepresentable {
             MenuAction(title: "Low Priority", action: .priority(.low), symbol: Priority.low.symbol, key: "3"),
             MenuAction(title: "Clear Priority", action: .priority(nil), symbol: "xmark", key: "0"),
             MenuAction(title: "Pin / Unpin", action: .togglePin, symbol: "pin", key: "p"),
-            MenuAction(title: "Mark as Read", action: .markRead, symbol: "envelope.open", key: "n"),
+            MenuAction(title: "Mark as Read / Unread", action: .toggleRead, symbol: "envelope.open", key: "n"),
             MenuAction(title: "Upvote Author", action: .voteAuthor(.up), symbol: "hand.thumbsup", key: "+"),
             MenuAction(title: "Downvote Author", action: .voteAuthor(.down), symbol: "hand.thumbsdown", key: "-"),
             MenuAction(title: "👀 Investigate", action: .sendToBot(.investigate), key: "e"),
