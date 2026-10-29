@@ -20,6 +20,29 @@ struct SettingsView: View {
     }
 }
 
+private extension View {
+    func settingsPage() -> some View { modifier(SettingsPage()) }
+}
+
+/// A grouped form as tall as its content, so the window grows and shrinks with each tab as in
+/// classic Settings windows, up to a cap past which the form scrolls.
+private struct SettingsPage: ViewModifier {
+    private static let maxHeight: CGFloat = 640
+    @State private var height: CGFloat?
+
+    func body(content: Content) -> some View {
+        content
+            .formStyle(.grouped)
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                // The top inset is the toolbar's, which the window adds on its own.
+                geometry.contentSize.height + geometry.contentInsets.bottom
+            } action: { _, height in
+                self.height = height
+            }
+            .frame(height: height.map { min($0, Self.maxHeight) })
+    }
+}
+
 private struct TokenSettingsView: View {
     @Environment(AppModel.self) private var model
     @State private var token = ""
@@ -76,7 +99,7 @@ private struct TokenSettingsView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .formStyle(.grouped)
+        .settingsPage()
         .task { hasSavedToken = Keychain.readToken() != nil }
     }
 }
@@ -116,7 +139,7 @@ private struct GrokBotSettingsView: View {
                     .textSelection(.enabled)
             }
         }
-        .formStyle(.grouped)
+        .settingsPage()
         .task {
             do {
                 account = .success(try await GrokBot.whoami())
@@ -218,7 +241,7 @@ private struct AffiliationSettingsView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .formStyle(.grouped)
+        .settingsPage()
     }
 }
 
@@ -260,6 +283,6 @@ private struct VoteSettingsView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .formStyle(.grouped)
+        .settingsPage()
     }
 }
