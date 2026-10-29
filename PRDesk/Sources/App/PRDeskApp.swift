@@ -3,6 +3,8 @@ import SwiftUI
 @main
 struct PRDeskApp: App {
     @State private var model: AppModel
+    /// Set in General settings; ⌘-dragging the icon out of the menu bar clears it too.
+    @AppStorage("showsMenuBarExtra") private var showsMenuBarExtra = true
 
     init() {
         // Tooltips carry details the dense list leaves out, so show them almost at once (AppKit's
@@ -28,7 +30,7 @@ struct PRDeskApp: App {
                 .environment(model)
         }
 
-        MenuBarExtra {
+        MenuBarExtra(isInserted: $showsMenuBarExtra) {
             MenuBarContent()
                 .environment(model)
         } label: {

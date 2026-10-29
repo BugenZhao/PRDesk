@@ -23,6 +23,8 @@ struct SettingsView: View {
 private struct TokenSettingsView: View {
     @Environment(AppModel.self) private var model
     @State private var token = ""
+    /// The same setting as `PRDeskApp`'s, which inserts the menu bar extra.
+    @AppStorage("showsMenuBarExtra") private var showsMenuBarExtra = true
     /// Loaded in `.task`: a keychain read is too slow to repeat on every view rebuild.
     @State private var hasSavedToken = false
 
@@ -62,6 +64,15 @@ private struct TokenSettingsView: View {
                 Text("Sync")
             } footer: {
                 Text("Each round costs a few of GitHub's 5,000 hourly API points; the triage board is read at most every 3 minutes. ⌘R syncs everything at once.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Toggle("Show in menu bar", isOn: $showsMenuBarExtra)
+            } header: {
+                Text("Menu bar")
+            } footer: {
+                Text("The unread inbox count, with a menu of the items you are working on.")
                     .foregroundStyle(.secondary)
             }
         }
