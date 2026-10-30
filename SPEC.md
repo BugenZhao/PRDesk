@@ -109,6 +109,16 @@ Rust frontend 的 parity agent（`richard` 仓库的 `notes/vllm-rust-parity-age
 
 消息是 `[Sent from PR Desk] <emoji> <链接> <标题>`，多选时一条消息、每条目一行（🚀 即一个批次）。按住 ⌥（`⌥E` / `⌥F` / `⌥R`，或右键菜单里按住 ⌥ 出现的「…」项）先打开发送面板，可以附一段给 bot 的备注，放在消息最后、空一行之后原样发出；🚀 和重发也总是先打开这个面板（备注可空，`⌘↩` 发送，`esc` 取消）。按下就在标题后画出 emoji：发送中半透明，CLI 返回成功后变实并存进本地数据库，失败则撤掉（不留痕迹）。发过的条目在标题后显示对应的 emoji，悬停显示发给谁、多久之前和当时的备注（每种请求只记最后一次）。bot 名字在 Settings → Grok Bot 里改（名字、唯一前缀或 id）；CLI 的登录和其他 grokbot 共用（`grokbot login`）。构建时 `scripts/embed-grokbot.sh` 按脚本里固定的 commit 编译 grokbot-cli（按 commit 缓存），签名后放进 `Contents/Helpers/`。测试时 dry-run 只记日志不发。
 
+## 3.4 同步 pin 到 Yab
+
+Settings → General → Yab 打开后（默认关），app 把 Pinned 单向同步到 Yab 侧边栏：指定 space（默认 Inferact）pinned 区里名为 `PR Desk` 的 folder，经 Yab 的 `yab exec` 执行，不弹确认。
+
+- **Pin**：加一个休眠的 tab，folder 不存在时自动创建。这个 PR 已开在今天的 tab 里就移进 folder；已被我保留在别处就不动，等它离开后再加。
+- **Unpin**：关闭 app 加的那个 tab。正看着的 tab 等离开后再关；已移出 folder 的算我的，不关。
+- **在 Yab 里关掉 tab**：pin 不变，也不会加回来；取消再重新 pin 才会再加。Yab 这边的改动不回传。
+- **时机**：pin 变化时和每轮同步后各对账一次。Yab 只能读写屏幕上的 space，所以 Yab 没开或目标 space 不在屏幕上时先不动，等之后的轮次，Settings 里显示在等什么。
+- 测试时 dry-run 只记日志不动 Yab；测试副本有自己的偏好设置，默认不同步。
+
 ## 4. 主界面
 
 ```
@@ -261,7 +271,7 @@ Rust frontend 的 parity agent（`richard` 仓库的 `notes/vllm-rust-parity-age
 ## 7. 本地状态（SQLite）
 
 - `items`：PR / Issue 的快照字段 + 原始 JSON，带所在仓库（编号只在仓库内唯一）
-- `item_state`：pinned、viewed_at、seen_at、各 Grok Bot 请求最后一次的发送时间和备注（只存本地，按条目的 node id）
+- `item_state`：pinned、viewed_at、seen_at、各 Grok Bot 请求最后一次的发送时间和备注、pin 在 Yab 里对应的 tab id（只存本地，按条目的 node id）
 - `board_item`：board 条目的缓存（item id、Status 及其设置时间、Priority、Comment、Session）
 - `users`：login、头像、company、orgs、邮箱域名、committer 领域、来源、fetched_at
 - `org_overrides`：手动设置的映射

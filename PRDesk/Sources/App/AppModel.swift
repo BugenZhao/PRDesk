@@ -53,6 +53,10 @@ final class AppModel {
     }
 
     static let syncIntervals = [60, 120, 300, 600, 900]
+    /// Why pins aren't in Yab yet, if anything, for Settings.
+    var yabPinsNote: String?
+    @ObservationIgnored private var yabPinsTask: Task<Void, Never>?
+    @ObservationIgnored private var yabPinsAgain = false
     /// Rounds are timed from the last attempt, so a failing sync isn't retried every tick.
     @ObservationIgnored private var lastSyncAttemptAt: Date?
     /// How often the poll loop checks whether a sync is due, so a new interval applies promptly.
@@ -435,6 +439,7 @@ final class AppModel {
             logger.error("Sync failed: \(String(describing: error), privacy: .public)")
             syncState = .failed(error.localizedDescription)
         }
+        syncYabPins()
     }
 
     private func syncInbox() async {
@@ -932,6 +937,30 @@ final class AppModel {
         for change in changes {
             let pinnedAt = change.pinnedAt
             updateState(change.item) { $0.pinnedAt = pinnedAt }
+        }
+        syncYabPins()
+    }
+
+    /// Runs a round of `YabPins`, or one more after the one in flight: on a pin, after each sync
+    /// (for what had to wait for Yab or its space) and from Settings.
+    func syncYabPins() {
+        guard YabPins.isEnabled else {
+            yabPinsNote = nil
+            return
+        }
+        guard yabPinsTask == nil else {
+            yabPinsAgain = true
+            return
+        }
+        yabPinsTask = Task { [weak self, db] in
+            repeat {
+                self?.yabPinsAgain = false
+                // Lets the writes of the pins that started this land first.
+                try? await Task.sleep(for: .milliseconds(300))
+                let note = await YabPins.reconcile(db: db)
+                self?.yabPinsNote = note
+            } while self?.yabPinsAgain == true
+            self?.yabPinsTask = nil
         }
     }
 

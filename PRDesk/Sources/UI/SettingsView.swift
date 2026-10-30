@@ -48,6 +48,8 @@ private struct TokenSettingsView: View {
     @State private var token = ""
     /// The same setting as `PRDeskApp`'s, which inserts the menu bar extra.
     @AppStorage("showsMenuBarExtra") private var showsMenuBarExtra = true
+    @AppStorage(YabPins.enabledKey) private var yabPinsEnabled = false
+    @AppStorage(YabPins.spaceKey) private var yabPinsSpace = YabPins.defaultSpace
     /// Loaded in `.task`: a keychain read is too slow to repeat on every view rebuild.
     @State private var hasSavedToken = false
 
@@ -97,6 +99,24 @@ private struct TokenSettingsView: View {
             } footer: {
                 Text("The unread inbox count, with a menu of the items you are working on.")
                     .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Toggle("Sync pins to Yab", isOn: $yabPinsEnabled)
+                    .onChange(of: yabPinsEnabled) { model.syncYabPins() }
+                TextField("Space", text: $yabPinsSpace, prompt: Text(YabPins.defaultSpace))
+                    .onSubmit { model.syncYabPins() }
+                    .disabled(!yabPinsEnabled)
+            } header: {
+                Text("Yab")
+            } footer: {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Pinned items become tabs in the \(YabPins.folder) folder of this space's pinned tabs, while the space is on screen in Yab. Unpinning closes them, unless you moved them out of the folder; closing one in Yab leaves the pin.")
+                        .foregroundStyle(.secondary)
+                    if let note = model.yabPinsNote {
+                        Text(note)
+                    }
+                }
             }
         }
         .settingsPage()
