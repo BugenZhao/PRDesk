@@ -180,7 +180,7 @@ Rust frontend 的 parity agent（`richard` 仓库的 `notes/vllm-rust-parity-age
 | 键 | 作用 |
 |---|---|
 | `j` / `k`，`↑` / `↓` | 移动 |
-| `esc` | 取消选中，详情面板回到空状态 |
+| `esc` | 取消选中，详情面板回到空状态；没有选中时清空过滤 |
 | `⌘` / `⇧` 点击 | 多选；下面的快捷键和右键菜单作用于所有选中条目（右键的行不在选区里时只作用于该行）。切换类操作按整体切换：都已是该状态则清除，否则全部设置 |
 | `/` | 聚焦过滤框 |
 | `w` / `b` / `s` / `m` | Status 设为 Working / Backlog / Skipped / Muted；再按一次同一个键清除 Status（回到未分诊）；被唤醒的 Skipped 条目按 `s` 是重新 skip，不清除 |

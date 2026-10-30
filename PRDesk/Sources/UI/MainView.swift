@@ -32,6 +32,11 @@ struct MainView: View {
                 onToggleSection: { model.toggleCollapsed($0) },
                 onFocusFilter: { model.requestFilterFocus() },
                 onFocusComposer: { model.requestComposerFocus() },
+                onClearFilter: {
+                    guard !model.filterText.isEmpty else { return false }
+                    model.filterText = ""
+                    return true
+                },
                 onAutoSelect: { model.autoSelect($0) },
                 listUndoManager: model.undoManager
             )

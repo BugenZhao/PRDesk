@@ -20,6 +20,8 @@ struct ItemTableView: NSViewRepresentable {
     var onToggleSection: (ListSection) -> Void
     var onFocusFilter: () -> Void
     var onFocusComposer: () -> Void
+    /// Clears the list filter; false if there was none.
+    var onClearFilter: () -> Bool
     /// Selection made by the table itself (e.g. moving to a neighbor when the selected row goes
     /// away); unlike user selection it must not count as opening the item.
     var onAutoSelect: (TableSelection?) -> Void
@@ -293,9 +295,14 @@ struct ItemTableView: NSViewRepresentable {
             }
             switch key {
             case "\u{1b}":
-                // Escape clears the selection, returning the detail pane to its empty state.
-                guard let table, table.selectedRow != -1 else { return false }
-                table.deselectAll(nil)
+                // Escape clears the selection, returning the detail pane to its empty state; with
+                // nothing selected it clears the filter.
+                guard let table else { return false }
+                if table.selectedRow != -1 {
+                    table.deselectAll(nil)
+                } else if !parent.onClearFilter() {
+                    return false
+                }
             case "j": move(by: 1)
             case "k": move(by: -1)
             case "/": parent.onFocusFilter()
