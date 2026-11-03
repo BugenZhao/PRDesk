@@ -29,7 +29,9 @@ actor SyncEngine {
     static let repo = "\(owner)/\(name)"
     static let initialLookback: TimeInterval = 90 * 24 * 3600
     private static let indexSlack: TimeInterval = 5 * 60
+    /// Open board items are probed this often (see `probe(ids:)`), and fully refetched hourly.
     private static let boardRefreshInterval: TimeInterval = 5 * 60
+    private static let boardFullRefreshInterval: TimeInterval = 3600
     /// The board is read every few minutes rather than every round; the app's own writes show
     /// at once anyway, so this only delays edits made on the web.
     private static let boardSyncInterval: TimeInterval = 3 * 60
@@ -43,6 +45,7 @@ actor SyncEngine {
     private let logger = Logger(subsystem: "com.bugenzhao.PRDesk", category: "Sync")
     private var isSyncing = false
     private var boardRefreshedAt: Date?
+    private var boardFullyRefreshedAt: Date?
     private var boardSyncedAt: Date?
     /// Ids needed to write to the board, from the latest board sync.
     var boardSchema: BoardQuery.Schema?
@@ -82,23 +85,15 @@ actor SyncEngine {
         let windows = Self.windows(from: since, to: startedAt)
         let pageSize = windows.count > 1 ? ItemQuery.fullSyncPageSize : ItemQuery.incrementalPageSize
         let jobs = queries.flatMap { query in windows.map { (query: query, from: $0.from, to: $0.to) } }
-        var fetched = try await withThrowingTaskGroup(of: Int.self) { group in
-            var pending = jobs.makeIterator()
-            var total = 0
-            for _ in 0 ..< Self.maxConcurrentFetches {
-                guard let job = pending.next() else { break }
-                group.addTask { try await self.fetch(query: job.query, from: job.from, to: job.to, pageSize: pageSize) }
-            }
-            while let count = try await group.next() {
-                total += count
-                if let job = pending.next() {
-                    group.addTask { try await self.fetch(query: job.query, from: job.from, to: job.to, pageSize: pageSize) }
-                }
-            }
-            return total
-        }
-        if includeBoard || boardSyncedAt.map({ startedAt.timeIntervalSince($0) >= Self.boardSyncInterval }) ?? true {
-            fetched += try await refreshBoardItems(syncBoard())
+        // The board is read alongside the searches (its pages come one after another, so it takes
+        // a while); its items are refreshed after them, once what the searches found is stored.
+        let readBoard = includeBoard || boardSyncedAt.map { startedAt.timeIntervalSince($0) >= Self.boardSyncInterval } ?? true
+        async let board = readBoard ? syncBoard() : nil
+        var fetched = try await Self.concurrently(jobs) { job in
+            try await self.fetch(query: job.query, from: job.from, to: job.to, pageSize: pageSize)
+        }.reduce(0, +)
+        if let contentIDs = try await board {
+            fetched += try await refreshBoardItems(contentIDs)
             boardSyncedAt = startedAt
         }
 
@@ -134,49 +129,91 @@ actor SyncEngine {
 
     /// Re-fetches the given items by node id, a few small batches at a time.
     func refresh(ids: [String]) async throws -> Int {
-        let chunks = stride(from: 0, to: ids.count, by: ItemQuery.pageSize).map { Array(ids[$0 ..< min($0 + ItemQuery.pageSize, ids.count)]) }
-        return try await withThrowingTaskGroup(of: Int.self) { group in
-            var pending = chunks.makeIterator()
-            var total = 0
-            for _ in 0 ..< Self.maxConcurrentFetches {
-                guard let chunk = pending.next() else { break }
-                group.addTask { try await self.refreshChunk(chunk) }
-            }
-            while let count = try await group.next() {
-                total += count
-                if let chunk = pending.next() {
-                    group.addTask { try await self.refreshChunk(chunk) }
-                }
-            }
-            return total
-        }
+        try await Self.concurrently(ids.chunked(ItemQuery.pageSize)) { chunk in
+            let response = try await self.client.query(ItemQuery.nodes, variables: ItemQuery.NodesVariables(ids: chunk), as: ItemQuery.NodesResponse.self)
+            let now = Date()
+            let items = response.nodes.compactMap { $0?.item(fetchedAt: now) }
+            try await self.db.upsert(items)
+            return items.count
+        }.reduce(0, +)
     }
 
-    private func refreshChunk(_ ids: [String]) async throws -> Int {
-        let response = try await client.query(ItemQuery.nodes, variables: ItemQuery.NodesVariables(ids: ids), as: ItemQuery.NodesResponse.self)
+    /// Brings the given stored items up to date like `refresh(ids:)`, at a fraction of GitHub's
+    /// time: items whose `updatedAt` moved are fetched again, and the rest only get their
+    /// mergeability and CI, the parts that change without moving it. It misses a `reviewDecision`
+    /// changed by new branch rules or code owners alone, until the next full refresh.
+    private func probe(ids: [String]) async throws -> Int {
+        guard !ids.isEmpty else { return 0 }
+        let probes = try await Self.concurrently(ids.chunked(ItemQuery.probePageSize)) { chunk in
+            try await self.client.query(ItemQuery.probe, variables: ItemQuery.NodesVariables(ids: chunk), as: ItemQuery.ProbeResponse.self)
+                .nodes.compactMap(\.self)
+        }.flatMap(\.self)
+        let stored = try await Dictionary(uniqueKeysWithValues: db.items(ids: ids).map { ($0.id, $0) })
         let now = Date()
-        let items = response.nodes.compactMap { $0?.item(fetchedAt: now) }
-        try await db.upsert(items)
-        return items.count
+        var moved: [String] = []
+        var patched: [Item] = []
+        for probe in probes {
+            guard var item = stored[probe.id], item.updatedAt >= probe.updatedAt else {
+                moved.append(probe.id)
+                continue
+            }
+            guard item.mergeable != probe.mergeable || item.ci != probe.ci else { continue }
+            item.mergeable = probe.mergeable
+            item.ci = probe.ci
+            item.fetchedAt = now
+            patched.append(item)
+        }
+        try await db.upsert(patched)
+        logger.info("Probed \(ids.count) items: \(moved.count) moved, \(patched.count) patched")
+        return try await refresh(ids: moved) + patched.count
     }
 
-    /// Fetches board items missing locally at once, and refreshes the open ones now and then, since
-    /// the searches may not cover them. A failed refresh is retried next round rather than failing
-    /// the sync, whose searches have landed by then.
+    /// Fetches board items missing locally at once, and brings the open ones up to date now and
+    /// then, since the searches may not cover them. A failed refresh is retried next round rather
+    /// than failing the sync, whose searches have landed by then.
     private func refreshBoardItems(_ contentIDs: [String]) async throws -> Int {
         let known = try await db.itemStates()
+        let now = Date()
         var ids = contentIDs.filter { known[$0] == nil }
-        let refreshOpen = boardRefreshedAt.map { Date().timeIntervalSince($0) >= Self.boardRefreshInterval } ?? true
+        var probed: [String] = []
+        let refreshOpen = boardRefreshedAt.map { now.timeIntervalSince($0) >= Self.boardRefreshInterval } ?? true
+        let fully = boardFullyRefreshedAt.map { now.timeIntervalSince($0) >= Self.boardFullRefreshInterval } ?? true
         if refreshOpen {
-            ids += contentIDs.filter { known[$0] == .open }
+            let open = contentIDs.filter { known[$0] == .open }
+            if fully { ids += open } else { probed = open }
         }
         do {
-            let count = try await refresh(ids: ids)
-            if refreshOpen { boardRefreshedAt = Date() }
+            let count = try await refresh(ids: ids) + probe(ids: probed)
+            if refreshOpen {
+                boardRefreshedAt = now
+                if fully { boardFullyRefreshedAt = now }
+            }
             return count
         } catch {
             logger.error("Board item refresh failed: \(String(describing: error), privacy: .public)")
             return 0
+        }
+    }
+
+    /// Runs `work` on each element, at most `maxConcurrentFetches` at a time.
+    private static func concurrently<Element: Sendable, Result: Sendable>(
+        _ elements: [Element],
+        _ work: @escaping @Sendable (Element) async throws -> Result
+    ) async throws -> [Result] {
+        try await withThrowingTaskGroup(of: Result.self) { group in
+            var pending = elements.makeIterator()
+            var results: [Result] = []
+            for _ in 0 ..< maxConcurrentFetches {
+                guard let element = pending.next() else { break }
+                group.addTask { try await work(element) }
+            }
+            while let result = try await group.next() {
+                results.append(result)
+                if let element = pending.next() {
+                    group.addTask { try await work(element) }
+                }
+            }
+            return results
         }
     }
 

@@ -266,6 +266,10 @@ extension AppDatabase {
         }
     }
 
+    func items(ids: [String]) async throws -> [Item] {
+        try await reader.read { db in try Item.fetchAll(db, keys: ids) }
+    }
+
     /// States of all cached items by node id.
     func itemStates() async throws -> [String: Item.State] {
         try await reader.read { db in

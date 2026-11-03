@@ -11,10 +11,30 @@ enum ItemQuery {
     /// Search page size for incremental syncs, which usually find a handful of changes. GitHub
     /// charges for the nodes a page could return (50 per page costs 6 points, 20 costs 2).
     static let incrementalPageSize = 20
+    /// Batch size for `probe`, which costs GitHub a fraction of the full fields per item.
+    static let probePageSize = 25
     /// GitHub search never returns more than this many results for one query.
     static let resultCap = 1000
 
     private static let actor = "{ __typename login }"
+
+    /// The head commit's CI rollup, as counts by state.
+    private static let ci = """
+    commits(last: 1) {
+      nodes {
+        commit {
+          statusCheckRollup {
+            state
+            contexts(first: 1) {
+              totalCount
+              checkRunCountsByState { state count }
+              statusContextCountsByState { state count }
+            }
+          }
+        }
+      }
+    }
+    """
 
     /// Recent events used for Turn, unread state and the summary next to the title.
     private static let prEvents = """
@@ -64,20 +84,7 @@ enum ItemQuery {
         nodes { requestedReviewer { __typename ... on User { login } ... on Team { slug } } }
       }
       latestOpinionatedReviews(first: 30) { nodes { author { login } state submittedAt } }
-      commits(last: 1) {
-        nodes {
-          commit {
-            statusCheckRollup {
-              state
-              contexts(first: 1) {
-                totalCount
-                checkRunCountsByState { state count }
-                statusContextCountsByState { state count }
-              }
-            }
-          }
-        }
-      }
+      \(ci)
       \(prEvents)
       \(mentions)
     }
@@ -108,6 +115,18 @@ enum ItemQuery {
       nodes(ids: $ids) { __typename ...PRFields ...IssueFields }
     }
     \(fragments)
+    """
+
+    /// What can change about an item without moving its `updatedAt`: a PR's mergeability (its base
+    /// branch moves) and CI (checks finish). Everything else is only worth fetching again once
+    /// `updatedAt` moves, `reviewDecision` above all: GitHub spends about 0.12 s per vllm PR on it.
+    static let probe = """
+    query($ids: [ID!]!) {
+      nodes(ids: $ids) {
+        ... on PullRequest { id updatedAt mergeable \(ci) }
+        ... on Issue { id updatedAt }
+      }
+    }
     """
 
     static let byNumber = """
@@ -144,6 +163,19 @@ enum ItemQuery {
     }
 
     struct NodesResponse: Decodable, Sendable {
+        let nodes: [Node?]
+    }
+
+    struct ProbeResponse: Decodable, Sendable {
+        struct Node: Decodable, Sendable {
+            let id: String
+            let updatedAt: Date
+            let mergeable: String?
+            let commits: Nodes<Commit>?
+
+            var ci: Item.CIStatus? { commits?.values.last?.commit.statusCheckRollup?.status }
+        }
+
         let nodes: [Node?]
     }
 
