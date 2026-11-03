@@ -59,6 +59,9 @@ final class AppModel {
     @ObservationIgnored private var yabPinsAgain = false
     /// Rounds are timed from the last attempt, so a failing sync isn't retried every tick.
     @ObservationIgnored private var lastSyncAttemptAt: Date?
+    /// Failed rounds in a row; after a failure the next round comes sooner than the interval
+    /// (1, 2, 4… minutes), since GitHub's 502s and 504s usually pass within minutes.
+    @ObservationIgnored private var syncFailures = 0
     /// How often the poll loop checks whether a sync is due, so a new interval applies promptly.
     private static let pollTick: Duration = .seconds(15)
 
@@ -409,12 +412,17 @@ final class AppModel {
             }
             while !Task.isCancelled {
                 guard let self else { return }
-                if lastSyncAttemptAt.map({ Date().timeIntervalSince($0) >= TimeInterval(syncInterval) }) ?? true {
+                if lastSyncAttemptAt.map({ Date().timeIntervalSince($0) >= nextSyncDelay }) ?? true {
                     await sync(includeBoard: false)
                 }
                 try? await Task.sleep(for: Self.pollTick)
             }
         })
+    }
+
+    private var nextSyncDelay: TimeInterval {
+        guard syncFailures > 0 else { return TimeInterval(syncInterval) }
+        return min(60 * pow(2, Double(syncFailures - 1)), TimeInterval(syncInterval))
     }
 
     /// Syncs now. Unless it is the timer's round, this also reads the board.
@@ -432,12 +440,14 @@ final class AppModel {
                 rateLimit = result.rateLimit
             }
             syncState = .idle
+            syncFailures = 0
             await syncInbox()
             Task { await refreshAffiliations() }
             prefetchDetails()
         } catch {
             logger.error("Sync failed: \(String(describing: error), privacy: .public)")
             syncState = .failed(error.localizedDescription)
+            syncFailures += 1
         }
         syncYabPins()
     }

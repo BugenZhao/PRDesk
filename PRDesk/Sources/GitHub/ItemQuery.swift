@@ -2,8 +2,9 @@ import Foundation
 
 /// GraphQL queries that fetch list-level item data, and the response shapes they decode into.
 enum ItemQuery {
-    /// Batch size for fetching items by id.
-    static let pageSize = 50
+    /// Batch size for fetching items by id. GitHub spends about 0.3–0.5 s per open vllm PR on these
+    /// fields, so 50 always ran past its 10 s limit (502/504) and even 25 came close.
+    static let pageSize = 10
     /// Search page size for a full sync. Pages of 50 tracked PRs (with CI and reviews) often run
     /// past GitHub's time limit and fail with 502s; 25 don't, at about the same total cost.
     static let fullSyncPageSize = 25

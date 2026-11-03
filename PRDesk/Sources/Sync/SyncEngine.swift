@@ -132,29 +132,52 @@ actor SyncEngine {
         return item
     }
 
-    /// Re-fetches the given items by node id.
+    /// Re-fetches the given items by node id, a few small batches at a time.
     func refresh(ids: [String]) async throws -> Int {
-        var count = 0
-        for chunk in stride(from: 0, to: ids.count, by: ItemQuery.pageSize).map({ Array(ids[$0 ..< min($0 + ItemQuery.pageSize, ids.count)]) }) {
-            let response = try await client.query(ItemQuery.nodes, variables: ItemQuery.NodesVariables(ids: chunk), as: ItemQuery.NodesResponse.self)
-            let now = Date()
-            let items = response.nodes.compactMap { $0?.item(fetchedAt: now) }
-            try await db.upsert(items)
-            count += items.count
+        let chunks = stride(from: 0, to: ids.count, by: ItemQuery.pageSize).map { Array(ids[$0 ..< min($0 + ItemQuery.pageSize, ids.count)]) }
+        return try await withThrowingTaskGroup(of: Int.self) { group in
+            var pending = chunks.makeIterator()
+            var total = 0
+            for _ in 0 ..< Self.maxConcurrentFetches {
+                guard let chunk = pending.next() else { break }
+                group.addTask { try await self.refreshChunk(chunk) }
+            }
+            while let count = try await group.next() {
+                total += count
+                if let chunk = pending.next() {
+                    group.addTask { try await self.refreshChunk(chunk) }
+                }
+            }
+            return total
         }
-        return count
+    }
+
+    private func refreshChunk(_ ids: [String]) async throws -> Int {
+        let response = try await client.query(ItemQuery.nodes, variables: ItemQuery.NodesVariables(ids: ids), as: ItemQuery.NodesResponse.self)
+        let now = Date()
+        let items = response.nodes.compactMap { $0?.item(fetchedAt: now) }
+        try await db.upsert(items)
+        return items.count
     }
 
     /// Fetches board items missing locally at once, and refreshes the open ones now and then, since
-    /// the searches may not cover them.
+    /// the searches may not cover them. A failed refresh is retried next round rather than failing
+    /// the sync, whose searches have landed by then.
     private func refreshBoardItems(_ contentIDs: [String]) async throws -> Int {
         let known = try await db.itemStates()
         var ids = contentIDs.filter { known[$0] == nil }
-        if boardRefreshedAt.map({ Date().timeIntervalSince($0) >= Self.boardRefreshInterval }) ?? true {
-            boardRefreshedAt = Date()
+        let refreshOpen = boardRefreshedAt.map { Date().timeIntervalSince($0) >= Self.boardRefreshInterval } ?? true
+        if refreshOpen {
             ids += contentIDs.filter { known[$0] == .open }
         }
-        return try await refresh(ids: ids)
+        do {
+            let count = try await refresh(ids: ids)
+            if refreshOpen { boardRefreshedAt = Date() }
+            return count
+        } catch {
+            logger.error("Board item refresh failed: \(String(describing: error), privacy: .public)")
+            return 0
+        }
     }
 
     /// Fetches every item matching `query` updated in `[from, to]`, writing each page as it arrives.

@@ -20,6 +20,9 @@ enum GraphQLClientError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
+        case let .http(status, _) where (500 ... 599).contains(status):
+            // The body is GitHub's HTML error page.
+            "GitHub didn't answer in time (HTTP \(status))."
         case let .http(status, body):
             "GitHub returned HTTP \(status): \(body.prefix(200))"
         case let .emptyData(errors):
