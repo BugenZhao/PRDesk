@@ -42,22 +42,7 @@ enum Parity {
     /// each row paired with its other end. Rows keep their order within a section.
     static func sections(of rows: [ItemRow]) -> [ListSection: [ItemRow]] {
         let upstreamRows = rows.filter(\.item.isParityUpstream)
-        // Several upstream PRs can share a slug (one closed and promoted again): the open one wins,
-        // then the newest. Closed ones without a merge pair with nothing.
-        var upstreamBySlug: [String: Item] = [:]
-        for row in upstreamRows where row.item.state != .closed {
-            guard let slug = upstreamSlug(row.item.headRef) else { continue }
-            if let current = upstreamBySlug[slug], current.isOpen || (!row.item.isOpen && current.createdAt > row.item.createdAt) {
-                continue
-            }
-            upstreamBySlug[slug] = row.item
-        }
-        var stagingBySlug: [String: Item] = [:]
-        for row in rows where row.item.isParityStaging {
-            if let slug = stagingSlug(row.item.headRef), stagingBySlug[slug].map({ $0.createdAt < row.item.createdAt }) ?? true {
-                stagingBySlug[slug] = row.item
-            }
-        }
+        let (upstreamOf, stagingOf) = pairs(staging: rows.map(\.item).filter(\.isParityStaging), upstream: upstreamRows.map(\.item))
 
         let upstreamIDs = Set(upstreamRows.map(\.item.id))
         var result: [ListSection: [ItemRow]] = [:]
@@ -65,7 +50,7 @@ enum Parity {
             let item = row.item
             let section: ListSection?
             if item.isParityStaging {
-                let upstream = stagingSlug(item.headRef).flatMap { upstreamBySlug[$0] }
+                let upstream = upstreamOf[item.id]
                 row.paired = upstream
                 if upstream != nil {
                     // Listed through its upstream PR, where the work is now (Upstream, then Landed).
@@ -80,7 +65,7 @@ enum Parity {
                     section = row.insight.turn == .me ? .parityReview : .parityDiscussing
                 }
             } else if upstreamIDs.contains(item.id), item.state != .closed {
-                row.paired = upstreamSlug(item.headRef).flatMap { stagingBySlug[$0] }
+                row.paired = stagingOf[item.id]
                 section = item.isOpen ? .parityUpstream : .parityLanded
             } else {
                 section = nil
@@ -88,5 +73,55 @@ enum Parity {
             if let section { result[section, default: []].append(row) }
         }
         return result
+    }
+    /// Pairs staging PRs with the upstream PRs promoted from them, by slug. Several upstream PRs can
+    /// share a slug (one closed and promoted again): the open one wins, then the newest. Closed ones
+    /// without a merge pair with nothing. An upstream PR pairs back with the newest staging PR of
+    /// its slug.
+    ///
+    /// The agent sometimes shortens the slug when promoting (`parity-fix-drop-incomplete-call-markup`
+    /// became `bz/rust-parity-drop-incomplete-call`), so a staging PR without an exact match takes an
+    /// upstream PR no staging PR has the slug of, opened after it, with its title or with a slug
+    /// that its own starts with up to a `-`: by title first, then the longest slug.
+    static func pairs(staging: [Item], upstream: [Item]) -> (upstreamOf: [Item.ID: Item], stagingOf: [Item.ID: Item]) {
+        var upstreamBySlug: [String: Item] = [:]
+        for item in upstream where item.state != .closed {
+            guard let slug = upstreamSlug(item.headRef) else { continue }
+            if let current = upstreamBySlug[slug], current.isOpen || (!item.isOpen && current.createdAt > item.createdAt) {
+                continue
+            }
+            upstreamBySlug[slug] = item
+        }
+        var stagingBySlug: [String: Item] = [:]
+        for item in staging {
+            if let slug = stagingSlug(item.headRef), stagingBySlug[slug].map({ $0.createdAt < item.createdAt }) ?? true {
+                stagingBySlug[slug] = item
+            }
+        }
+
+        var upstreamOf: [Item.ID: Item] = [:]
+        var stagingOf: [Item.ID: Item] = [:]
+        var unmatched: [(item: Item, slug: String)] = []
+        for item in staging {
+            guard let slug = stagingSlug(item.headRef) else { continue }
+            if let upstream = upstreamBySlug[slug] {
+                upstreamOf[item.id] = upstream
+                stagingOf[upstream.id] = stagingBySlug[slug]
+            } else {
+                unmatched.append((item, slug))
+            }
+        }
+        var unclaimed = upstreamBySlug.filter { stagingBySlug[$0.key] == nil }
+        for (item, slug) in unmatched.sorted(by: { $0.item.createdAt > $1.item.createdAt }) {
+            let candidates = unclaimed.filter { upstreamSlug, upstream in
+                upstream.createdAt >= item.createdAt && (upstream.title == item.title || slug.hasPrefix(upstreamSlug + "-"))
+            }
+            let rank = { (candidate: (key: String, value: Item)) in (candidate.value.title == item.title ? 1 : 0, candidate.key.count) }
+            guard let (upstreamSlug, upstream) = candidates.max(by: { rank($0) < rank($1) }) else { continue }
+            unclaimed[upstreamSlug] = nil
+            upstreamOf[item.id] = upstream
+            stagingOf[upstream.id] = item
+        }
+        return (upstreamOf, stagingOf)
     }
 }
