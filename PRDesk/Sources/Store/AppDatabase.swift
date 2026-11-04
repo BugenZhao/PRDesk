@@ -270,6 +270,16 @@ extension AppDatabase {
         try await reader.read { db in try Item.fetchAll(db, keys: ids) }
     }
 
+    /// Open PRs of `repo` updated since `date`.
+    func openPullRequests(repo: String, updatedSince date: Date) async throws -> [Item] {
+        try await reader.read { db in
+            try Item.filter(
+                Column("repo").collating(.nocase) == repo && Column("kind") == Item.Kind.pullRequest.rawValue
+                    && Column("state") == Item.State.open.rawValue && Column("updatedAt") >= date
+            ).fetchAll(db)
+        }
+    }
+
     /// States of all cached items by node id.
     func itemStates() async throws -> [String: Item.State] {
         try await reader.read { db in

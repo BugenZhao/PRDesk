@@ -52,6 +52,9 @@ actor SyncEngine {
     /// When the app last wrote each board item, so a sync that read the board just before
     /// doesn't undo the write locally.
     var boardWrites: [Int: Date] = [:]
+    /// PRs put on the board as Good for the viewer's approval this session, so one taken off the
+    /// board again isn't put back by a later look at the same approval.
+    var approvalsAdded: Set<Int> = []
 
     init(client: GitHubClient, db: AppDatabase) {
         self.client = client
@@ -95,6 +98,7 @@ actor SyncEngine {
         if let contentIDs = try await board {
             fetched += try await refreshBoardItems(contentIDs)
             boardSyncedAt = startedAt
+            await followApprovals(viewer: viewer, readAt: startedAt)
         }
 
         try await db.setMeta(Self.lastSyncKey, Self.format(startedAt))
@@ -103,6 +107,34 @@ actor SyncEngine {
         }
         logger.info("Synced \(fetched) items updated since \(since, privacy: .public)")
         return await SyncResult(viewer: viewer, fetched: fetched, finishedAt: Date(), rateLimit: client.rateLimit)
+    }
+
+    private static let approvalsKey = "approvalsFollowedAt"
+
+    /// Does what `addApproved` does for approvals the viewer made elsewhere (on the web) since the
+    /// previous look, minus the search's index slack. Runs right after a board read, so what is on
+    /// the board is current; the first run only marks where to start, so older approvals stay as
+    /// they are.
+    func followApprovals(viewer: String, readAt: Date) async {
+        do {
+            if let previous = try await db.meta(Self.approvalsKey).flatMap(Self.parse) {
+                let since = previous.addingTimeInterval(-Self.indexSlack)
+                for item in try await db.openPullRequests(repo: Self.repo, updatedSince: since) where !item.isParity {
+                    guard !approvalsAdded.contains(item.number), let review = item.review(by: viewer),
+                          review.state == "APPROVED", let at = review.submittedAt, at > since
+                    else { continue }
+                    logger.info("Adding #\(item.number) to the board as Good: approved at \(at, privacy: .public)")
+                    do {
+                        try await addApproved(number: item.number, contentID: item.id)
+                    } catch {
+                        logger.error("Failed to add #\(item.number) as Good: \(String(describing: error), privacy: .public)")
+                    }
+                }
+            }
+            try await db.setMeta(Self.approvalsKey, Self.format(readAt))
+        } catch {
+            logger.error("Failed to follow approvals: \(String(describing: error), privacy: .public)")
+        }
     }
 
     func viewer() async throws -> String {

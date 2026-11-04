@@ -282,6 +282,7 @@ extension SyncEngine {
     /// other tracker, are left to it. Good counts as Working, so the subscription stays.
     func addApproved(number: Int, contentID: String) async throws {
         if let entry = try await db.boardEntry(number: number), !entry.isArchived || entry.isForeign { return }
+        approvalsAdded.insert(number)
         try await writeBoard(number: number, contentID: contentID) { entry in
             entry.status = "Good"
             entry.statusAt = Date()
