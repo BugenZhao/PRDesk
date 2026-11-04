@@ -118,7 +118,7 @@ are used off the main actor); no glass on content (cards, chips, rows).
   crates fail to build ("can't find crate for `serde_derive`"), and the half-built target dir
   keeps failing until it is deleted (`~/Library/Caches/com.bugenzhao.PRDesk.build/grokbot`).
 - The triage board (GitHub Project `vllm-project` #56) is the source of truth for Status, Priority
-  and Comment (SPEC §3.1). The app writes them only on an explicit user action, never from a rule;
+  and Comment (SPEC §3.1). The app writes them only on an explicit user action, never from a rule (approving an off-board PR in the app adds it as Good, standing in for the board's own approval workflow);
   it also shares the board with another tracker (`Python Parity Backlog`), whose items it must
   leave alone.
 - Menu commands live in `AppCommands`, apart from the scenes, and read only observed flags that

@@ -277,6 +277,20 @@ extension SyncEngine {
         return (field.id, option)
     }
 
+    /// Puts a PR the viewer just approved on the board with Status Good, as the board's own "Code
+    /// review approved" workflow does for items already on it (SPEC §3.1); those, and items of the
+    /// other tracker, are left to it. Good counts as Working, so the subscription stays.
+    func addApproved(number: Int, contentID: String) async throws {
+        if let entry = try await db.boardEntry(number: number), !entry.isArchived || entry.isForeign { return }
+        try await writeBoard(number: number, contentID: contentID) { entry in
+            entry.status = "Good"
+            entry.statusAt = Date()
+        } field: { schema, _ in
+            let (id, option) = try Self.option(schema.status, named: "Good", in: "Status")
+            return (id, FieldValue(singleSelectOptionId: option))
+        }
+    }
+
     /// Sets (or with nil clears) the item's Status, and moves its subscription along with it:
     /// quiet statuses turn notifications down, leaving them turns them back on.
     func setTriage(_ status: TriageStatus?, number: Int, contentID: String) async throws {

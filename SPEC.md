@@ -41,7 +41,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 
 ## 3.1 分诊（Bugen's Board）
 
-分诊是手动的决定，写在 board 上；条目的实时状态（Turn、approve、CI、冲突、merged/closed）由 API 算出，不手动维护。app 从不自动改 Status。
+分诊是手动的决定，写在 board 上；条目的实时状态（Turn、approve、CI、冲突、merged/closed）由 API 算出，不手动维护。app 从不自动改 Status，唯一的例外是下面的 approve。
 
 | Status | 意思 | GitHub 订阅 |
 |---|---|---|
@@ -59,6 +59,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
   - Inbox 和未读数不计 Muted 条目的通知，Skipped 的照常计
 - 改订阅需要 token 有 `notifications` scope（`gh auth refresh -h github.com -s notifications`）
 - **我自己开的条目**：没有 Status 时当作 Working（显示和过滤都算），不进 Triage，因为没有什么要分诊的；这个默认不写到 board。按 `w` / `b` / `s` / `m` 照常写 Status；在详情里选 Triage 不清除这个默认
+- **我 approve 的 PR**：board 自带的 "Code review approved" workflow 把 board 上的 PR 设成 `Good`（当作 Working，approved 的进 Good 分组）。不在 board 上（或已 archive）的 PR 它管不到，所以在 app 里 approve 后，app 把它加到 board 并设为 `Good`；已在 board 上的交给 workflow，app 不写。在 GitHub 网页上 approve 的不算
 - **Priority**：board 上的单选字段，High / Medium / Low
 - **Comment**：board 上的文本字段，作为这条的备注（通常是下一步要做什么）；app 只读，在列表标题后显示
 - **其他 Status**：`Python Parity Backlog` 属于另一个 tracker，app 完全忽略这些条目（不显示，也不改）。旧的 `Good`、`Pending` 当作 Working，`Stale` 当作 Backlog；open 的条目上出现 Done（比如重新打开了）当作未分诊

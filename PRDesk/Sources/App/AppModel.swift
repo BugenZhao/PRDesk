@@ -529,6 +529,12 @@ final class AppModel {
             try await engine.submit(submission, body: body, subjectID: detail.id)
         }
         setDraft("", for: item.id)
+        if submission == .approve, item.kind == .pullRequest, item.isUpstream, item.isOpen,
+           board(for: item).map({ $0.isArchived && !$0.isForeign }) ?? true {
+            writeBoard("add #\(item.number) to the board as Good", activity: "#\(item.number) → Good", numbers: [item.number]) { engine in
+                try await engine.addApproved(number: item.number, contentID: item.id)
+            }
+        }
         // Our own action shouldn't make the item look unread.
         updateState(item) { $0.seenAt = Date() }
         _ = try? await engine.refresh(ids: [item.id])
