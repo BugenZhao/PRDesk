@@ -2,15 +2,15 @@ import AppKit
 
 /// Columns of the item table and how each renders a row.
 enum ItemColumn: String, CaseIterable {
-    case unread, priority, number, title, author, link, review, turn, ci, size, age, updated
+    case unread, priority, number, title, author, avatar, link, review, turn, ci, size, age, updated
 
     /// Shown in the Parity tab only, where it takes the place of Author (always the agent there).
     static let parityOnly: Set<ItemColumn> = [.link]
     /// Left out of the Parity tab.
-    static let notInParity: Set<ItemColumn> = [.author]
+    static let notInParity: Set<ItemColumn> = [.author, .avatar]
     /// Hidden one by one, in this order, while the title column would be narrower than
-    /// `titleRoom`: the columns looked at least.
-    static let givesWay: [ItemColumn] = [.ci, .turn, .size, .age]
+    /// `titleRoom`: the columns looked at least. Author gives way to `avatar`, just its picture.
+    static let givesWay: [ItemColumn] = [.turn, .ci, .author, .size, .age]
     static let titleRoom: CGFloat = 360
 
     var identifier: NSUserInterfaceItemIdentifier { .init(rawValue) }
@@ -22,6 +22,7 @@ enum ItemColumn: String, CaseIterable {
         case .number: "#"
         case .title: "Title"
         case .author: "Author"
+        case .avatar: ""
         case .link: "Link"
         case .review: "Review"
         case .turn: "Turn"
@@ -39,6 +40,7 @@ enum ItemColumn: String, CaseIterable {
         case .number: 42
         case .title: 520
         case .author: 168
+        case .avatar: 13 + 2 * RunsCellView.inset
         case .link: 64
         case .review: 40
         case .turn: 46
@@ -70,7 +72,7 @@ enum ItemColumn: String, CaseIterable {
         case .priority: .priority
         case .number: .number
         case .title: .title
-        case .author: .author
+        case .author, .avatar: .author
         case .link: nil
         case .review: .review
         case .turn: .turn
@@ -93,6 +95,10 @@ enum ItemColumn: String, CaseIterable {
         if self == .title {
             // Sized by the table to fill the remaining width; see `Coordinator.fitTitleColumn`.
             column.minWidth = 160
+            column.resizingMask = []
+        } else if self == .avatar {
+            column.minWidth = width
+            column.maxWidth = width
             column.resizingMask = []
         } else {
             column.minWidth = self == .size ? width : min(width, 16)
@@ -132,6 +138,9 @@ enum ItemColumn: String, CaseIterable {
             let avatar: CellRun = .avatar(item.author.flatMap(AvatarCache.shared.image(for:)))
             // Marks of trust sit at the right edge, so they line up down the column.
             return [avatar, name] + vote + [.spring] + seal + orgBadges.map(\.cellRun)
+
+        case .avatar:
+            return [.avatar(item.author.flatMap(AvatarCache.shared.image(for:)))]
 
         case .link:
             guard let paired = row.paired else { return [] }
@@ -197,16 +206,18 @@ enum ItemColumn: String, CaseIterable {
         if let reason = row.wakeReason {
             runs.append(.chip(reason, color: .systemPurple))
         }
-        // The board comment and the latest event give way, the event first, before the title is
-        // cut short.
+        // The board comment and the latest event make room for the title: they shrink, then go,
+        // the event first.
         if let comment = row.comment {
             runs.append(.optional(.symbol("text.bubble", color: .tertiaryLabelColor), priority: 1))
-            runs.append(.optional(.text(comment, color: .secondaryLabelColor, font: CellFont.small, flexible: true, maxWidth: 320), priority: 1))
+            runs.append(.optional(.text(comment, color: .secondaryLabelColor, font: CellFont.small, flexible: true, maxWidth: 320), priority: 1, minWidth: 40))
         }
-        // The latest event sits at the right edge, so it lines up down the column.
+        // The latest event sits at the right edge, so it lines up down the column. Its age stays
+        // whole while the words before it shrink.
         if let summary = row.insight.summary, let at = row.insight.summaryAt {
             runs.append(.spring)
-            runs.append(.optional(.text("\(summary) \(at.compactAge(relativeTo: now))", color: .tertiaryLabelColor, font: CellFont.small, maxWidth: 180), priority: 0))
+            runs.append(.optional(.text(summary, color: .tertiaryLabelColor, font: CellFont.small, flexible: true, maxWidth: 150), priority: 0, minWidth: 44))
+            runs.append(.optional(.text(at.compactAge(relativeTo: now), color: .tertiaryLabelColor, font: CellFont.small), priority: 0))
         }
         return runs
     }

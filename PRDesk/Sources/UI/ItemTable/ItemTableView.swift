@@ -48,12 +48,14 @@ struct ItemTableView: NSViewRepresentable {
         }
         table.autosaveName = "ItemTable"
         table.autosaveTableColumns = true
-        // A column added after the order was saved comes last; Link takes Author's place in the
-        // Parity tab, so it goes beside it.
-        let author = table.column(withIdentifier: ItemColumn.author.identifier)
-        let link = table.column(withIdentifier: ItemColumn.link.identifier)
-        if author >= 0, link >= 0, link != author + 1 {
-            table.moveColumn(link, toColumn: link > author ? author + 1 : author)
+        // A column added after the order was saved comes last; Avatar stands in for Author and
+        // Link takes its place in the Parity tab, so they go beside it.
+        for (column, offset) in [(ItemColumn.avatar, 0), (.link, 1)] {
+            let author = table.column(withIdentifier: ItemColumn.author.identifier)
+            let index = table.column(withIdentifier: column.identifier)
+            guard author >= 0, index >= 0 else { continue }
+            let target = index > author ? author + offset : author + offset - 1
+            if index != target { table.moveColumn(index, toColumn: target) }
         }
         table.sortDescriptors = [NSSortDescriptor(key: sort.key.rawValue, ascending: sort.ascending)]
 
@@ -111,6 +113,8 @@ struct ItemTableView: NSViewRepresentable {
         private var viewer: String?
         private var badgeVersion = 0
         private var focusRequest = 0
+        /// Which tab's columns show; nil until the first update.
+        private var isParity: Bool?
         /// Set while the table is changed programmatically, so callbacks don't write back.
         private var isApplyingUpdate = false
         private var lastSelectedRow = -1
@@ -176,20 +180,10 @@ struct ItemTableView: NSViewRepresentable {
                 focusRequest = parent.focusRequest
                 table.window?.makeFirstResponder(table)
             }
-            showColumns(parity: parent.isParity, in: table)
-        }
-
-        private func showColumns(parity: Bool, in table: NSTableView) {
-            var changed = false
-            for column in ItemColumn.parityOnly.union(ItemColumn.notInParity) {
-                guard let tableColumn = table.tableColumn(withIdentifier: column.identifier) else { continue }
-                let hidden = ItemColumn.parityOnly.contains(column) != parity
-                if tableColumn.isHidden != hidden {
-                    tableColumn.isHidden = hidden
-                    changed = true
-                }
+            if isParity != parent.isParity {
+                isParity = parent.isParity
+                fitTitleColumn()
             }
-            if changed { fitTitleColumn() }
         }
 
         private func index(of selection: TableSelection) -> Int? {
@@ -350,30 +344,39 @@ struct ItemTableView: NSViewRepresentable {
 
         // MARK: Layout
 
-        /// Gives the title column all width not used by the other columns, hiding the columns that
-        /// give way (`ItemColumn.givesWay`) while it would be narrower than `ItemColumn.titleRoom`.
+        /// Shows the columns of the current tab and gives the title column all width the others
+        /// leave, letting columns give way (`ItemColumn.givesWay`) while it would be narrower than
+        /// `ItemColumn.titleRoom`.
         @objc func fitTitleColumn() {
-            guard let table,
+            guard let table, let isParity,
                   let clip = table.enclosingScrollView?.contentView,
                   let title = table.tableColumn(withIdentifier: ItemColumn.title.identifier)
             else { return }
-            let givesWay = ItemColumn.givesWay.compactMap { table.tableColumn(withIdentifier: $0.identifier) }
-            func titleWidth(hiding hidden: ArraySlice<NSTableColumn>) -> CGFloat {
-                let others = table.tableColumns.reduce(0) { sum, column in
-                    let shown = givesWay.contains(column) ? !hidden.contains(column) : !column.isHidden
-                    return sum + (column === title || !shown ? 0 : column.width)
+            func shown(_ column: ItemColumn, givingWay: Int) -> Bool {
+                if ItemColumn.parityOnly.contains(column) { return isParity }
+                if ItemColumn.notInParity.contains(column), isParity { return false }
+                let given = ItemColumn.givesWay.prefix(givingWay)
+                return column == .avatar ? given.contains(.author) : !given.contains(column)
+            }
+            let columns = table.tableColumns.compactMap { tableColumn in
+                ItemColumn(rawValue: tableColumn.identifier.rawValue).map { ($0, tableColumn) }
+            }
+            func titleWidth(givingWay: Int) -> CGFloat {
+                let others = columns.reduce(0) { sum, pair in
+                    pair.0 == .title || !shown(pair.0, givingWay: givingWay) ? sum : sum + pair.1.width
                 }
                 let spacing = table.intercellSpacing.width * CGFloat(table.tableColumns.count)
                 return floor(clip.bounds.width - others - spacing)
             }
-            var hiding = 0
-            while hiding < givesWay.count, titleWidth(hiding: givesWay.prefix(hiding)) < ItemColumn.titleRoom {
-                hiding += 1
+            var givingWay = 0
+            while givingWay < ItemColumn.givesWay.count, titleWidth(givingWay: givingWay) < ItemColumn.titleRoom {
+                givingWay += 1
             }
-            for (index, column) in givesWay.enumerated() where column.isHidden != (index < hiding) {
-                column.isHidden = index < hiding
+            for (column, tableColumn) in columns where column != .title {
+                let hidden = !shown(column, givingWay: givingWay)
+                if tableColumn.isHidden != hidden { tableColumn.isHidden = hidden }
             }
-            let target = max(title.minWidth, titleWidth(hiding: givesWay.prefix(hiding)))
+            let target = max(title.minWidth, titleWidth(givingWay: givingWay))
             // Setting the width posts columnDidResize again, which then finds nothing to change.
             if abs(title.width - target) >= 1 {
                 title.width = target
@@ -599,7 +602,7 @@ struct ItemTableView: NSViewRepresentable {
                     let sessions = (itemRow.board?.sessionLinks ?? []).map { "\(AgentSession.agentName(for: $0)) session: \($0.absoluteString)" }
                     let lines = [truncated].compactMap(\.self) + sent + sessions
                     return lines.isEmpty ? nil : lines.joined(separator: "\n")
-                case .author: return authorTooltip(itemRow.item.author)
+                case .author, .avatar: return authorTooltip(itemRow.item.author)
                 case .link: return itemRow.paired.map { "\($0.repo)#\($0.number) \($0.title)" }
                 case .ci: return ItemColumn.ciTooltip(itemRow.item)
                 default: return nil
