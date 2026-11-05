@@ -210,7 +210,7 @@ enum ItemColumn: String, CaseIterable {
         let parts = Self.titlePieces(title).map { piece in
             TextSegment(
                 text: piece.text,
-                color: piece.isPrefix ? .secondaryLabelColor : piece.isCode ? .titleCode : .labelColor,
+                color: piece.isPrefix ? .secondaryLabelColor : .labelColor,
                 font: piece.isCode ? (bold ? CellFont.codeBold : CellFont.code) : nil
             )
         }
@@ -306,9 +306,6 @@ extension NSColor {
             ? NSColor(srgbRed: 0.85, green: 0.21, blue: 0.20, alpha: 1)
             : NSColor(srgbRed: 0.81, green: 0.13, blue: 0.18, alpha: 1)
     }
-
-    /// Inline code in a title's subject: a little fainter than the text around it.
-    static let titleCode = NSColor.labelColor.withAlphaComponent(0.7)
 }
 
 extension Vote {

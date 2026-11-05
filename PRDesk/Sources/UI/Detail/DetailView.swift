@@ -189,11 +189,7 @@ private struct DetailHeader: View {
             var part = Text(verbatim: piece.text)
             // SF Mono a point smaller looks the same size as the title's 15-point text.
             if piece.isCode { part = part.font(.system(size: 14, weight: .semibold, design: .monospaced)) }
-            if piece.isPrefix {
-                part = part.foregroundStyle(.secondary)
-            } else if piece.isCode {
-                part = part.foregroundStyle(Color(nsColor: .titleCode))
-            }
+            if piece.isPrefix { part = part.foregroundStyle(.secondary) }
             return Text("\(text)\(part)")
         }
     }
