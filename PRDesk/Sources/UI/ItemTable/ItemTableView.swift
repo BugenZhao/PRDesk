@@ -137,6 +137,12 @@ struct ItemTableView: NSViewRepresentable {
             // What is selected, by identity, before rows move around.
             let selected = Set(table.selectedRowIndexes.compactMap { rows.indices.contains($0) ? rows[$0].selectionID : nil })
 
+            // The tab's columns first, so rows animating in come with all their cells.
+            if isParity != parent.isParity {
+                isParity = parent.isParity
+                fitTitleColumn()
+            }
+
             if parent.rows != rows || parent.viewer != viewer {
                 let old = rows
                 let viewerChanged = parent.viewer != viewer
@@ -179,10 +185,6 @@ struct ItemTableView: NSViewRepresentable {
             if parent.focusRequest != focusRequest {
                 focusRequest = parent.focusRequest
                 table.window?.makeFirstResponder(table)
-            }
-            if isParity != parent.isParity {
-                isParity = parent.isParity
-                fitTitleColumn()
             }
         }
 
