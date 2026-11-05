@@ -260,6 +260,13 @@ enum ItemColumn: String, CaseIterable {
     /// to everything else a row scrolling in costs.
     @MainActor private static var titleSplits: [String: (pieces: [TitlePiece], shortPrefix: String?)] = [:]
 
+    /// The title as drawn with its tags shortened, when shortening changes it.
+    @MainActor static func shortenedTitle(_ title: String) -> String? {
+        let parsed = parsedTitle(title)
+        guard let short = parsed.shortPrefix else { return nil }
+        return short + parsed.pieces.filter { !$0.isPrefix }.map(\.text).joined()
+    }
+
     @MainActor private static func parsedTitle(_ title: String) -> (pieces: [TitlePiece], shortPrefix: String?) {
         if let parsed = titleSplits[title] { return parsed }
         let parsed = (TitleMarkup.pieces(title), TitlePrefix.abbreviate(TitlePrefix.split(title).prefix))

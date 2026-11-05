@@ -667,7 +667,12 @@ struct ItemTableView: NSViewRepresentable {
                 else { return nil }
                 switch itemColumn {
                 case .title:
-                    let truncated = (table.view(atColumn: column, row: row, makeIfNecessary: false) as? RunsCellView)?.truncatedText
+                    var truncated = (table.view(atColumn: column, row: row, makeIfNecessary: false) as? RunsCellView)?.truncatedText
+                    // With its tags shortened, the title shows in full, in place of the cut one.
+                    if abbreviatesTags, let shortened = ItemColumn.shortenedTitle(itemRow.item.title) {
+                        let others = (truncated ?? "").split(separator: "\n").map(String.init).filter { $0 != shortened }
+                        truncated = ([itemRow.item.title] + others).joined(separator: "\n")
+                    }
                     let sent = itemRow.state.sentRequests.map { request in
                         let age = itemRow.state.sentAt(request)!.compactAge()
                         let note = itemRow.state.note(request).map { ": \($0)" } ?? ""
