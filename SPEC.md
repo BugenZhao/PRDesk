@@ -76,7 +76,7 @@ macOS 原生的 vLLM PR / Issue 工作台，高密度、键盘驱动。Clean roo
 
 Rust frontend 的 parity agent（`richard` 仓库的 `notes/vllm-rust-parity-agent-runbook.md`）每天在 fork 上开 staging PR，我 review；approve 后我手动让 agent promote 成 upstream PR，upstream approve 后再让它 merge。app 只负责看这条流水线、在里面 review，不运行 agent，也不读 agent 的 ledger：阶段全部从 GitHub 上的状态算出来。
 
-- **staging PR**：`BugenZhao/vllm` 上 `richard-for-bugen[bot]` 开的 PR（`author:app/richard-for-bugen`），和主仓库一起增量同步，回溯同样 90 天
+- **staging PR**：`BugenZhao/vllm` 上 `richard-for-bugen[bot]` 开的 PR（`author:app/richard-for-bugen`），和主仓库一起增量同步，回溯同样 90 天。fork 上我自己开的 PR（比如挂在 upstream PR 下的 stack）不是 staging PR，不进 Parity tab，只在 Inbox 里出现
 - **对应关系**：按分支名。staging 是 `richard/parity-fix-<slug>`、`richard/parity-impl-<slug>` 或 `richard/parity-run-<slug>`，promote 出来的 upstream PR 是我开的 `bz/rust-parity-<slug>`（run PR 的 slug 带 `run-` 前缀，两边一样）。只认 open 或 merged 的 upstream PR；同一个 slug 有多个时取 open 的，其次最新的。agent promote 时有时会缩短 slug（`parity-fix-drop-incomplete-call-markup` → `bz/rust-parity-drop-incomplete-call`），所以没有同名 upstream 的 staging PR 退而认一个没被别的 staging PR 认领、开得比它晚、标题相同或 slug 是它 slug 在 `-` 处截断的前缀的 upstream PR（标题相同优先，其次 slug 最长）
 - **我的决定**就是 GitHub 上的动作，agent 下次运行时读取：
   - Approve：可以 promote

@@ -154,8 +154,12 @@ extension Item {
     /// In `vllm-project/vllm`, the repository the board and the dashboard are about.
     var isUpstream: Bool { repo.caseInsensitiveCompare(SyncEngine.repo) == .orderedSame }
 
-    /// A staging PR of the parity agent on its fork (SPEC §3.2).
-    var isParityStaging: Bool { repo.caseInsensitiveCompare(Parity.repo) == .orderedSame }
+    /// A staging PR of the parity agent on its fork (SPEC §3.2). The fork also holds Bugen's own PRs
+    /// (stacks under an upstream PR, say), which come in through notifications and links: those
+    /// are not the agent's and stay out of the Parity tab.
+    var isParityStaging: Bool {
+        repo.caseInsensitiveCompare(Parity.repo) == .orderedSame && kind == .pullRequest && Parity.isBot(author)
+    }
 
     /// An upstream PR promoted from a staging PR (`bz/rust-parity-*`).
     var isParityUpstream: Bool { isUpstream && kind == .pullRequest && Parity.upstreamSlug(headRef) != nil }
