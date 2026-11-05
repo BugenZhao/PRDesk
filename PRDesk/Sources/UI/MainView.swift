@@ -3,6 +3,18 @@ import SwiftUI
 struct MainView: View {
     @Environment(AppModel.self) private var model
     @AppStorage("showsDetail") private var showsDetail = true
+    /// The window's content width, which caps the detail pane.
+    @State private var width: CGFloat = 0
+
+    private static let listMinWidth: CGFloat = 560
+    private static let detailMinWidth: CGFloat = 360
+
+    /// The widest the detail pane may get: what leaves the list its minimum. A fixed maximum lets a
+    /// drag of the divider past the list's minimum widen the window instead.
+    private var detailMaxWidth: CGFloat {
+        guard width > 0 else { return 1000 }
+        return min(1000, max(Self.detailMinWidth, width - Self.listMinWidth - 1))
+    }
 
     var body: some View {
         // The status bar sits under the whole split view, so neither the list nor the detail pane
@@ -11,6 +23,7 @@ struct MainView: View {
             content
             StatusBar()
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
     }
 
     private var content: some View {
@@ -41,10 +54,10 @@ struct MainView: View {
                 listUndoManager: model.undoManager
             )
         }
-        .frame(minWidth: 560, maxHeight: .infinity)
+        .frame(minWidth: Self.listMinWidth, maxHeight: .infinity)
         .inspector(isPresented: $showsDetail) {
             DetailView(isShown: showsDetail)
-                .inspectorColumnWidth(min: 360, ideal: 480, max: 1000)
+                .inspectorColumnWidth(min: Self.detailMinWidth, ideal: 480, max: detailMaxWidth)
         }
         .toolbar {
             ToolbarItem(placement: .principal) {
