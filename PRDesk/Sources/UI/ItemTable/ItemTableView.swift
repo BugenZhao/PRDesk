@@ -393,7 +393,22 @@ struct ItemTableView: NSViewRepresentable {
             if abs(title.width - target) >= 1 {
                 title.width = target
             }
+            // Once columns give way, the title cells lay out as if no wider than `titleRoom`: the
+            // width a column leaves would otherwise bring back what the cells just shortened
+            // (tags, the latest event), only to shorten it again as the list narrows on.
+            let slack = givingWay > 0 ? max(0, floor(target - ItemColumn.titleRoom)) : 0
+            if slack != titleSlack {
+                titleSlack = slack
+                let column = table.column(withIdentifier: ItemColumn.title.identifier)
+                let visible = table.rows(in: table.visibleRect)
+                for row in visible.lowerBound ..< visible.upperBound {
+                    (table.view(atColumn: column, row: row, makeIfNecessary: false) as? RunsCellView)?.reservedWidth = slack
+                }
+            }
         }
+
+        /// See `fitTitleColumn`.
+        private var titleSlack: CGFloat = 0
 
         /// Puts the columns back in their first order and widths; the table saves them as usual.
         @objc func resetColumns() {
@@ -590,6 +605,7 @@ struct ItemTableView: NSViewRepresentable {
                 cell.alignment = column.alignment
                 cell.runs = column.runs(for: itemRow, viewer: viewer, badges: parent.badges, contribution: parent.contribution, now: Date())
                 cell.opacity = Self.opacity(of: itemRow.item, in: column)
+                cell.reservedWidth = column == .title ? titleSlack : 0
                 return cell
             }
         }

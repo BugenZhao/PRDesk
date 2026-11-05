@@ -75,6 +75,12 @@ final class RunsCellView: NSTableCellView {
     var opacity: CGFloat = 1 {
         didSet { if opacity != oldValue { needsDisplay = true } }
     }
+    /// Width the runs are laid out without, as if the cell were that much narrower; springs take it
+    /// back. What the cell shortens or leaves out then doesn't come back when a column giving way
+    /// widens it (see `Coordinator.fitTitleColumn`).
+    var reservedWidth: CGFloat = 0 {
+        didSet { if reservedWidth != oldValue { needsDisplay = true } }
+    }
 
     nonisolated static let spacing: CGFloat = 4
     nonisolated static let inset: CGFloat = 2
@@ -152,7 +158,7 @@ final class RunsCellView: NSTableCellView {
         let shown = runs.map { run in run.dropPriority.map { !dropping.contains($0) } ?? true }
         let count = shown.filter(\.self).count
         let gaps = Self.spacing * CGFloat(max(0, count - 1))
-        let available = bounds.width - 2 * Self.inset - gaps
+        let available = bounds.width - reservedWidth - 2 * Self.inset - gaps
         let fixed = runs.indices.reduce(0) { $0 + (shown[$1] && !runs[$1].isFlexible ? natural[$1] : 0) }
         var remaining = max(0, available - fixed)
         var widths = runs.indices.map { index -> CGFloat? in
@@ -164,7 +170,7 @@ final class RunsCellView: NSTableCellView {
         }
         let springs = runs.indices.filter { if case .spring = runs[$0] { true } else { false } }
         for index in springs {
-            widths[index] = remaining / CGFloat(springs.count)
+            widths[index] = (remaining + reservedWidth) / CGFloat(springs.count)
         }
         return widths
     }
