@@ -151,7 +151,7 @@ enum ItemColumn: String, CaseIterable {
             return [.icon(paired.stateIcon, color: paired.stateColor), .text("#\(paired.number)", color: .secondaryLabelColor, font: CellFont.digits)]
 
         case .review:
-            return reviewRuns(row, viewer: viewer)
+            return reviewRuns(row)
 
         case .turn:
             // A pending review request is the most common reason it's the viewer's move; name it.
@@ -255,22 +255,17 @@ enum ItemColumn: String, CaseIterable {
     /// One size for the review check and the CI dot, so they match.
     private static let markPointSize: CGFloat = 10
 
-    /// One mark, the first that applies: a red cross when the viewer requested changes, a gray one
-    /// when someone else did, a check when anyone approved: green when the viewer approved (or, on
-    /// their own PR, once the approvals are enough to merge), gray when only others did.
-    private func reviewRuns(_ row: ItemRow, viewer: String?) -> [CellRun] {
-        let item = row.item
-        guard item.kind == .pullRequest else { return [] }
-        let mine = viewer.flatMap(item.review(by:))?.state
-        if mine == "CHANGES_REQUESTED" {
-            return [.symbol("xmark", color: .systemRed, pointSize: Self.markPointSize)]
+    /// `ReviewMark`: crosses for change requests, checks for approvals; colored when it concerns
+    /// the viewer, gray when only others think so.
+    private func reviewRuns(_ row: ItemRow) -> [CellRun] {
+        let mark: (symbol: String, color: NSColor)? = switch row.insight.reviewMark {
+        case .none: nil
+        case .approvedByOthers: ("checkmark", .secondaryLabelColor)
+        case .approved: ("checkmark", .systemGreen)
+        case .changesRequestedByOthers: ("xmark", .secondaryLabelColor)
+        case .changesRequested: ("xmark", .systemRed)
         }
-        if item.reviews.contains(where: { $0.state == "CHANGES_REQUESTED" }) {
-            return [.symbol("xmark", color: .secondaryLabelColor, pointSize: Self.markPointSize)]
-        }
-        guard item.approvalCount > 0 else { return [] }
-        let isGreen = sameLogin(item.author, viewer) ? item.reviewDecision == "APPROVED" : mine == "APPROVED"
-        return [.symbol("checkmark", color: isGreen ? .systemGreen : .secondaryLabelColor, pointSize: Self.markPointSize)]
+        return mark.map { [.symbol($0.symbol, color: $0.color, pointSize: Self.markPointSize)] } ?? []
     }
 
     /// A dot for the CI state (green passed, red failed, yellow running, gray cancelled), filled

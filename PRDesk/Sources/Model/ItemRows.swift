@@ -163,7 +163,7 @@ struct ItemSort: Equatable, Codable {
         case .number: compare(a.item.number, b.item.number)
         case .title: a.item.title.localizedCaseInsensitiveCompare(b.item.title)
         case .author: (a.item.author ?? "").localizedCaseInsensitiveCompare(b.item.author ?? "")
-        case .review: compare(a.item.approvalCount, b.item.approvalCount)
+        case .review: compare(a.insight.reviewMark, b.insight.reviewMark)
         case .turn: compare(a.insight.turn == .me ? 1 : 0, b.insight.turn == .me ? 1 : 0)
         case .ci: compare(a.item.ci?.failed ?? -1, b.item.ci?.failed ?? -1)
         case .size: compare((a.item.additions ?? 0) + (a.item.deletions ?? 0), (b.item.additions ?? 0) + (b.item.deletions ?? 0))

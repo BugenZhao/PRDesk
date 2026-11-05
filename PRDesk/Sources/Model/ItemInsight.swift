@@ -5,6 +5,37 @@ enum Turn: String, Sendable {
     case me, them
 }
 
+/// The one review mark a PR shows, in the order they rank: what concerns the viewer is colored,
+/// what only others think is gray.
+enum ReviewMark: Int, Comparable, Sendable {
+    case none
+    /// Others approved; not (yet) enough to merge the viewer's own PR.
+    case approvedByOthers
+    /// The viewer approved, or their own PR has the approvals it needs.
+    case approved
+    /// Someone else requested changes on someone else's PR.
+    case changesRequestedByOthers
+    /// The viewer requested changes, or someone did on the viewer's own PR.
+    case changesRequested
+
+    static func < (a: Self, b: Self) -> Bool { a.rawValue < b.rawValue }
+
+    init(item: Item, viewer: String?) {
+        guard item.kind == .pullRequest else { self = .none; return }
+        let mine = viewer.flatMap(item.review(by:))?.state
+        let isMine = sameLogin(item.author, viewer)
+        if mine == "CHANGES_REQUESTED" {
+            self = .changesRequested
+        } else if item.reviews.contains(where: { $0.state == "CHANGES_REQUESTED" }) {
+            self = isMine ? .changesRequested : .changesRequestedByOthers
+        } else if item.approvalCount > 0 {
+            self = (isMine ? item.reviewDecision == "APPROVED" : mine == "APPROVED") ? .approved : .approvedByOthers
+        } else {
+            self = .none
+        }
+    }
+}
+
 /// Someone turning to the viewer directly: what wakes a Skipped item (SPEC §3.1).
 struct DirectAsk: Hashable, Sendable {
     var at: Date
@@ -28,6 +59,7 @@ struct ItemInsight: Hashable, Sendable {
     var isMine: Bool
     /// The viewer's latest opinionated review approves the PR.
     var isApprovedByMe: Bool
+    var reviewMark: ReviewMark
 
     init(item: Item, state: ItemState?, viewer: String?, baseline: Date?) {
         let isMe = { (login: String?) in sameLogin(login, viewer) }
@@ -37,6 +69,7 @@ struct ItemInsight: Hashable, Sendable {
         }
         isMine = isMe(item.author)
         isApprovedByMe = viewer.flatMap(item.review(by:))?.state == "APPROVED"
+        reviewMark = ReviewMark(item: item, viewer: viewer)
 
         let othersActivity = human.filter { event in
             guard !isMe(event.actor) else { return false }
