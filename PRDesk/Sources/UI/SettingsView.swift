@@ -93,6 +93,17 @@ private struct TokenSettingsView: View {
             }
 
             Section {
+                Button("Reset Columns") {
+                    NotificationCenter.default.post(name: .resetItemTableColumns, object: nil)
+                }
+            } header: {
+                Text("List")
+            } footer: {
+                Text("Puts the list's columns back in their first order and widths.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
                 Toggle("Show in menu bar", isOn: $showsMenuBarExtra)
             } header: {
                 Text("Menu bar")

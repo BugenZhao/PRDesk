@@ -34,7 +34,8 @@ enum ItemColumn: String, CaseIterable {
         }
     }
 
-    private var width: CGFloat {
+    /// The width a column starts with, and goes back to on Reset Columns.
+    var width: CGFloat {
         switch self {
         case .unread: 8
         case .priority: 16

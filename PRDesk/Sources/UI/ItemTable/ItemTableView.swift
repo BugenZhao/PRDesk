@@ -92,6 +92,10 @@ struct ItemTableView: NSViewRepresentable {
             coordinator, selector: #selector(Coordinator.fitTitleColumn),
             name: NSTableView.columnDidResizeNotification, object: table
         )
+        NotificationCenter.default.addObserver(
+            coordinator, selector: #selector(Coordinator.resetColumns),
+            name: .resetItemTableColumns, object: nil
+        )
         return scroll
     }
 
@@ -383,6 +387,18 @@ struct ItemTableView: NSViewRepresentable {
             if abs(title.width - target) >= 1 {
                 title.width = target
             }
+        }
+
+        /// Puts the columns back in their first order and widths; the table saves them as usual.
+        @objc func resetColumns() {
+            guard let table else { return }
+            for (target, column) in ItemColumn.allCases.enumerated() {
+                let index = table.column(withIdentifier: column.identifier)
+                guard index >= 0 else { continue }
+                if index != target { table.moveColumn(index, toColumn: target) }
+                if column != .title { table.tableColumns[target].width = column.width }
+            }
+            fitTitleColumn()
         }
 
         /// Keeps the relative times fresh between syncs.
@@ -853,4 +869,9 @@ final class ItemRowView: NSTableRowView {
         tint.setFill()
         dirtyRect.fill(using: .sourceOver)
     }
+}
+
+extension Notification.Name {
+    /// Asks the item table to put its columns back in their first order and widths.
+    static let resetItemTableColumns = Notification.Name("PRDeskResetItemTableColumns")
 }
