@@ -227,28 +227,33 @@ enum ItemColumn: String, CaseIterable {
         return runs
     }
 
-    /// The title with its leading tags ("[Core] ", "fix(x): ") dimmed and its inline code monospaced.
+    /// The title with its leading tags ("[Core] ", "fix(x): ") dimmed and its inline code
+    /// monospaced. Short of room, the tags shorten ("[RF][Fix] "), then go, before the rest of the
+    /// title is cut.
     @MainActor private func titleRun(_ title: String, bold: Bool) -> CellRun {
-        let parts = Self.titlePieces(title).map { piece in
-            TextSegment(
-                text: piece.text,
-                color: piece.isPrefix ? .secondaryLabelColor : .labelColor,
-                font: piece.isCode ? (bold ? CellFont.codeBold : CellFont.code) : nil
-            )
+        let parsed = Self.parsedTitle(title)
+        let font = bold ? CellFont.regularBold : CellFont.regular
+        let rest = parsed.pieces.filter { !$0.isPrefix }.map { piece in
+            TextSegment(text: piece.text, color: .labelColor, font: piece.isCode ? (bold ? CellFont.codeBold : CellFont.code) : nil)
         }
-        return .segments(parts, font: bold ? CellFont.regularBold : CellFont.regular, flexible: true)
+        let full = parsed.pieces.filter(\.isPrefix).map { piece in
+            TextSegment(text: piece.text, color: .secondaryLabelColor, font: piece.isCode ? (bold ? CellFont.codeBold : CellFont.code) : nil)
+        } + rest
+        guard full.count > rest.count, !rest.isEmpty else { return .segments(full, font: font, flexible: true) }
+        let short = parsed.shortPrefix.map { [TextSegment(text: $0, color: .secondaryLabelColor, font: nil)] + rest }
+        return .variants([full, short, rest].compactMap(\.self).map { .segments($0, font: font, flexible: true) })
     }
 
-    /// `TitleMarkup.pieces`, remembered: the prefix regexes are slow next to everything else a row
-    /// scrolling in costs.
-    @MainActor private static var titleSplits: [String: [TitlePiece]] = [:]
+    /// `TitleMarkup.pieces` and the shortened prefix, remembered: the prefix regexes are slow next
+    /// to everything else a row scrolling in costs.
+    @MainActor private static var titleSplits: [String: (pieces: [TitlePiece], shortPrefix: String?)] = [:]
 
-    @MainActor private static func titlePieces(_ title: String) -> [TitlePiece] {
-        if let pieces = titleSplits[title] { return pieces }
-        let pieces = TitleMarkup.pieces(title)
+    @MainActor private static func parsedTitle(_ title: String) -> (pieces: [TitlePiece], shortPrefix: String?) {
+        if let parsed = titleSplits[title] { return parsed }
+        let parsed = (TitleMarkup.pieces(title), TitlePrefix.abbreviate(TitlePrefix.split(title).prefix))
         if titleSplits.count > 5000 { titleSplits.removeAll() }
-        titleSplits[title] = pieces
-        return pieces
+        titleSplits[title] = parsed
+        return parsed
     }
 
     /// A review mark's width.

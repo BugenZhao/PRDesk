@@ -18,3 +18,71 @@ enum TitlePrefix {
         return (title[..<index], title[index...])
     }
 }
+
+extension TitlePrefix {
+    /// Short forms of common tags, from the tags of vLLM's commits and of the items here. Keys are
+    /// lowercased, with `-` and `_` read as spaces; a tag that maps to itself is kept as it is.
+    private static let abbreviations: [String: String] = [
+        "rust frontend": "RF",
+        "bugfix": "Fix",
+        "frontend": "FE",
+        "feature": "Feat",
+        "performance": "Perf",
+        "benchmark": "Bench",
+        "security": "Sec",
+        "spec decode": "SD",
+        "metrics": "Metr",
+        "kernel": "Kern",
+        "ci/build": "CI",
+        "docs": "Doc",
+        "refactor": "Refac",
+        "model runner v2": "MRV2",
+        "modelrunner v2": "MRV2",
+        "quantization": "Quant",
+        "attention": "Attn",
+        "multimodal": "MM",
+        "kv offload": "KVO",
+        "kv connector": "KVC",
+        "kvconnector": "KVC",
+        "structured output": "SO",
+        "structured outputs": "SO",
+        "hardware": "HW",
+        "moe refactor": "MoE Ref",
+        "torch.compile": "compile",
+        "pooling": "Pool",
+        "auxoutput": "Aux",
+        "observability": "Obs",
+        "renderer": "Render",
+        "tests": "Test",
+        "tool parser": "Tool Parser",
+    ]
+
+    /// A tag's short form: from the table, else the initials of a tag of several plain words
+    /// ("Spec Decode" → "SD"), else the tag itself.
+    static func abbreviate(tag: Substring) -> String {
+        let tag = tag.trimmingCharacters(in: .whitespaces)
+        let key = tag.lowercased().map { $0 == "-" || $0 == "_" ? " " : $0 }
+            .split(separator: " ").joined(separator: " ")
+        if let short = abbreviations[String(key)] { return short }
+        let words = tag.split(separator: " ")
+        if words.count > 1, words.allSatisfy({ $0.allSatisfy(\.isLetter) }) {
+            return String(words.compactMap(\.first)).uppercased()
+        }
+        return tag
+    }
+
+    /// The prefix with its tags shortened, e.g. "[Rust Frontend][Bugfix] " → "[RF][Fix] " and
+    /// "fix(rust): " → "fix: "; nil when that saves nothing.
+    static func abbreviate(_ prefix: Substring) -> String? {
+        let short: String
+        if prefix.hasPrefix("[") {
+            let tags = prefix.matches(of: /\[([^\]\n]+)\]/).map { "[\(abbreviate(tag: $0.1))]" }
+            short = tags.joined() + " "
+        } else if let match = prefix.prefixMatch(of: /([A-Za-z][\w .\/-]*?)(?:\([^)\n]*\))?!?:\s+/) {
+            short = abbreviate(tag: match.1) + ": "
+        } else {
+            return nil
+        }
+        return short.count < prefix.count ? short : nil
+    }
+}
