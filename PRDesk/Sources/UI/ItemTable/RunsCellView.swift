@@ -14,8 +14,8 @@ indirect enum CellRun {
     case symbol(String, color: NSColor, pointSize: CGFloat = 11)
     /// An item state icon (asset template or SF Symbol), tinted.
     case icon(StateIcon, color: NSColor)
-    /// Differently colored pieces of one string that truncate together, e.g. a dimmed title prefix.
-    case segments([(text: String, color: NSColor)], font: NSFont = CellFont.regular, flexible: Bool = false)
+    /// Differently styled pieces of one string that truncate together, e.g. a dimmed title prefix.
+    case segments([TextSegment], font: NSFont = CellFont.regular, flexible: Bool = false)
     /// Small rounded image, e.g. an org avatar.
     case image(NSImage)
     /// A short label on a solid rounded square the size of `image`, so it sits among org avatars.
@@ -29,6 +29,13 @@ indirect enum CellRun {
     case faded(CellRun, opacity: CGFloat)
 }
 
+/// A piece of `CellRun.segments`; `font` replaces the run's, e.g. for inline code.
+struct TextSegment {
+    var text: String
+    var color: NSColor
+    var font: NSFont?
+}
+
 /// NSFont is immutable, so sharing these across isolation domains is safe.
 enum CellFont {
     nonisolated(unsafe) static let regular = NSFont.systemFont(ofSize: 12)
@@ -39,6 +46,9 @@ enum CellFont {
     nonisolated(unsafe) static let smallBold = NSFont.systemFont(ofSize: 11, weight: .semibold)
     nonisolated(unsafe) static let chip = NSFont.systemFont(ofSize: 10, weight: .medium)
     nonisolated(unsafe) static let tile = NSFont.systemFont(ofSize: 8, weight: .bold)
+    /// Inline code in 12-point text: SF Mono a point smaller looks the same size.
+    nonisolated(unsafe) static let code = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+    nonisolated(unsafe) static let codeBold = NSFont.monospacedSystemFont(ofSize: 11, weight: .semibold)
 }
 
 /// A cell that draws its runs directly, which keeps dense tables cheap to scroll.
@@ -170,7 +180,7 @@ final class RunsCellView: NSTableCellView {
         case .spring:
             0
         case let .segments(parts, font, _):
-            Self.textWidth(parts.map(\.text).joined(), font: font)
+            Self.segmentsWidth(parts, font: font)
         }
     }
 
@@ -191,13 +201,25 @@ final class RunsCellView: NSTableCellView {
         return width
     }
 
-    private static func attributed(_ parts: [(text: String, color: NSColor)], font: NSFont, override: NSColor?) -> NSAttributedString {
+    private static var segmentWidths: [[WidthKey]: CGFloat] = [:]
+
+    fileprivate static func segmentsWidth(_ parts: [TextSegment], font: NSFont) -> CGFloat {
+        if parts.allSatisfy({ $0.font == nil }) { return textWidth(parts.map(\.text).joined(), font: font) }
+        let key = parts.map { WidthKey(text: $0.text, font: $0.font ?? font) }
+        if let width = segmentWidths[key] { return width }
+        let width = ceil(attributed(parts, font: font, override: nil).size().width)
+        if segmentWidths.count > 5000 { segmentWidths.removeAll() }
+        segmentWidths[key] = width
+        return width
+    }
+
+    private static func attributed(_ parts: [TextSegment], font: NSFont, override: NSColor?) -> NSAttributedString {
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineBreakMode = .byTruncatingTail
         let result = NSMutableAttributedString()
         for part in parts {
             result.append(NSAttributedString(string: part.text, attributes: [
-                .font: font,
+                .font: part.font ?? font,
                 .foregroundColor: override ?? part.color,
                 .paragraphStyle: paragraph,
             ]))
@@ -470,7 +492,7 @@ private extension CellRun {
     @MainActor var fullWidth: CGFloat? {
         switch self {
         case let .text(string, _, font, _, _): RunsCellView.textWidth(string, font: font)
-        case let .segments(parts, font, _): RunsCellView.textWidth(parts.map(\.text).joined(), font: font)
+        case let .segments(parts, font, _): RunsCellView.segmentsWidth(parts, font: font)
         default: nil
         }
     }

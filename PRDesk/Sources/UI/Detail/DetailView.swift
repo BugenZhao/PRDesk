@@ -183,10 +183,19 @@ private struct DetailHeader: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// The title with its leading tags ("[Core] ", "fix(x): ") dimmed.
+    /// The title with its leading tags ("[Core] ", "fix(x): ") dimmed and its inline code monospaced.
     private var titleText: Text {
-        let (prefix, rest) = TitlePrefix.split(item.title)
-        return Text("\(Text(prefix).foregroundStyle(.secondary))\(Text(rest))")
+        TitleMarkup.pieces(item.title).reduce(Text(verbatim: "")) { text, piece in
+            var part = Text(verbatim: piece.text)
+            // SF Mono a point smaller looks the same size as the title's 15-point text.
+            if piece.isCode { part = part.font(.system(size: 14, weight: .semibold, design: .monospaced)) }
+            if piece.isPrefix {
+                part = part.foregroundStyle(.secondary)
+            } else if piece.isCode {
+                part = part.foregroundStyle(Color(nsColor: .titleCode))
+            }
+            return Text("\(text)\(part)")
+        }
     }
 
     private var stateChip: some View {

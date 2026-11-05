@@ -205,26 +205,28 @@ enum ItemColumn: String, CaseIterable {
         return runs
     }
 
-    /// The title with its leading tags ("[Core] ", "fix(x): ") dimmed.
+    /// The title with its leading tags ("[Core] ", "fix(x): ") dimmed and its inline code monospaced.
     @MainActor private func titleRun(_ title: String, bold: Bool) -> CellRun {
-        let (prefix, rest) = Self.splitTitle(title)
-        var parts: [(text: String, color: NSColor)] = []
-        if !prefix.isEmpty { parts.append((prefix, .secondaryLabelColor)) }
-        parts.append((rest, .labelColor))
+        let parts = Self.titlePieces(title).map { piece in
+            TextSegment(
+                text: piece.text,
+                color: piece.isPrefix ? .secondaryLabelColor : piece.isCode ? .titleCode : .labelColor,
+                font: piece.isCode ? (bold ? CellFont.codeBold : CellFont.code) : nil
+            )
+        }
         return .segments(parts, font: bold ? CellFont.regularBold : CellFont.regular, flexible: true)
     }
 
-    /// `TitlePrefix.split`, remembered: its regexes are slow next to everything else a row
+    /// `TitleMarkup.pieces`, remembered: the prefix regexes are slow next to everything else a row
     /// scrolling in costs.
-    @MainActor private static var titleSplits: [String: (prefix: String, rest: String)] = [:]
+    @MainActor private static var titleSplits: [String: [TitlePiece]] = [:]
 
-    @MainActor private static func splitTitle(_ title: String) -> (prefix: String, rest: String) {
-        if let split = titleSplits[title] { return split }
-        let (prefix, rest) = TitlePrefix.split(title)
-        let split = (String(prefix), String(rest))
+    @MainActor private static func titlePieces(_ title: String) -> [TitlePiece] {
+        if let pieces = titleSplits[title] { return pieces }
+        let pieces = TitleMarkup.pieces(title)
         if titleSplits.count > 5000 { titleSplits.removeAll() }
-        titleSplits[title] = split
-        return split
+        titleSplits[title] = pieces
+        return pieces
     }
 
     /// Review and CI share one shape: a small mark, then a count, in the same fixed slots.
@@ -305,6 +307,8 @@ extension NSColor {
             : NSColor(srgbRed: 0.81, green: 0.13, blue: 0.18, alpha: 1)
     }
 
+    /// Inline code in a title's subject: a little fainter than the text around it.
+    static let titleCode = NSColor.labelColor.withAlphaComponent(0.7)
 }
 
 extension Vote {
