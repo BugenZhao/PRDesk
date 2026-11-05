@@ -9,7 +9,8 @@ enum ItemColumn: String, CaseIterable {
     /// Left out of the Parity tab.
     static let notInParity: Set<ItemColumn> = [.author, .avatar]
     /// Hidden one by one, in this order, while the title column would be narrower than
-    /// `titleRoom`: the columns looked at least. Author gives way to `avatar`, just its picture.
+    /// `titleRoom`: the columns looked at least. Author gives way to `avatar`, its picture and
+    /// marks without the name.
     static let givesWay: [ItemColumn] = [.turn, .ci, .author, .size, .age]
     static let titleRoom: CGFloat = 360
 
@@ -40,7 +41,8 @@ enum ItemColumn: String, CaseIterable {
         case .number: 42
         case .title: 520
         case .author: 168
-        case .avatar: 13 + 2 * RunsCellView.inset
+        // The picture and up to three marks: a vote and two org badges.
+        case .avatar: 4 * 13 + 3 * RunsCellView.spacing + 2 * RunsCellView.inset
         case .link: 64
         case .review: 40
         case .turn: 46
@@ -125,7 +127,7 @@ enum ItemColumn: String, CaseIterable {
         case .title:
             return titleRuns(row, now: now)
 
-        case .author:
+        case .author, .avatar:
             let vote: [CellRun] = row.authorVote.map { [.symbol($0.symbol, color: $0.nsColor)] } ?? []
             let orgBadges = item.author.map(badges) ?? []
             let contribution = item.author.flatMap(contribution)
@@ -137,10 +139,7 @@ enum ItemColumn: String, CaseIterable {
             let name: CellRun = .text(item.author ?? "ghost", font: unvouched ? CellFont.regularItalic : CellFont.regular, flexible: true)
             let avatar: CellRun = .avatar(item.author.flatMap(AvatarCache.shared.image(for:)))
             // Marks of trust sit at the right edge, so they line up down the column.
-            return [avatar, name] + vote + [.spring] + seal + orgBadges.map(\.cellRun)
-
-        case .avatar:
-            return [.avatar(item.author.flatMap(AvatarCache.shared.image(for:)))]
+            return [avatar] + (self == .author ? [name] : []) + vote + [.spring] + seal + orgBadges.map(\.cellRun)
 
         case .link:
             guard let paired = row.paired else { return [] }
