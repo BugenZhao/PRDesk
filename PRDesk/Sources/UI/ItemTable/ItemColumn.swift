@@ -41,7 +41,9 @@ enum ItemColumn: String, CaseIterable {
         case .priority: 16
         case .number: 42
         case .title: 520
-        case .author: 168
+        // Room for the picture, two marks and an 80-point login (three in four open items' authors);
+        // with no marks, 115 points (nearly all). Longer logins truncate, whole in the tooltip.
+        case .author: 140
         // The picture and up to three marks: a vote and two org badges.
         case .avatar: 4 * 13 + 3 * RunsCellView.spacing + 2 * RunsCellView.inset
         case .link: 64
