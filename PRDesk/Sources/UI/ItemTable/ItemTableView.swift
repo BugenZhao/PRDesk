@@ -350,15 +350,30 @@ struct ItemTableView: NSViewRepresentable {
 
         // MARK: Layout
 
-        /// Gives the title column all width not used by the other columns.
+        /// Gives the title column all width not used by the other columns, hiding the columns that
+        /// give way (`ItemColumn.givesWay`) while it would be narrower than `ItemColumn.titleRoom`.
         @objc func fitTitleColumn() {
             guard let table,
                   let clip = table.enclosingScrollView?.contentView,
                   let title = table.tableColumn(withIdentifier: ItemColumn.title.identifier)
             else { return }
-            let others = table.tableColumns.reduce(0) { $0 + ($1 === title || $1.isHidden ? 0 : $1.width) }
-            let spacing = table.intercellSpacing.width * CGFloat(table.tableColumns.count)
-            let target = max(title.minWidth, floor(clip.bounds.width - others - spacing))
+            let givesWay = ItemColumn.givesWay.compactMap { table.tableColumn(withIdentifier: $0.identifier) }
+            func titleWidth(hiding hidden: ArraySlice<NSTableColumn>) -> CGFloat {
+                let others = table.tableColumns.reduce(0) { sum, column in
+                    let shown = givesWay.contains(column) ? !hidden.contains(column) : !column.isHidden
+                    return sum + (column === title || !shown ? 0 : column.width)
+                }
+                let spacing = table.intercellSpacing.width * CGFloat(table.tableColumns.count)
+                return floor(clip.bounds.width - others - spacing)
+            }
+            var hiding = 0
+            while hiding < givesWay.count, titleWidth(hiding: givesWay.prefix(hiding)) < ItemColumn.titleRoom {
+                hiding += 1
+            }
+            for (index, column) in givesWay.enumerated() where column.isHidden != (index < hiding) {
+                column.isHidden = index < hiding
+            }
+            let target = max(title.minWidth, titleWidth(hiding: givesWay.prefix(hiding)))
             // Setting the width posts columnDidResize again, which then finds nothing to change.
             if abs(title.width - target) >= 1 {
                 title.width = target

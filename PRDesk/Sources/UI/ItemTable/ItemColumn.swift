@@ -8,6 +8,10 @@ enum ItemColumn: String, CaseIterable {
     static let parityOnly: Set<ItemColumn> = [.link]
     /// Left out of the Parity tab.
     static let notInParity: Set<ItemColumn> = [.author]
+    /// Hidden one by one, in this order, while the title column would be narrower than
+    /// `titleRoom`: the columns looked at least.
+    static let givesWay: [ItemColumn] = [.ci, .turn, .size, .age]
+    static let titleRoom: CGFloat = 360
 
     var identifier: NSUserInterfaceItemIdentifier { .init(rawValue) }
 
@@ -193,14 +197,16 @@ enum ItemColumn: String, CaseIterable {
         if let reason = row.wakeReason {
             runs.append(.chip(reason, color: .systemPurple))
         }
+        // The board comment and the latest event give way, the event first, before the title is
+        // cut short.
         if let comment = row.comment {
-            runs.append(.symbol("text.bubble", color: .tertiaryLabelColor))
-            runs.append(.text(comment, color: .secondaryLabelColor, font: CellFont.small, flexible: true, maxWidth: 320))
+            runs.append(.optional(.symbol("text.bubble", color: .tertiaryLabelColor), priority: 1))
+            runs.append(.optional(.text(comment, color: .secondaryLabelColor, font: CellFont.small, flexible: true, maxWidth: 320), priority: 1))
         }
         // The latest event sits at the right edge, so it lines up down the column.
         if let summary = row.insight.summary, let at = row.insight.summaryAt {
             runs.append(.spring)
-            runs.append(.text("\(summary) \(at.compactAge(relativeTo: now))", color: .tertiaryLabelColor, font: CellFont.small, maxWidth: 180))
+            runs.append(.optional(.text("\(summary) \(at.compactAge(relativeTo: now))", color: .tertiaryLabelColor, font: CellFont.small, maxWidth: 180), priority: 0))
         }
         return runs
     }

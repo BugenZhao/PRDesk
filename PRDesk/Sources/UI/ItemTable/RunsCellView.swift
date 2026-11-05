@@ -27,6 +27,9 @@ indirect enum CellRun {
     /// A run drawn see-through, e.g. a mark for a write still under way. Only the run fades,
     /// not the cell (see `RunsCellView.opacity`).
     case faded(CellRun, opacity: CGFloat)
+    /// A run left out while a flexible run that isn't optional (e.g. a title) would be cut short.
+    /// The lowest `priority` goes first; runs of one priority go together.
+    case optional(CellRun, priority: Int)
 }
 
 /// A piece of `CellRun.segments`; `font` replaces the run's, e.g. for inline code.
@@ -110,24 +113,46 @@ final class RunsCellView: NSTableCellView {
 
     private func drawRuns() {
         let widths = layoutWidths(natural: naturalWidths)
-        let total = widths.reduce(0, +) + Self.spacing * CGFloat(runs.count - 1)
+        let shown = widths.compactMap(\.self)
+        let total = shown.reduce(0, +) + Self.spacing * CGFloat(shown.count - 1)
         var x = alignment == .trailing ? bounds.maxX - Self.inset - total : Self.inset
         for (run, width) in zip(runs, widths) {
+            guard let width else { continue }
             draw(run, in: NSRect(x: x, y: 0, width: width, height: bounds.height))
             x += width + Self.spacing
         }
     }
 
-    /// The width each run gets: flexible runs share what the fixed ones leave, earlier runs first;
-    /// springs get the rest.
-    private func layoutWidths(natural: [CGFloat]) -> [CGFloat] {
-        let gaps = Self.spacing * CGFloat(runs.count - 1)
+    /// The width each run gets, nil for an optional run left out: optional runs give way, lowest
+    /// priority first, until the other flexible runs get all they need or none are left.
+    private func layoutWidths(natural: [CGFloat]) -> [CGFloat?] {
+        var widths = layoutWidths(natural: natural, dropping: [])
+        let priorities = Set(runs.compactMap(\.dropPriority)).sorted()
+        var dropping: Set<Int> = []
+        for priority in priorities {
+            let cutShort = runs.indices.contains { index in
+                guard runs[index].isFlexible, runs[index].dropPriority == nil, let width = widths[index] else { return false }
+                return width < natural[index] - 0.5
+            }
+            guard cutShort else { break }
+            dropping.insert(priority)
+            widths = layoutWidths(natural: natural, dropping: dropping)
+        }
+        return widths
+    }
+
+    /// Flexible runs share what the fixed ones leave, earlier runs first; springs get the rest.
+    private func layoutWidths(natural: [CGFloat], dropping: Set<Int>) -> [CGFloat?] {
+        let shown = runs.map { run in run.dropPriority.map { !dropping.contains($0) } ?? true }
+        let count = shown.filter(\.self).count
+        let gaps = Self.spacing * CGFloat(max(0, count - 1))
         let available = bounds.width - 2 * Self.inset - gaps
-        let fixed = zip(runs, natural).reduce(0) { $0 + ($1.0.isFlexible ? 0 : $1.1) }
+        let fixed = runs.indices.reduce(0) { $0 + (shown[$1] && !runs[$1].isFlexible ? natural[$1] : 0) }
         var remaining = max(0, available - fixed)
-        var widths = zip(runs, natural).map { run, width -> CGFloat in
-            guard run.isFlexible else { return width }
-            let given = min(width, remaining)
+        var widths = runs.indices.map { index -> CGFloat? in
+            guard shown[index] else { return nil }
+            guard runs[index].isFlexible else { return natural[index] }
+            let given = min(natural[index], remaining)
             remaining -= given
             return given
         }
@@ -155,8 +180,9 @@ final class RunsCellView: NSTableCellView {
     /// asked for only when a tooltip is about to show.
     var truncatedText: String? {
         let widths = layoutWidths(natural: naturalWidths)
-        let cut = zip(runs, widths).compactMap { run, width in
-            run.fullWidth.map { $0 > width + 0.5 } == true ? run.fullText : nil
+        let cut = zip(runs, widths).compactMap { run, width -> String? in
+            guard let width else { return nil }
+            return run.fullWidth.map { $0 > width + 0.5 } == true ? run.fullText : nil
         }
         return cut.isEmpty ? nil : cut.joined(separator: "\n")
     }
@@ -171,7 +197,7 @@ final class RunsCellView: NSTableCellView {
             Self.dotSize
         case let .slot(_, width, _):
             width
-        case let .faded(run, _):
+        case let .faded(run, _), let .optional(run, _):
             naturalWidth(run)
         case .symbol, .icon:
             Self.symbolSize
@@ -263,6 +289,9 @@ final class RunsCellView: NSTableCellView {
             context.setAlpha(opacity)
             draw(run, in: rect)
             context.restoreGState()
+
+        case let .optional(run, _):
+            draw(run, in: rect)
 
         case let .slot(run, _, trailing):
             guard let run else { return }
@@ -465,8 +494,13 @@ private extension CellRun {
     var isFlexible: Bool {
         switch self {
         case let .text(_, _, _, flexible, _), let .segments(_, _, flexible): flexible
+        case let .optional(run, _): run.isFlexible
         default: false
         }
+    }
+
+    var dropPriority: Int? {
+        if case let .optional(_, priority) = self { priority } else { nil }
     }
 
     /// What VoiceOver reads for the run; nil for pure decoration.
@@ -474,7 +508,7 @@ private extension CellRun {
         switch self {
         case let .text(string, _, _, _, _), let .chip(string, _), let .tile(string, _): string
         case let .segments(parts, _, _): parts.map(\.text).joined()
-        case let .slot(run?, _, _), let .faded(run, _): run.spokenText
+        case let .slot(run?, _, _), let .faded(run, _), let .optional(run, _): run.spokenText
         default: nil
         }
     }
@@ -484,6 +518,7 @@ private extension CellRun {
         switch self {
         case let .text(string, _, _, _, _): string
         case let .segments(parts, _, _): parts.map(\.text).joined()
+        case let .optional(run, _): run.fullText
         default: nil
         }
     }
@@ -493,6 +528,7 @@ private extension CellRun {
         switch self {
         case let .text(string, _, font, _, _): RunsCellView.textWidth(string, font: font)
         case let .segments(parts, font, _): RunsCellView.segmentsWidth(parts, font: font)
+        case let .optional(run, _): run.fullWidth
         default: nil
         }
     }
