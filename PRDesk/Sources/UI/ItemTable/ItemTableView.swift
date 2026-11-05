@@ -57,6 +57,12 @@ struct ItemTableView: NSViewRepresentable {
             let target = index > author ? author + offset : author + offset - 1
             if index != target { table.moveColumn(index, toColumn: target) }
         }
+        // Review was gone for a while; a layout saved then has it last.
+        let review = table.column(withIdentifier: ItemColumn.review.identifier)
+        let turn = table.column(withIdentifier: ItemColumn.turn.identifier)
+        if review >= 0, turn >= 0, review > turn {
+            table.moveColumn(review, toColumn: turn)
+        }
         table.sortDescriptors = [NSSortDescriptor(key: sort.key.rawValue, ascending: sort.ascending)]
 
         let coordinator = context.coordinator
@@ -618,10 +624,11 @@ struct ItemTableView: NSViewRepresentable {
                         return "\(request.emoji) Sent to \(request.bot) \(age == "now" ? "just now" : "\(age) ago")\(note)"
                     }
                     let sessions = (itemRow.board?.sessionLinks ?? []).map { "\(AgentSession.agentName(for: $0)) session: \($0.absoluteString)" }
-                    let lines = [truncated].compactMap(\.self) + ItemColumn.reviewTooltip(itemRow.item) + sent + sessions
+                    let lines = [truncated].compactMap(\.self) + sent + sessions
                     return lines.isEmpty ? nil : lines.joined(separator: "\n")
                 case .author, .avatar: return authorTooltip(itemRow.item.author)
                 case .link: return itemRow.paired.map { "\($0.repo)#\($0.number) \($0.title)" }
+                case .review: return ItemColumn.reviewTooltip(itemRow.item)
                 case .ci: return ItemColumn.ciTooltip(itemRow.item)
                 default: return nil
                 }
