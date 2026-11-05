@@ -178,7 +178,7 @@ Settings → General → Yab 打开后（默认关），app 把 Pinned 单向同
 ### 4.3 颜色
 
 - 行底色：H 为淡橙，M 为淡黄，L 和无优先级不着色
-- Turn = me 用强调色；merged 和 closed 的行整体变淡
+- Turn = me 用正文颜色加粗（不用颜色，颜色留给优先级）；merged 和 closed 的行整体变淡
 - 选中行用系统选中色；以上颜色在深色和浅色下各有一套
 
 ### 4.4 过滤
