@@ -25,7 +25,7 @@ enum ItemColumn: String, CaseIterable {
         case .author: "Author"
         case .avatar: ""
         case .link: "Link"
-        case .review: "Rev"
+        case .review: "✓"
         case .turn: "Turn"
         case .ci: "CI"
         case .size: "Size"
@@ -47,8 +47,8 @@ enum ItemColumn: String, CaseIterable {
         // The picture and up to three marks: a vote and two org badges.
         case .avatar: 4 * 13 + 3 * RunsCellView.spacing + 2 * RunsCellView.inset
         case .link: 64
-        // A check and a cross, no counts (the tooltip has the reviewers).
-        case .review: 2 * Self.markSlot + RunsCellView.spacing + 2 * RunsCellView.inset
+        // One mark, no counts (the tooltip has the reviewers).
+        case .review: Self.markSlot + 2 * RunsCellView.inset
         case .turn: 46
         case .ci: 22
         case .size: Self.sizeWidth
@@ -102,7 +102,8 @@ enum ItemColumn: String, CaseIterable {
             // Sized by the table to fill the remaining width; see `Coordinator.fitTitleColumn`.
             column.minWidth = 160
             column.resizingMask = []
-        } else if self == .avatar {
+        } else if self == .avatar || self == .review {
+            // Fixed: a wider width saved before can't leave them with empty room.
             column.minWidth = width
             column.maxWidth = width
             column.resizingMask = []
@@ -249,24 +250,27 @@ enum ItemColumn: String, CaseIterable {
         return pieces
     }
 
-    /// A review mark's slot, so checks and crosses line up down the column.
+    /// A review mark's width.
     private static let markSlot: CGFloat = 13
     /// One size for the review check and the CI dot, so they match.
     private static let markPointSize: CGFloat = 10
 
-    /// A check when anyone approved: green when the viewer approved (or, on their own PR, once the
-    /// approvals are enough to merge), gray when only others did. A red cross after it when the
-    /// viewer requested changes.
+    /// One mark, the first that applies: a red cross when the viewer requested changes, a gray one
+    /// when someone else did, a check when anyone approved: green when the viewer approved (or, on
+    /// their own PR, once the approvals are enough to merge), gray when only others did.
     private func reviewRuns(_ row: ItemRow, viewer: String?) -> [CellRun] {
         let item = row.item
         guard item.kind == .pullRequest else { return [] }
         let mine = viewer.flatMap(item.review(by:))?.state
+        if mine == "CHANGES_REQUESTED" {
+            return [.symbol("xmark", color: .systemRed, pointSize: Self.markPointSize)]
+        }
+        if item.reviews.contains(where: { $0.state == "CHANGES_REQUESTED" }) {
+            return [.symbol("xmark", color: .secondaryLabelColor, pointSize: Self.markPointSize)]
+        }
+        guard item.approvalCount > 0 else { return [] }
         let isGreen = sameLogin(item.author, viewer) ? item.reviewDecision == "APPROVED" : mine == "APPROVED"
-        let check: CellRun? = item.approvalCount > 0
-            ? .symbol("checkmark", color: isGreen ? .systemGreen : .secondaryLabelColor, pointSize: Self.markPointSize) : nil
-        let cross: CellRun? = mine == "CHANGES_REQUESTED"
-            ? .symbol("xmark", color: .systemRed, pointSize: Self.markPointSize) : nil
-        return check == nil && cross == nil ? [] : [.slot(check, width: Self.markSlot), .slot(cross, width: Self.markSlot)]
+        return [.symbol("checkmark", color: isGreen ? .systemGreen : .secondaryLabelColor, pointSize: Self.markPointSize)]
     }
 
     /// A dot for the CI state (green passed, red failed, yellow running, gray cancelled), filled
