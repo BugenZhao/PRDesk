@@ -44,8 +44,8 @@ enum ItemColumn: String, CaseIterable {
         // Room for the picture, two marks and an 80-point login (three in four open items' authors);
         // with no marks, 115 points (nearly all). Longer logins truncate, whole in the tooltip.
         case .author: 140
-        // The picture and up to three marks: a vote and two org badges.
-        case .avatar: 4 * 13 + 3 * RunsCellView.spacing + 2 * RunsCellView.inset
+        // The picture and up to two marks (see `runs`).
+        case .avatar: 3 * 13 + 2 * RunsCellView.spacing + 2 * RunsCellView.inset
         case .link: 64
         // One mark, no counts (the tooltip has the reviewers).
         case .review: Self.markSlot + 2 * RunsCellView.inset
@@ -146,7 +146,11 @@ enum ItemColumn: String, CaseIterable {
             let name: CellRun = .text(item.author ?? "ghost", font: unvouched ? CellFont.regularItalic : CellFont.regular, flexible: true)
             let avatar: CellRun = .avatar(item.author.flatMap(AvatarCache.shared.image(for:)))
             // Marks of trust sit at the right edge, so they line up down the column.
-            return [avatar] + (self == .author ? [name] : []) + vote + [.spring] + seal + orgBadges.map(\.cellRun)
+            if self == .avatar {
+                // Room for two marks, the vote first; the tooltip names the rest.
+                return [avatar, .spring] + (vote + seal + orgBadges.map(\.cellRun)).prefix(2)
+            }
+            return [avatar, name] + vote + [.spring] + seal + orgBadges.map(\.cellRun)
 
         case .link:
             guard let paired = row.paired else { return [] }
