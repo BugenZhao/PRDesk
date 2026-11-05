@@ -72,9 +72,9 @@ final class RunsCellView: NSTableCellView {
     var opacity: CGFloat = 1 {
         didSet { if opacity != oldValue { needsDisplay = true } }
     }
-    /// Width the runs are laid out without, as if the cell were that much narrower; springs take it
-    /// back. What the cell shortens or leaves out then doesn't come back when a column giving way
-    /// widens it (see `Coordinator.fitTitleColumn`).
+    /// Width the cell decides what to leave out without, as if that much narrower; what stays then
+    /// gets the whole width. What the cell leaves out then doesn't come back when a column giving
+    /// way widens it (see `Coordinator.fitTitleColumn`), while the title still uses the room.
     var reservedWidth: CGFloat = 0 {
         didSet { if reservedWidth != oldValue { needsDisplay = true } }
     }
@@ -134,7 +134,8 @@ final class RunsCellView: NSTableCellView {
     /// minimum and then give way, lowest priority first, until the other flexible runs get all
     /// they need or none are left.
     private func layoutWidths(natural: [CGFloat]) -> [CGFloat?] {
-        var widths = layoutWidths(natural: natural, dropping: [])
+        // What goes is decided as if `reservedWidth` narrower; what stays then gets all the width.
+        var widths = layoutWidths(natural: natural, dropping: [], reserving: reservedWidth)
         let priorities = Set(runs.compactMap(\.dropPriority)).sorted()
         var dropping: Set<Int> = []
         for priority in priorities {
@@ -145,17 +146,17 @@ final class RunsCellView: NSTableCellView {
             }
             guard short else { break }
             dropping.insert(priority)
-            widths = layoutWidths(natural: natural, dropping: dropping)
+            widths = layoutWidths(natural: natural, dropping: dropping, reserving: reservedWidth)
         }
-        return widths
+        return reservedWidth > 0 ? layoutWidths(natural: natural, dropping: dropping, reserving: 0) : widths
     }
 
     /// Flexible runs share what the fixed ones leave, earlier runs first; springs get the rest.
-    private func layoutWidths(natural: [CGFloat], dropping: Set<Int>) -> [CGFloat?] {
+    private func layoutWidths(natural: [CGFloat], dropping: Set<Int>, reserving reserved: CGFloat) -> [CGFloat?] {
         let shown = runs.map { run in run.dropPriority.map { !dropping.contains($0) } ?? true }
         let count = shown.filter(\.self).count
         let gaps = Self.spacing * CGFloat(max(0, count - 1))
-        let available = bounds.width - reservedWidth - 2 * Self.inset - gaps
+        let available = bounds.width - reserved - 2 * Self.inset - gaps
         let fixed = runs.indices.reduce(0) { $0 + (shown[$1] && !runs[$1].isFlexible ? natural[$1] : 0) }
         var remaining = max(0, available - fixed)
         var widths = runs.indices.map { index -> CGFloat? in
@@ -167,7 +168,7 @@ final class RunsCellView: NSTableCellView {
         }
         let springs = runs.indices.filter { if case .spring = runs[$0] { true } else { false } }
         for index in springs {
-            widths[index] = (remaining + reservedWidth) / CGFloat(springs.count)
+            widths[index] = (remaining + reserved) / CGFloat(springs.count)
         }
         return widths
     }
