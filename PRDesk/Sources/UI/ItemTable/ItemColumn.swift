@@ -23,7 +23,7 @@ enum ItemColumn: String, CaseIterable {
         case .number: "#"
         case .title: "Title"
         case .author: "Author"
-        case .avatar: ""
+        case .avatar: "Author"
         case .link: "Link"
         case .review: "✓"
         case .turn: "Turn"
