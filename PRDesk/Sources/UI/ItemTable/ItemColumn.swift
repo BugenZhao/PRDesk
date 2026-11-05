@@ -115,7 +115,9 @@ enum ItemColumn: String, CaseIterable {
     }
 
     @MainActor
-    func runs(for row: ItemRow, viewer: String?, badges: (String) -> [Badge], contribution: (String) -> Contribution?, now: Date) -> [CellRun] {
+    /// `abbreviatesTags` shortens the title's tags ("[RF][Fix] "); the table turns it on for all
+    /// rows at once.
+    func runs(for row: ItemRow, viewer: String?, badges: (String) -> [Badge], contribution: (String) -> Contribution?, now: Date, abbreviatesTags: Bool = false) -> [CellRun] {
         let item = row.item
         switch self {
         case .unread:
@@ -130,7 +132,7 @@ enum ItemColumn: String, CaseIterable {
             return [.text(String(item.number), color: .secondaryLabelColor, font: CellFont.digits)]
 
         case .title:
-            return titleRuns(row, now: now)
+            return titleRuns(row, now: now, abbreviatesTags: abbreviatesTags)
 
         case .author, .avatar:
             let vote: [CellRun] = row.authorVote.map { [.symbol($0.symbol, color: $0.nsColor)] } ?? []
@@ -187,11 +189,11 @@ enum ItemColumn: String, CaseIterable {
         }
     }
 
-    @MainActor private func titleRuns(_ row: ItemRow, now: Date) -> [CellRun] {
+    @MainActor private func titleRuns(_ row: ItemRow, now: Date, abbreviatesTags: Bool) -> [CellRun] {
         let item = row.item
         var runs: [CellRun] = [
             .icon(item.stateIcon, color: item.stateColor),
-            titleRun(item.title, bold: row.insight.isUnread),
+            titleRun(item.title, bold: row.insight.isUnread, abbreviatesTags: abbreviatesTags),
         ]
         // What the item was sent to a Grok Bot for; faint while the send is under way.
         for request in row.state.sentRequests {
@@ -227,21 +229,25 @@ enum ItemColumn: String, CaseIterable {
         return runs
     }
 
-    /// The title with its leading tags ("[Core] ", "fix(x): ") dimmed and its inline code
-    /// monospaced. Short of room, the tags shorten ("[RF][Fix] "), then go, before the rest of the
-    /// title is cut.
-    @MainActor private func titleRun(_ title: String, bold: Bool) -> CellRun {
+    /// The title with its leading tags ("[Core] ", "fix(x): ") dimmed, shortened ("[RF][Fix] ")
+    /// when `abbreviatesTags`, and its inline code monospaced.
+    @MainActor private func titleRun(_ title: String, bold: Bool, abbreviatesTags: Bool) -> CellRun {
         let parsed = Self.parsedTitle(title)
         let font = bold ? CellFont.regularBold : CellFont.regular
-        let rest = parsed.pieces.filter { !$0.isPrefix }.map { piece in
-            TextSegment(text: piece.text, color: .labelColor, font: piece.isCode ? (bold ? CellFont.codeBold : CellFont.code) : nil)
+        let segments: [TextSegment] = if abbreviatesTags, let short = parsed.shortPrefix {
+            [TextSegment(text: short, color: .secondaryLabelColor, font: nil)] + parsed.pieces.filter { !$0.isPrefix }.map { segment($0, bold: bold) }
+        } else {
+            parsed.pieces.map { segment($0, bold: bold) }
         }
-        let full = parsed.pieces.filter(\.isPrefix).map { piece in
-            TextSegment(text: piece.text, color: .secondaryLabelColor, font: piece.isCode ? (bold ? CellFont.codeBold : CellFont.code) : nil)
-        } + rest
-        guard full.count > rest.count, !rest.isEmpty else { return .segments(full, font: font, flexible: true) }
-        let short = parsed.shortPrefix.map { [TextSegment(text: $0, color: .secondaryLabelColor, font: nil)] + rest }
-        return .variants([full, short, rest].compactMap(\.self).map { .segments($0, font: font, flexible: true) })
+        return .segments(segments, font: font, flexible: true)
+    }
+
+    private func segment(_ piece: TitlePiece, bold: Bool) -> TextSegment {
+        TextSegment(
+            text: piece.text,
+            color: piece.isPrefix ? .secondaryLabelColor : .labelColor,
+            font: piece.isCode ? (bold ? CellFont.codeBold : CellFont.code) : nil
+        )
     }
 
     /// `TitleMarkup.pieces` and the shortened prefix, remembered: the prefix regexes are slow next

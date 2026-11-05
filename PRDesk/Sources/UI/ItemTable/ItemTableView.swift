@@ -160,9 +160,11 @@ struct ItemTableView: NSViewRepresentable {
                 viewer = parent.viewer
                 badgeVersion = parent.badgeVersion
                 table.resetToolTip()
+                measureTitles()
                 if viewerChanged || !animateChanges(from: old, in: table) {
                     table.reloadData()
                 }
+                updateTagMode()
             } else if parent.badgeVersion != badgeVersion {
                 badgeVersion = parent.badgeVersion
                 let author = table.column(withIdentifier: ItemColumn.author.identifier)
@@ -397,6 +399,7 @@ struct ItemTableView: NSViewRepresentable {
             // width a column leaves would otherwise bring back what the cells just shortened
             // (tags, the latest event), only to shorten it again as the list narrows on.
             let slack = givingWay > 0 ? max(0, floor(target - ItemColumn.titleRoom)) : 0
+            titleLayoutWidth = target - slack
             if slack != titleSlack {
                 titleSlack = slack
                 let column = table.column(withIdentifier: ItemColumn.title.identifier)
@@ -405,10 +408,39 @@ struct ItemTableView: NSViewRepresentable {
                     (table.view(atColumn: column, row: row, makeIfNecessary: false) as? RunsCellView)?.reservedWidth = slack
                 }
             }
+            updateTagMode()
         }
 
         /// See `fitTitleColumn`.
         private var titleSlack: CGFloat = 0
+        /// The width title cells lay out in: the title column's, less `titleSlack`.
+        private var titleLayoutWidth: CGFloat = .infinity
+        /// What each item row's title cell needs with its tags in full; nil for headers.
+        private var fullTitleWidths: [CGFloat?] = []
+        /// Whether every title's tags are shortened: on while more than a quarter of the rows
+        /// would be cut short with them in full. One mode for all rows, so a tag reads the same in
+        /// every row, and it only turns on as the list narrows.
+        private var abbreviatesTags = false
+
+        private func measureTitles() {
+            fullTitleWidths = rows.map { row in
+                guard case let .item(_, itemRow) = row else { return nil }
+                let runs = ItemColumn.title.runs(for: itemRow, viewer: viewer, badges: parent.badges, contribution: parent.contribution, now: Date())
+                return RunsCellView.requiredWidth(runs)
+            }
+        }
+
+        private func updateTagMode() {
+            guard let table else { return }
+            let widths = fullTitleWidths.compactMap(\.self)
+            let cut = widths.count { $0 > titleLayoutWidth + 0.5 }
+            let abbreviates = cut * 4 > widths.count
+            guard abbreviates != abbreviatesTags else { return }
+            abbreviatesTags = abbreviates
+            let column = table.column(withIdentifier: ItemColumn.title.identifier)
+            guard column >= 0, !rows.isEmpty else { return }
+            table.reloadData(forRowIndexes: IndexSet(integersIn: 0 ..< rows.count), columnIndexes: [column])
+        }
 
         /// Puts the columns back in their first order and widths; the table saves them as usual.
         @objc func resetColumns() {
@@ -603,7 +635,10 @@ struct ItemTableView: NSViewRepresentable {
                 guard let tableColumn, let column = ItemColumn(rawValue: tableColumn.identifier.rawValue) else { return nil }
                 let cell = reusableCell(tableView, id: column.rawValue)
                 cell.alignment = column.alignment
-                cell.runs = column.runs(for: itemRow, viewer: viewer, badges: parent.badges, contribution: parent.contribution, now: Date())
+                cell.runs = column.runs(
+                    for: itemRow, viewer: viewer, badges: parent.badges, contribution: parent.contribution, now: Date(),
+                    abbreviatesTags: column == .title && abbreviatesTags
+                )
                 cell.opacity = Self.opacity(of: itemRow.item, in: column)
                 cell.reservedWidth = column == .title ? titleSlack : 0
                 return cell

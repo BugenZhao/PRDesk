@@ -31,9 +31,6 @@ indirect enum CellRun {
     /// or, when flexible itself, while it would get less than `minWidth`. The lowest `priority`
     /// goes first; runs of one priority go together.
     case optional(CellRun, priority: Int, minWidth: CGFloat = 0)
-    /// Versions of one run, longest first: the first is laid out (and is the full text), and the
-    /// first that fits the width it gets is drawn; the last one truncates if none fits.
-    case variants([CellRun])
 }
 
 /// A piece of `CellRun.segments`; `font` replaces the run's, e.g. for inline code.
@@ -103,7 +100,7 @@ final class RunsCellView: NSTableCellView {
     private var cachedNaturalWidths: [CGFloat]?
     private var naturalWidths: [CGFloat] {
         if let cachedNaturalWidths { return cachedNaturalWidths }
-        let widths = runs.map(naturalWidth)
+        let widths = runs.map(Self.naturalWidth)
         cachedNaturalWidths = widths
         return widths
     }
@@ -199,7 +196,17 @@ final class RunsCellView: NSTableCellView {
         return cut.isEmpty ? nil : cut.joined(separator: "\n")
     }
 
-    private func naturalWidth(_ run: CellRun) -> CGFloat {
+    /// The width runs need with every optional one left out, insets included: what must fit for
+    /// nothing that matters to be cut short.
+    static func requiredWidth(_ runs: [CellRun]) -> CGFloat {
+        let kept = runs.filter { run in
+            if case .spring = run { return false }
+            return run.dropPriority == nil
+        }
+        return kept.reduce(0) { $0 + naturalWidth($1) } + spacing * CGFloat(max(0, kept.count - 1)) + 2 * inset
+    }
+
+    private static func naturalWidth(_ run: CellRun) -> CGFloat {
         switch run {
         case let .text(string, _, font, _, maxWidth):
             min(Self.textWidth(string, font: font), maxWidth ?? .infinity)
@@ -211,8 +218,6 @@ final class RunsCellView: NSTableCellView {
             width
         case let .faded(run, _), let .optional(run, _, _):
             naturalWidth(run)
-        case let .variants(runs):
-            runs.first.map(naturalWidth) ?? 0
         case .symbol, .icon:
             Self.symbolSize
         case .image, .tile, .avatar:
@@ -307,13 +312,9 @@ final class RunsCellView: NSTableCellView {
         case let .optional(run, _, _):
             draw(run, in: rect)
 
-        case let .variants(runs):
-            guard let run = runs.first(where: { naturalWidth($0) <= rect.width + 0.5 }) ?? runs.last else { return }
-            draw(run, in: rect)
-
         case let .slot(run, _, trailing):
             guard let run else { return }
-            let width = min(naturalWidth(run), rect.width)
+            let width = min(Self.naturalWidth(run), rect.width)
             draw(run, in: NSRect(x: trailing ? rect.maxX - width : rect.minX, y: rect.minY, width: width, height: rect.height))
 
         case let .symbol(name, color, pointSize):
@@ -513,7 +514,6 @@ private extension CellRun {
         switch self {
         case let .text(_, _, _, flexible, _), let .segments(_, _, flexible): flexible
         case let .optional(run, _, _): run.isFlexible
-        case let .variants(runs): runs.first?.isFlexible ?? false
         default: false
         }
     }
@@ -528,7 +528,7 @@ private extension CellRun {
         case let .text(string, _, _, _, _), let .chip(string, _), let .tile(string, _): string
         case let .segments(parts, _, _): parts.map(\.text).joined()
         case let .slot(run?, _, _), let .faded(run, _), let .optional(run, _, _): run.spokenText
-        case let .variants(runs): runs.first?.spokenText
+
         default: nil
         }
     }
@@ -539,7 +539,6 @@ private extension CellRun {
         case let .text(string, _, _, _, _): string
         case let .segments(parts, _, _): parts.map(\.text).joined()
         case let .optional(run, _, _): run.fullText
-        case let .variants(runs): runs.first?.fullText
         default: nil
         }
     }
@@ -550,7 +549,6 @@ private extension CellRun {
         case let .text(string, _, font, _, _): RunsCellView.textWidth(string, font: font)
         case let .segments(parts, font, _): RunsCellView.segmentsWidth(parts, font: font)
         case let .optional(run, _, _): run.fullWidth
-        case let .variants(runs): runs.first?.fullWidth
         default: nil
         }
     }
