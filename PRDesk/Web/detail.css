@@ -143,14 +143,13 @@ button.icon-link:hover { background: color-mix(in srgb, currentColor 12%, transp
 .fstat { font-variant-numeric: tabular-nums; flex: none; }
 /* GitHub's "Viewed" checkbox, shown once the marks are known. */
 .vbox {
-  display: none; align-items: center; gap: 3px; flex: none; margin-left: 2px;
-  padding: 1px 5px 1px 3px; border-radius: 4px; color: var(--secondary);
+  display: none; flex: none; padding: 1px; border-radius: 4px; color: var(--secondary);
 }
 .file[data-viewed] .vbox { display: inline-flex; }
 .vbox:hover { color: var(--label); background: color-mix(in srgb, currentColor 12%, transparent); }
 .vbox > .s-checkmark-square-fill, .file[data-viewed="VIEWED"] .vbox > .s-square { display: none; }
 .file[data-viewed="VIEWED"] .vbox > .s-checkmark-square-fill { display: inline-block; color: var(--accent); }
-.file[data-viewed="DISMISSED"] .vbox::before { content: "Changed"; color: -apple-system-orange; margin-right: 2px; }
+.file[data-viewed="DISMISSED"] .vbox { color: -apple-system-orange; }
 .no-diff { font-size: 11px; color: var(--secondary); padding: 8px; }
 
 .diff { font: 11px/16px var(--mono); --nw: 4ch; tab-size: 4; }

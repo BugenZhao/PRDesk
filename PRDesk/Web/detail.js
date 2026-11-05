@@ -416,7 +416,7 @@ const PRDesk = (() => {
       + `<span class="fname" title="${escapeHTML(file.previous ? `${file.previous} → ${file.name}` : file.name)}">${from}<span class="dir">${escapeHTML(dir)}</span><span class="base">${escapeHTML(base)}</span></span>`
       + `<span class="spacer"></span>`
       + `<span class="fstat c-green">+${file.additions}</span><span class="fstat c-red">−${file.deletions}</span>`
-      + `<span class="vbox"><i class="sym s-square"></i><i class="sym s-checkmark-square-fill"></i>Viewed</span>`
+      + `<span class="vbox"><i class="sym s-square"></i><i class="sym s-checkmark-square-fill"></i></span>`
       + (file.url ? `<a class="icon-link" href="${escapeHTML(file.url)}" title="Open on GitHub"><i class="sym s-arrow-up-right"></i></a>` : "");
   }
 
