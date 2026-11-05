@@ -147,8 +147,9 @@ enum ItemColumn: String, CaseIterable {
             let avatar: CellRun = .avatar(item.author.flatMap(AvatarCache.shared.image(for:)))
             // Marks of trust sit at the right edge, so they line up down the column.
             if self == .avatar {
-                // Room for two marks, the vote first; the tooltip names the rest.
-                return [avatar, .spring] + (vote + seal + orgBadges.map(\.cellRun)).prefix(2)
+                // Room for two marks, the vote first; the tooltip names the rest. They follow the
+                // picture, so a lone mark lines up with the first of two.
+                return [avatar] + (vote + seal + orgBadges.map(\.cellRun)).prefix(2)
             }
             return [avatar, name] + vote + [.spring] + seal + orgBadges.map(\.cellRun)
 
