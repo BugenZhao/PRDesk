@@ -618,7 +618,7 @@ struct ItemTableView: NSViewRepresentable {
                         return "\(request.emoji) Sent to \(request.bot) \(age == "now" ? "just now" : "\(age) ago")\(note)"
                     }
                     let sessions = (itemRow.board?.sessionLinks ?? []).map { "\(AgentSession.agentName(for: $0)) session: \($0.absoluteString)" }
-                    let lines = [truncated].compactMap(\.self) + sent + sessions
+                    let lines = [truncated].compactMap(\.self) + ItemColumn.reviewTooltip(itemRow.item) + sent + sessions
                     return lines.isEmpty ? nil : lines.joined(separator: "\n")
                 case .author, .avatar: return authorTooltip(itemRow.item.author)
                 case .link: return itemRow.paired.map { "\($0.repo)#\($0.number) \($0.title)" }

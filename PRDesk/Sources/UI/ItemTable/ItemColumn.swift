@@ -2,7 +2,7 @@ import AppKit
 
 /// Columns of the item table and how each renders a row.
 enum ItemColumn: String, CaseIterable {
-    case unread, priority, number, title, author, avatar, link, review, turn, ci, size, age, updated
+    case unread, priority, number, title, author, avatar, link, turn, ci, size, age, updated
 
     /// Shown in the Parity tab only, where it takes the place of Author (always the agent there).
     static let parityOnly: Set<ItemColumn> = [.link]
@@ -25,7 +25,6 @@ enum ItemColumn: String, CaseIterable {
         case .author: "Author"
         case .avatar: ""
         case .link: "Link"
-        case .review: "Review"
         case .turn: "Turn"
         case .ci: "CI"
         case .size: "Size"
@@ -47,7 +46,6 @@ enum ItemColumn: String, CaseIterable {
         // The picture and up to three marks: a vote and two org badges.
         case .avatar: 4 * 13 + 3 * RunsCellView.spacing + 2 * RunsCellView.inset
         case .link: 64
-        case .review: 40
         case .turn: 46
         case .ci: 22
         case .size: Self.sizeWidth
@@ -79,7 +77,6 @@ enum ItemColumn: String, CaseIterable {
         case .title: .title
         case .author, .avatar: .author
         case .link: nil
-        case .review: .review
         case .turn: .turn
         case .ci: .ci
         case .size: .size
@@ -128,7 +125,7 @@ enum ItemColumn: String, CaseIterable {
             return [.text(String(item.number), color: .secondaryLabelColor, font: CellFont.digits)]
 
         case .title:
-            return titleRuns(row, now: now)
+            return titleRuns(row, viewer: viewer, now: now)
 
         case .author, .avatar:
             let vote: [CellRun] = row.authorVote.map { [.symbol($0.symbol, color: $0.nsColor)] } ?? []
@@ -147,9 +144,6 @@ enum ItemColumn: String, CaseIterable {
         case .link:
             guard let paired = row.paired else { return [] }
             return [.icon(paired.stateIcon, color: paired.stateColor), .text("#\(paired.number)", color: .secondaryLabelColor, font: CellFont.digits)]
-
-        case .review:
-            return reviewRuns(row, viewer: viewer)
 
         case .turn:
             // A pending review request is the most common reason it's the viewer's move; name it.
@@ -184,12 +178,13 @@ enum ItemColumn: String, CaseIterable {
         }
     }
 
-    @MainActor private func titleRuns(_ row: ItemRow, now: Date) -> [CellRun] {
+    @MainActor private func titleRuns(_ row: ItemRow, viewer: String?, now: Date) -> [CellRun] {
         let item = row.item
         var runs: [CellRun] = [
             .icon(item.stateIcon, color: item.stateColor),
             titleRun(item.title, bold: row.insight.isUnread),
         ]
+        runs += reviewRuns(row, viewer: viewer)
         // What the item was sent to a Grok Bot for; faint while the send is under way.
         for request in row.state.sentRequests {
             let mark: CellRun = .text(request.emoji, font: CellFont.small)
@@ -248,14 +243,12 @@ enum ItemColumn: String, CaseIterable {
         return pieces
     }
 
-    /// Review and CI share one shape: a small mark, then a count, in the same fixed slots.
-    private static let markSlot: CGFloat = 13
-    private static let countSlot: CGFloat = 16
-    /// One size for the review check and the CI dot, both SF Symbol circles, so they match.
+    /// One size for the review check and the CI dot, so they match.
     private static let markPointSize: CGFloat = 10
 
-    /// Approvals as a bare check and a count: green when the viewer approved, gray when only others
-    /// did. A red cross after them when the viewer requested changes.
+    /// Approvals as a bare check and a count after the title, nothing when there are none (most
+    /// PRs): green when the viewer approved, gray when only others did. A red cross after them when
+    /// the viewer requested changes. Never left out for room; the title is cut short instead.
     private func reviewRuns(_ row: ItemRow, viewer: String?) -> [CellRun] {
         let item = row.item
         guard item.kind == .pullRequest else { return [] }
@@ -265,9 +258,11 @@ enum ItemColumn: String, CaseIterable {
         // their own); on others' once the viewer approved.
         let isGreen = sameLogin(item.author, viewer) ? item.reviewDecision == "APPROVED" : mine == "APPROVED"
         let color: NSColor = isGreen ? .systemGreen : .secondaryLabelColor
-        let check: CellRun? = count > 0 ? .symbol("checkmark", color: color, pointSize: Self.markPointSize) : nil
-        let approvals: CellRun? = count > 0 ? .text(String(count), color: color, font: CellFont.digits) : nil
-        var runs: [CellRun] = [.slot(check, width: Self.markSlot), .slot(approvals, width: Self.countSlot)]
+        var runs: [CellRun] = []
+        if count > 0 {
+            runs.append(.symbol("checkmark", color: color, pointSize: Self.markPointSize))
+            runs.append(.text(String(count), color: color, font: CellFont.digits))
+        }
         if mine == "CHANGES_REQUESTED" {
             runs.append(.symbol("xmark", color: .systemRed, pointSize: Self.markPointSize))
         }
@@ -290,6 +285,14 @@ enum ItemColumn: String, CaseIterable {
         }
         let isReady = item.labels.contains { $0.name == "ready" }
         return [.symbol(isReady ? "circle.fill" : "circle", color: color, pointSize: Self.markPointSize)]
+    }
+
+    /// E.g. "Approved by alice, bob" and "Changes requested by carol", one per line.
+    static func reviewTooltip(_ item: Item) -> [String] {
+        [("APPROVED", "Approved by"), ("CHANGES_REQUESTED", "Changes requested by")].compactMap { state, label in
+            let logins = item.reviews.filter { $0.state == state }.map(\.login)
+            return logins.isEmpty ? nil : "\(label) \(logins.joined(separator: ", "))"
+        }
     }
 
     /// E.g. "CI: 2 failed, 1 pending of 14 · ready".
