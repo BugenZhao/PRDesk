@@ -85,7 +85,8 @@ const PRDesk = (() => {
     if (head && !event.target.closest("a")) {
       event.preventDefault();
       const file = head.parentElement;
-      post({ type: "fileMenu", path: file.dataset.path, url: file.dataset.url || "", x: event.clientX, y: event.clientY });
+      const viewed = file.dataset.viewed ? file.dataset.viewed === "VIEWED" : null;
+      post({ type: "fileMenu", path: file.dataset.path, url: file.dataset.url || "", viewed, x: event.clientX, y: event.clientY });
     }
   });
 
@@ -224,6 +225,8 @@ const PRDesk = (() => {
     expanded: new Map(),
     all: null,
     saved: new Map(),
+    /** The viewer's "Viewed" marks by path, for the item `key`; null until known. */
+    viewed: { key: null, states: null },
   };
 
   const languages = {
@@ -413,6 +416,7 @@ const PRDesk = (() => {
       + `<span class="fname" title="${escapeHTML(file.previous ? `${file.previous} → ${file.name}` : file.name)}">${from}<span class="dir">${escapeHTML(dir)}</span><span class="base">${escapeHTML(base)}</span></span>`
       + `<span class="spacer"></span>`
       + `<span class="fstat c-green">+${file.additions}</span><span class="fstat c-red">−${file.deletions}</span>`
+      + `<span class="vbox"><i class="sym s-square"></i><i class="sym s-checkmark-square-fill"></i>Viewed</span>`
       + (file.url ? `<a class="icon-link" href="${escapeHTML(file.url)}" title="Open on GitHub"><i class="sym s-arrow-up-right"></i></a>` : "");
   }
 
@@ -448,6 +452,7 @@ const PRDesk = (() => {
       element._file = file;
       element.dataset.url = file.url || "";
       applyFileExpansion(element);
+      applyViewed(element);
       return element;
     });
     const names = new Set(data.files.map((file) => file.name));
@@ -456,10 +461,43 @@ const PRDesk = (() => {
     if (reset) scrollTo(0, prior ? prior.scroll : 0);
   }
 
-  function toggleFile(element) {
-    files.expanded.set(element.dataset.path, !isFileExpanded(element));
+  function setFileExpanded(element, open) {
+    files.expanded.set(element.dataset.path, open);
     applyFileExpansion(element);
-    if (element.classList.contains("collapsed") && element.getBoundingClientRect().top < 0) scrollToElement(element);
+    if (!open && element.getBoundingClientRect().top < 0) scrollToElement(element);
+  }
+
+  function toggleFile(element) {
+    setFileExpanded(element, !isFileExpanded(element));
+  }
+
+  function viewedState(element) {
+    const { key, states } = files.viewed;
+    return key === files.key && states ? states[element.dataset.path] ?? null : null;
+  }
+
+  function applyViewed(element) {
+    const state = viewedState(element);
+    if (state) element.dataset.viewed = state;
+    else delete element.dataset.viewed;
+    element.querySelector(".vbox").title = state === "DISMISSED"
+      ? "Changed since you marked it viewed" : state === "VIEWED" ? "Unmark as viewed" : "Mark as viewed";
+  }
+
+  /** The app's marks for item `key`, sent whenever they change. */
+  function setViewedFiles(key, states) {
+    files.viewed = { key, states };
+    for (const element of files.elements.values()) applyViewed(element);
+  }
+
+  /** Ticking "Viewed" folds the file, as on GitHub; clearing it unfolds it. */
+  function toggleViewed(element) {
+    if (!element || !viewedState(element)) return;
+    const viewed = viewedState(element) !== "VIEWED";
+    files.viewed.states[element.dataset.path] = viewed ? "VIEWED" : "UNVIEWED";
+    applyViewed(element);
+    setFileExpanded(element, !viewed);
+    post({ type: "fileViewed", path: element.dataset.path, viewed });
   }
 
   /** Builds every expanded diff in slices of a few milliseconds, so find can reach them all. */
@@ -555,6 +593,11 @@ const PRDesk = (() => {
       toggleCard(head.parentElement);
       return;
     }
+    const viewedBox = event.target.closest(".vbox");
+    if (viewedBox) {
+      toggleViewed(viewedBox.closest(".file"));
+      return;
+    }
     const fileHead = event.target.closest(".fhead");
     if (fileHead && !isSelectingIn(fileHead)) toggleFile(fileHead.parentElement);
   });
@@ -567,6 +610,8 @@ const PRDesk = (() => {
     renderFiles,
     setAllFiles,
     buildExpandedFiles,
+    setViewedFiles,
+    toggleViewed(path) { toggleViewed(files.elements.get(path)); },
     setWrap(wrap) { document.documentElement.classList.toggle("nowrap", !wrap); },
   };
 })();

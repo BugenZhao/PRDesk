@@ -43,6 +43,7 @@ enum WebSymbols {
         "arrow.uturn.left.circle", "eye", "pencil.circle", "person.badge.plus", "xmark.seal", "tag", "link",
         "person.crop.circle.badge.checkmark", "pencil", "eye.circle", "circle",
         "plus.square", "minus.square", "arrow.right.square", "square.and.pencil", "face.smiling",
+        "square", "checkmark.square.fill",
     ]
 
     static func className(_ name: String) -> String {

@@ -201,6 +201,22 @@ extension SyncEngine {
         )
     }
 
+    /// Ticks or clears the viewer's "Viewed" checkbox on a file of a PR.
+    func setFileViewed(_ viewed: Bool, path: String, pullRequestID: String) async throws {
+        if isDryRun("mark \(path) of \(pullRequestID) \(viewed ? "viewed" : "not viewed")") { return }
+        struct Input: Encodable, Sendable { let pullRequestId: String; let path: String }
+        struct Variables: Encodable, Sendable { let input: Input }
+        let mutation = viewed
+            ? "mutation($input: MarkFileAsViewedInput!) { markFileAsViewed(input: $input) { clientMutationId } }"
+            : "mutation($input: UnmarkFileAsViewedInput!) { unmarkFileAsViewed(input: $input) { clientMutationId } }"
+        _ = try await client.query(
+            mutation,
+            variables: Variables(input: Input(pullRequestId: pullRequestID, path: path)),
+            as: [String: Ignored].self,
+            strict: true
+        )
+    }
+
     func markThreadRead(_ threadID: String) async throws {
         if isDryRun("mark thread \(threadID) read") { return }
         try await client.rest("PATCH", "/notifications/threads/\(threadID)")

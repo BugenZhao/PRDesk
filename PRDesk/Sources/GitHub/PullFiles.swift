@@ -35,3 +35,44 @@ extension SyncEngine {
         return files
     }
 }
+
+/// The viewer's mark on a changed file, GitHub's "Viewed" checkbox.
+enum FileViewedState: String, Decodable, Sendable {
+    case viewed = "VIEWED"
+    case unviewed = "UNVIEWED"
+    /// Marked viewed, then changed by a later push.
+    case dismissed = "DISMISSED"
+}
+
+private struct ViewedStatesPage: Decodable, Sendable {
+    struct Node: Decodable, Sendable { let files: Files? }
+    struct Files: Decodable, Sendable { let pageInfo: PageInfo; let nodes: [File] }
+    struct PageInfo: Decodable, Sendable { let hasNextPage: Bool; let endCursor: String? }
+    struct File: Decodable, Sendable { let path: String; let viewerViewedState: String }
+
+    let node: Node?
+}
+
+extension SyncEngine {
+    /// The viewer's Viewed marks on a PR's changed files, by path.
+    func fetchViewedStates(pullRequestID: String) async throws -> [String: FileViewedState] {
+        struct Variables: Encodable, Sendable { let id: String; let after: String? }
+        let query = """
+        query($id: ID!, $after: String) { node(id: $id) { ... on PullRequest {
+          files(first: 100, after: $after) { pageInfo { hasNextPage endCursor } nodes { path viewerViewedState } }
+        } } }
+        """
+        var states: [String: FileViewedState] = [:]
+        var after: String?
+        for _ in 1 ... 30 {
+            let page = try await client.query(query, variables: Variables(id: pullRequestID, after: after), as: ViewedStatesPage.self)
+            guard let files = page.node?.files else { break }
+            for file in files.nodes {
+                states[file.path] = FileViewedState(rawValue: file.viewerViewedState) ?? .unviewed
+            }
+            guard files.pageInfo.hasNextPage, let cursor = files.pageInfo.endCursor else { break }
+            after = cursor
+        }
+        return states
+    }
+}

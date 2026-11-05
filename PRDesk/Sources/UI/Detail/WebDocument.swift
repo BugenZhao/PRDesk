@@ -22,6 +22,8 @@ final class WebDocument: NSObject {
     var reactionMenu: ((String) -> NSMenu?)?
     /// Adds or takes back the viewer's reaction on a node, for clicking a reaction under it.
     var toggleReaction: ((Reaction.Content, String) -> Void)?
+    /// Ticks or clears a file's "Viewed" mark, by path.
+    var setFileViewed: ((String, Bool) -> Void)?
 
     /// Every page's base URL, so relative links in GitHub's HTML resolve.
     static let baseURL = URL(string: "https://github.com/")!
@@ -157,13 +159,23 @@ final class WebDocument: NSObject {
         webView.loadHTMLString(WebResources.page(kind), baseURL: Self.baseURL)
     }
 
+    /// `value` as a JavaScript literal.
+    static func jsonLiteral(_ value: some Encodable) -> String? {
+        (try? JSONEncoder().encode(value)).map { String(decoding: $0, as: UTF8.self) }
+    }
+
     private func popUp(_ menu: NSMenu, x: Double, y: Double) {
         let point = NSPoint(x: x, y: webView.isFlipped ? y : webView.bounds.height - y)
         menu.popUp(positioning: nil, at: point, in: webView)
     }
 
-    private func fileMenu(path: String, url: String) -> NSMenu {
+    /// `viewed` is the file's "Viewed" mark, nil when the page offers none.
+    private func fileMenu(path: String, url: String, viewed: Bool?) -> NSMenu {
         let menu = NSMenu()
+        if let viewed, let script = Self.jsonLiteral(path).map({ "PRDesk.toggleViewed(\($0))" }) {
+            menu.addItem(ClosureMenuItem("Viewed", state: viewed ? .on : .off) { [weak self] in self?.run(script) })
+            menu.addItem(.separator())
+        }
         menu.addItem(ClosureMenuItem("Copy Path") {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(path, forType: .string)
@@ -196,7 +208,11 @@ extension WebDocument: WKScriptMessageHandler {
         case "openItem":
             if let repo = body["repo"] as? String, let number = body["number"] as? Int { openItem?(repo, number) }
         case "fileMenu":
-            if let path = body["path"] as? String { popUp(fileMenu(path: path, url: body["url"] as? String ?? ""), x: x, y: y) }
+            if let path = body["path"] as? String {
+                popUp(fileMenu(path: path, url: body["url"] as? String ?? "", viewed: body["viewed"] as? Bool), x: x, y: y)
+            }
+        case "fileViewed":
+            if let path = body["path"] as? String, let viewed = body["viewed"] as? Bool { setFileViewed?(path, viewed) }
         default:
             break
         }

@@ -603,6 +603,35 @@ final class AppModel {
         return files
     }
 
+    /// The viewer's "Viewed" marks on PRs' files, by PR and path; missing until fetched.
+    private(set) var viewedFiles: [Item.ID: [String: FileViewedState]] = [:]
+
+    /// Fetches the viewer's "Viewed" marks on a PR's files; on failure the page offers none.
+    func loadViewedFiles(for item: Item) async {
+        do {
+            viewedFiles[item.id] = try await engine.fetchViewedStates(pullRequestID: item.id)
+        } catch {
+            logger.error("Loading viewed files of #\(item.number) failed: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    /// Ticks or clears a file's "Viewed" mark at once, and puts it back if GitHub refuses.
+    func setFileViewed(_ viewed: Bool, path: String, in itemID: Item.ID) {
+        guard let before = viewedFiles[itemID]?[path] else { return }
+        let after: FileViewedState = viewed ? .viewed : .unviewed
+        guard before != after else { return }
+        viewedFiles[itemID]?[path] = after
+        Task { [weak self, engine] in
+            do {
+                try await engine.setFileViewed(viewed, path: path, pullRequestID: itemID)
+            } catch {
+                guard let self else { return }
+                logger.error("Marking \(path, privacy: .public) viewed failed: \(String(describing: error), privacy: .public)")
+                if viewedFiles[itemID]?[path] == after { viewedFiles[itemID]?[path] = before }
+            }
+        }
+    }
+
     // MARK: Opened from links
 
     /// Issues and PRs opened from links in the detail pane that aren't on the desk, newest first.
