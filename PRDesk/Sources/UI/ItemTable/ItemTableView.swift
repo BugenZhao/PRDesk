@@ -25,6 +25,8 @@ struct ItemTableView: NSViewRepresentable {
     /// Selection made by the table itself (e.g. moving to a neighbor when the selected row goes
     /// away); unlike user selection it must not count as opening the item.
     var onAutoSelect: (TableSelection?) -> Void
+    /// A GitHub link pasted (⌘V) or dropped on the list.
+    var onOpenLink: (ItemLink) -> Void
     /// Undo for list actions, answering ⌘Z while the table has focus.
     var listUndoManager: UndoManager
 
@@ -77,6 +79,9 @@ struct ItemTableView: NSViewRepresentable {
         table.keyHandler = { [weak coordinator] event in coordinator?.handleKey(event) ?? false }
         table.headerClickHandler = { [weak coordinator] row in coordinator?.toggleHeader(at: row) ?? false }
         table.copyLinksHandler = { [weak coordinator] in coordinator?.copySelectedLinks() ?? false }
+        table.openLinkHandler = { [weak coordinator] link in coordinator?.openLink(link) }
+        // Links dropped from a browser's address bar or a page open their items.
+        table.registerForDraggedTypes([.URL, .string])
         table.toolTipProvider = { [weak coordinator] row, column in coordinator?.toolTip(row: row, column: column) }
         table.listUndoManager = listUndoManager
         table.menu = coordinator.makeContextMenu()
@@ -608,6 +613,23 @@ struct ItemTableView: NSViewRepresentable {
             return item
         }
 
+        func openLink(_ link: ItemLink) {
+            parent.onOpenLink(link)
+        }
+
+        /// Accepts a link to an item (`ItemLink`) dropped anywhere on the list, but not its own rows.
+        func tableView(_ tableView: NSTableView, validateDrop info: any NSDraggingInfo, proposedRow _: Int, proposedDropOperation _: NSTableView.DropOperation) -> NSDragOperation {
+            guard info.draggingSource as? NSTableView !== tableView, ItemNSTableView.link(on: info.draggingPasteboard) != nil else { return [] }
+            tableView.setDropRow(-1, dropOperation: .on)
+            return .copy
+        }
+
+        func tableView(_ tableView: NSTableView, acceptDrop info: any NSDraggingInfo, row _: Int, dropOperation _: NSTableView.DropOperation) -> Bool {
+            guard info.draggingSource as? NSTableView !== tableView, let link = ItemNSTableView.link(on: info.draggingPasteboard) else { return false }
+            parent.onOpenLink(link)
+            return true
+        }
+
         // MARK: NSTableViewDelegate
 
         func tableView(_: NSTableView, isGroupRow row: Int) -> Bool {
@@ -806,6 +828,8 @@ final class ItemNSTableView: NSTableView {
     var copyLinksHandler: (() -> Bool)?
     /// The tooltip for the cell at a row and column.
     var toolTipProvider: ((Int, Int) -> String?)?
+    /// Opens a link pasted or dropped on the list.
+    var openLinkHandler: ((ItemLink) -> Void)?
 
     @objc func undo(_: Any?) { listUndoManager?.undo() }
     @objc func redo(_: Any?) { listUndoManager?.redo() }
@@ -820,6 +844,19 @@ final class ItemNSTableView: NSTableView {
         copyItemLinks(sender)
     }
 
+    /// Edit > Paste (⌘V) in the list opens the item a copied link names.
+    @objc func paste(_: Any?) {
+        guard let link = Self.link(on: .general) else { return NSSound.beep() }
+        openLinkHandler?(link)
+    }
+
+    /// The issue or PR a pasteboard's link (or `#n` text) names, if the app shows its repository.
+    static func link(on pasteboard: NSPasteboard) -> ItemLink? {
+        let text = (pasteboard.readObjects(forClasses: [NSURL.self], options: nil)?.first as? URL)?.absoluteString
+            ?? pasteboard.string(forType: .string)
+        return text.flatMap { ItemLink($0) }
+    }
+
     override func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
         guard let manager = listUndoManager else { return super.validateUserInterfaceItem(item) }
         switch item.action {
@@ -831,6 +868,8 @@ final class ItemNSTableView: NSTableView {
             return manager.canRedo
         case #selector(copy(_:)):
             return selectedRow != -1
+        case #selector(paste(_:)):
+            return Self.link(on: .general) != nil
         default:
             return super.validateUserInterfaceItem(item)
         }

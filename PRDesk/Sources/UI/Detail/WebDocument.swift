@@ -73,6 +73,9 @@ final class WebDocument: NSObject {
     private var settings: [String: String] = [:]
     /// One-off scripts waiting for the page, in order.
     private var pendingScripts: [String] = []
+    /// A comment to scroll to (GitHub's fragment, `#issuecomment-…`) once the document for `key`
+    /// shows it, which may take the fresh detail after the cached one; gives up after a few renders.
+    private var pendingAnchor: (key: String, fragment: String, tries: Int)?
 
     /// Shows `payload`, a JSON document for the page; a new `key` starts the page over.
     func render(key: String, payload: String) {
@@ -80,6 +83,7 @@ final class WebDocument: NSObject {
         sentPayload = payload
         if key != shownKey {
             shownKey = key
+            if pendingAnchor?.key != key { pendingAnchor = nil }
             // Hidden until the new document is in, rather than showing the previous item's.
             webView.alphaValue = 0
         }
@@ -101,6 +105,24 @@ final class WebDocument: NSObject {
             }
             self?.webView.alphaValue = 1
             self?.textFinder.noteClientStringWillChange()
+            self?.revealPendingAnchor()
+        }
+    }
+
+    /// Scrolls the conversation of `key` to a comment, now if it shows it, or after a later render.
+    func reveal(fragment: String, key: String) {
+        pendingAnchor = (key, fragment, 0)
+        if isReady, shownKey == key, pendingRender == nil, sentPayload != nil { revealPendingAnchor() }
+    }
+
+    private func revealPendingAnchor() {
+        guard kind == .timeline, let anchor = pendingAnchor, anchor.key == shownKey else { return }
+        webView.callAsyncJavaScript(
+            "return PRDesk.revealAnchor(fragment)", arguments: ["fragment": anchor.fragment], in: nil, in: .page
+        ) { [weak self] result in
+            guard let self, pendingAnchor?.key == anchor.key, pendingAnchor?.fragment == anchor.fragment else { return }
+            let found = (try? result.get()) as? Bool == true
+            if found || anchor.tries >= 2 { pendingAnchor = nil } else { pendingAnchor?.tries += 1 }
         }
     }
 

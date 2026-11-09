@@ -28,6 +28,7 @@ struct MenuBarContent: View {
         Button("Sync Now") {
             Task { await model.sync() }
         }
+        Button("Show Browser Tab") { model.showBrowserTab() }
         Divider()
         Button("Open PR Desk") { show {} }
         Button("Quit PR Desk") { NSApp.terminate(nil) }

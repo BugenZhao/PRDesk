@@ -10,7 +10,6 @@ enum YabPins {
     static let spaceKey = "yabPinsSpace"
     static let defaultSpace = "Inferact"
     static let folder = "PR Desk"
-    private static let bundleID = "dev.serafim.fast"
 
     static var isEnabled: Bool { UserDefaults.standard.bool(forKey: enabledKey) }
 
@@ -57,20 +56,6 @@ enum YabPins {
         var released: [Item.ID]?
     }
 
-    private struct ExecResult: Decodable {
-        struct Content: Decodable { var text: String }
-        var content: [Content]
-    }
-
-    private enum Failure: LocalizedError {
-        case failed(String)
-        var errorDescription: String? {
-            switch self {
-            case let .failed(message): message
-            }
-        }
-    }
-
     private static let logger = Logger(subsystem: "com.bugenzhao.PRDesk", category: "Yab")
 
     /// Brings Yab in line with the pins. Returns why it can't for now, if so, for Settings.
@@ -79,8 +64,7 @@ enum YabPins {
         do {
             let work = try await db.yabPinWork()
             guard !work.isEmpty else { return nil }
-            // Checked here because `yab exec` would otherwise open a hidden Yab.
-            guard let yab = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first?.executableURL else {
+            guard let yab = Yab.runningExecutable else {
                 return "Waiting for Yab to open."
             }
             let space = space
@@ -103,32 +87,7 @@ enum YabPins {
 
     private static func run(_ yab: URL, input: Input) throws -> Output {
         let payload = try String(decoding: JSONEncoder().encode(input), as: UTF8.self)
-        let process = Process()
-        process.executableURL = yab
-        process.arguments = ["exec", "-", "--json", "--timeout", "60", "--output-limit", "32000"]
-        // What Yab's own `yab` wrapper sets for its binary to act as the CLI.
-        process.environment = ProcessInfo.processInfo.environment.merging(["YAB_CLI": "1"]) { $1 }
-        let stdin = Pipe()
-        let stdout = Pipe()
-        let stderr = Pipe()
-        process.standardInput = stdin
-        process.standardOutput = stdout
-        process.standardError = stderr
-        try process.run()
-        stdin.fileHandleForWriting.write(Data(script.replacingOccurrences(of: "__INPUT__", with: payload).utf8))
-        try stdin.fileHandleForWriting.close()
-        // Both are short; read them before waiting so a full pipe can't stall the CLI.
-        let out = stdout.fileHandleForReading.readDataToEndOfFile()
-        let err = stderr.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
-            let trimmed = { (data: Data) in String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines) }
-            let message = [trimmed(err), trimmed(out)].first { !$0.isEmpty }
-            throw Failure.failed(message ?? "yab exited with status \(process.terminationStatus).")
-        }
-        // The script's answer, then a line counting its steps.
-        let text = try JSONDecoder().decode(ExecResult.self, from: out).content.first?.text ?? ""
-        let answer = text.range(of: "\n(", options: .backwards).map { String(text[..<$0.lowerBound]) } ?? text
+        let answer = try Yab.exec(yab, script: script.replacingOccurrences(of: "__INPUT__", with: payload))
         return try JSONDecoder().decode(Output.self, from: Data(answer.utf8))
     }
 

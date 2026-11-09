@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MainView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
     @AppStorage("showsDetail") private var showsDetail = true
     /// The window's content width, which caps the detail pane.
     @State private var width: CGFloat = 0
@@ -51,6 +52,7 @@ struct MainView: View {
                     return true
                 },
                 onAutoSelect: { model.autoSelect($0) },
+                onOpenLink: { model.open($0) },
                 listUndoManager: model.undoManager
             )
         }
@@ -77,7 +79,7 @@ struct MainView: View {
                     text: $model.filterText,
                     prompt: "Filter (/)",
                     focusRequest: model.filterFocusRequest,
-                    onDone: { model.requestTableFocus() }
+                    onDone: { if !model.submitFilter() { model.requestTableFocus() } }
                 )
             }
             // Its own capsule, so Sync doesn't read as part of the field.
@@ -109,6 +111,12 @@ struct MainView: View {
             actions: { Button("OK") {} },
             message: { Text(model.botError ?? "") }
         )
+        .alert(
+            "Not opened",
+            isPresented: Binding(get: { model.linkError != nil }, set: { if !$0 { model.linkError = nil } }),
+            actions: { Button("OK") {} },
+            message: { Text(model.linkError ?? "") }
+        )
         .sheet(item: Binding(get: { model.pendingBotSend }, set: { model.pendingBotSend = $0 })) { pending in
             BotSendSheet(pending: pending)
         }
@@ -121,6 +129,14 @@ struct MainView: View {
                 }
             #endif
             model.start()
+        }
+        .onAppear {
+            // The window may be closed when the shortcut comes from Yab.
+            model.showWindow = { [openWindow] in
+                openWindow(id: "main")
+                NSApp.activate()
+            }
+            GlobalHotKey.register(GlobalHotKey.showBrowserTab) { [model] in model.showBrowserTab() }
         }
     }
 }

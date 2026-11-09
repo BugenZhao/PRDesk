@@ -606,6 +606,7 @@ const PRDesk = (() => {
 
   return {
     renderTimeline,
+    revealAnchor,
     setAllCards,
     renderFiles,
     setAllFiles,

@@ -144,6 +144,8 @@ final class AppModel {
     var writeError: String?
     /// The last send to a Grok Bot that failed, shown until dismissed.
     var botError: String?
+    /// Why a link or Yab's tab in front didn't open, for an alert.
+    var linkError: String?
 
     /// A write the status bar reports: under way, then done for a few seconds. Failures clear it
     /// and are reported on their own.
@@ -658,6 +660,58 @@ final class AppModel {
                     logger.error("Opening #\(number) failed: \(String(describing: error), privacy: .public)")
                     writeError = "Couldn't open #\(number): \(error.localizedDescription)"
                 }
+            }
+        }
+    }
+
+    /// Opens the item a link names (a browser tab, a pasted or dropped link, the filter field), on
+    /// the tab the link shows, scrolled to the comment it points to.
+    func open(_ link: ItemLink) {
+        switch link.page {
+        case .conversation: detailTab = .conversation
+        case .checks: detailTab = .checks
+        case .files: detailTab = .files
+        }
+        linkedComment = link.anchor == nil ? nil : link
+        openItem(repo: link.repo, number: link.number)
+        requestTableFocus()
+    }
+
+    /// Return in the filter field: a link, or a `#n` that nothing listed matches, opens its item and
+    /// clears the filter. Returns false to leave the field as Return otherwise does.
+    func submitFilter() -> Bool {
+        let text = filterText.trimmingCharacters(in: .whitespaces)
+        guard let link = ItemLink(text) else { return false }
+        if text.hasPrefix("#"), rows.contains(where: { $0.selectionID != nil }) { return false }
+        filterText = ""
+        open(link)
+        return true
+    }
+
+    /// The last opened link that points to a comment, until the selection moves to another item;
+    /// the conversation scrolls to it once it shows the comment.
+    private(set) var linkedComment: ItemLink?
+
+    /// Brings up the window, set by the views that can open it.
+    @ObservationIgnored var showWindow: (() -> Void)?
+
+    /// Shows the issue or PR on the tab in front in Yab, bringing the window up.
+    func showBrowserTab() {
+        Task {
+            do {
+                guard let tab = try await YabFrontTab.read() else {
+                    linkError = "Yab has no tab in front."
+                    return
+                }
+                guard let link = ItemLink(tab.url) ?? ItemLink(pageTitle: tab.title) else {
+                    linkError = "The tab in front in Yab isn't an issue or PR of \(SyncEngine.repo):\n\(tab.url)"
+                    return
+                }
+                showWindow?()
+                open(link)
+            } catch {
+                logger.error("Reading Yab's tab failed: \(error.localizedDescription, privacy: .public)")
+                linkError = "Couldn't read Yab's tab in front: \(error.localizedDescription)"
             }
         }
     }
@@ -1197,6 +1251,7 @@ final class AppModel {
     private func selectionChanged(from old: TableSelection?) {
         guard selection?.itemID != old?.itemID else { return }
         recordHistory(from: old)
+        if let linkedComment, selectedItem?.repoNumber != linkedComment.key { self.linkedComment = nil }
         loadDetail()
         guard let item = selectedItem else {
             selectedItemPreviousSeenAt = nil

@@ -96,6 +96,10 @@ private struct AppCommands: Commands {
             Button("Forward") { model.goForward() }
                 .keyboardShortcut("]")
                 .disabled(!model.canGoForward)
+            Divider()
+            // Also system-wide (`GlobalHotKey`), so it works from Yab.
+            Button("Show Browser Tab") { model.showBrowserTab() }
+                .keyboardShortcut("d", modifiers: [.command, .option, .control])
         }
         CommandGroup(after: .pasteboard) {
             Divider()

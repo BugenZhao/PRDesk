@@ -210,6 +210,8 @@ Settings → General → Yab 打开后（默认关），app 把 Pinned 单向同
 | `⌘1` / `⌘2` / `⌘3` | 切换 Dashboard / Parity / Inbox |
 | `⌥⌘1` / `⌥⌘2` / `⌥⌘3` | PR 详情切到 Conversation / Checks / Files |
 | `⌘B` | 显示 / 隐藏详情面板（重启后保持） |
+| `⌃⌥⌘D` | 全局：在 desk 里打开 Yab 当前 tab 的 issue / PR（§6 从浏览器回到 desk） |
+| `⌘V` | 列表有焦点时，打开剪贴板里链接指向的 issue / PR |
 
 ## 5. 组织徽章
 
@@ -264,6 +266,7 @@ Settings → General → Yab 打开后（默认关），app 把 Pinned 单向同
 - **Files**：变更文件列表和 diff，同样是一个 `WKWebView` 页面；每个文件默认折叠，文件名过长时省略目录部分，文件头滚动时吸顶；按扩展名语法高亮（highlight.js，新旧两侧分别高亮）；复制时不带行号和 +/-；可切换自动换行；展开的文件接近屏幕时才生成 diff，⌘F 查找前补齐
   - 文件头有 GitHub 的 Viewed 勾选框（只有框，不带文字；右键文件头也可以），和 GitHub 网页同步：勾上折叠该文件，取消再展开；勾过之后又被新 push 改动的文件框变橙色；工具栏显示已看数量。点了先在本地生效，写失败再恢复；取不到标记时不显示勾选框
 - **站内链接**：详情里指向本仓库 issue / PR 的链接在 app 内打开：已在列表里的直接跳过去（必要时展开所在分组、清掉过滤）；不在的临时取来，放进列表顶部的 **Opened from links** 分组（只在本次运行内保留，不写库），可以 Add to Desk（`a`，进 Triage），设置 Status / 优先级 / Pin 也会顺带加入。指向当前条目某条评论的链接直接展开并滚到那条评论。⌘-click 和 ↗ 按钮仍在浏览器打开
+- **从浏览器回到 desk**：`⌃⌥⌘D`（全局快捷键，Carbon hot key，不需要辅助功能权限；也在 Go 菜单和菜单栏图标的菜单里）读 Yab 当前在前的 tab（`yab exec`，只读），把窗口叫到前面，按上面站内链接的规则打开它指向的 issue / PR：在列表里的直接选中，在 desk 上但被藏起来的展开 / 清掉过滤后选中，不在的取来放进 **Opened from links**。这算一次打开（标已读、进 Recently viewed）。链接里的 `/files`（或 `/changes`）、`/checks` 切到对应的详情 tab；`#issuecomment-…`、`#discussion_r…`、`#pullrequestreview-…` 等对话里出现那条评论后滚过去（缓存里还没有的，等实时详情到了再滚）。tab 不是这两个仓库的 issue / PR 时弹窗说明。不用 Yab 时：列表有焦点时 `⌘V` 粘贴链接、把链接拖到列表上，或在过滤框输入链接后按 `↩`，效果相同；过滤框里的 `#123` 只在列表里没有匹配项时按 `↩` 才去取，否则 `↩` 照旧回到列表
 - **前进 / 后退**：⌘[ / ⌘]（以及鼠标侧键）在选中过的条目间来回，回到某条目时恢复它的滚动位置和展开状态
 - **写操作**：底部是 Markdown 评论框（支持预览，`⌘↩` 发送）；open 的条目可以 Close：PR 直接关，issue 选 completed / not planned。框里有内容时先作为评论发出再关（Close with comment）。关之前要确认，没有快捷键
   - PR：Comment / Approve / Request changes，以带正文的整体 review 提交

@@ -29,6 +29,12 @@ struct ConversationView: View {
             page.reactionMenu = { [model] subject in Self.reactionMenu(subject, model: model) }
             page.toggleReaction = { [model] content, subject in model.toggleReaction(content, on: subject) }
         }
+        // A link that pointed to a comment of this item (e.g. Yab's tab in front) scrolls to it.
+        .onChange(of: model.linkedComment, initial: true) { _, link in
+            if let link, let fragment = link.anchor, link.key == item.repoNumber {
+                page.reveal(fragment: fragment, key: item.id)
+            }
+        }
     }
 
     private func toolbar(cardCount: Int) -> some View {
