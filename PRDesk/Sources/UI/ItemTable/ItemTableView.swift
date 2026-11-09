@@ -172,8 +172,9 @@ struct ItemTableView: NSViewRepresentable {
                 updateTagMode()
             } else if parent.badgeVersion != badgeVersion {
                 badgeVersion = parent.badgeVersion
-                let author = table.column(withIdentifier: ItemColumn.author.identifier)
-                table.reloadData(forRowIndexes: IndexSet(integersIn: 0 ..< rows.count), columnIndexes: [author])
+                // Both columns that show the author's marks.
+                let columns = IndexSet([ItemColumn.author, .avatar].map { table.column(withIdentifier: $0.identifier) }.filter { $0 >= 0 })
+                table.reloadData(forRowIndexes: IndexSet(integersIn: 0 ..< rows.count), columnIndexes: columns)
             }
 
             if let selection = parent.selection {
