@@ -40,6 +40,7 @@ struct MainView: View {
                 focusRequest: model.tableFocusRequest,
                 badges: { model.affiliations.badges(for: $0) },
                 contribution: { model.contribution(for: $0) },
+                affiliationMenu: { AffiliationMenu.make(for: $0, model: model) },
                 badgeVersion: model.affiliationsVersion + AvatarCache.shared.version,
                 onAction: { model.perform($0, on: $1) },
                 onSort: { model.sort = $0 },

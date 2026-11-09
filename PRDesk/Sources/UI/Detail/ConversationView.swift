@@ -67,7 +67,8 @@ struct ConversationView: View {
         return menu
     }
 
-    /// Right-clicking a person: vote on them (as `VoteMenu`), or open or copy their profile.
+    /// Right-clicking a person: vote on them (as `VoteMenu`), set their affiliation, or open or copy
+    /// their profile.
     private static func loginMenu(_ login: String, model: AppModel) -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
@@ -84,6 +85,8 @@ struct ConversationView: View {
             })
             menu.addItem(.separator())
         }
+        menu.addItem(AffiliationMenu.item("Affiliation", for: [login], model: model))
+        menu.addItem(.separator())
         menu.addItem(ClosureMenuItem("Open Profile on GitHub") { AppModel.openProfile(login) })
         menu.addItem(ClosureMenuItem("Copy Username") {
             NSPasteboard.general.clearContents()

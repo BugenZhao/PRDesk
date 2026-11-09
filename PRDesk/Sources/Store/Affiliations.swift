@@ -94,14 +94,60 @@ struct Affiliations: Equatable, Sendable {
     /// Sources in priority order: manual, committers.md (and CODEOWNERS for vLLM), org membership,
     /// profile company, commit email domain, username suffix.
     func badges(for login: String) -> [Badge] {
-        let key = login.lowercased()
-        return Org.allCases.compactMap { org in
-            if let override = overrides.first(where: { $0.login == key && $0.org == org }) {
-                return override.include ? Badge(org: org, source: "added manually") : nil
-            }
-            if org == .vllm { return vllmBadge(for: key) }
-            return source(of: org, for: key).map { Badge(org: org, source: $0) }
+        Org.allCases.compactMap { badge(org: $0, for: login) }
+    }
+
+    func badge(org: Org, for login: String) -> Badge? {
+        if let override = override(org: org, for: login) {
+            return override.include ? Badge(org: org, source: "added manually") : nil
         }
+        return detectedBadge(org: org, for: login)
+    }
+
+    /// The manual entry for `login` and `org`, if any.
+    func override(org: Org, for login: String) -> OrgOverride? {
+        let key = login.lowercased()
+        return overrides.first { $0.login == key && $0.org == org }
+    }
+
+    /// The badge the public data gives, manual entries aside.
+    func detectedBadge(org: Org, for login: String) -> Badge? {
+        let key = login.lowercased()
+        if org == .vllm { return vllmBadge(for: key) }
+        return source(of: org, for: key).map { Badge(org: org, source: $0) }
+    }
+
+    /// Whether `login` has the org's full badge (for vLLM, not just the gray member tier), which
+    /// is what the affiliation menus check and toggle.
+    func hasFullBadge(org: Org, for login: String) -> Bool {
+        badge(org: org, for: login).map { !$0.isSecondary } ?? false
+    }
+
+    /// The manual entries that toggle the org's full badge for `logins`: when all of them have it,
+    /// they lose it (a manual addition is dropped, a detected badge hidden); otherwise those
+    /// without it get it (a hidden detected badge is shown again, anything else added manually).
+    func toggling(_ org: Org, for logins: [String]) -> (save: [OrgOverride], delete: [OrgOverride]) {
+        let keys = Array(Set(logins.map { $0.lowercased() })).sorted()
+        var save: [OrgOverride] = []
+        var delete: [OrgOverride] = []
+        if keys.allSatisfy({ hasFullBadge(org: org, for: $0) }) {
+            for key in keys {
+                if let manual = override(org: org, for: key), manual.include {
+                    delete.append(manual)
+                } else {
+                    save.append(OrgOverride(login: key, org: org, include: false))
+                }
+            }
+        } else {
+            for key in keys where !hasFullBadge(org: org, for: key) {
+                if let hidden = override(org: org, for: key), detectedBadge(org: org, for: key)?.isSecondary == false {
+                    delete.append(hidden)
+                } else {
+                    save.append(OrgOverride(login: key, org: org, include: true))
+                }
+            }
+        }
+        return (save, delete)
     }
 
     private static let codeOwnerPathsShown = 3
@@ -206,6 +252,14 @@ extension AppDatabase {
 
     func delete(_ override: OrgOverride) async throws {
         _ = try await writer.write { db in try override.delete(db) }
+    }
+
+    /// Saves and deletes manual affiliations in one transaction, so the badges change at once.
+    func update(saving: [OrgOverride], deleting: [OrgOverride]) async throws {
+        try await writer.write { db in
+            for override in deleting { _ = try override.delete(db) }
+            for override in saving { try override.upsert(db) }
+        }
     }
 
     func setMetaJSON(_ key: String, _ value: some Encodable & Sendable) async throws {

@@ -12,6 +12,8 @@ struct ItemTableView: NSViewRepresentable {
     var focusRequest: Int
     var badges: (String) -> [Badge]
     var contribution: (String) -> Contribution?
+    /// The affiliation submenu for the authors of the right-clicked rows.
+    var affiliationMenu: ([String]) -> NSMenu
     /// Changes when badge data or avatars change, which the rows themselves don't reflect.
     var badgeVersion: Int
     /// An action on the selected items (or the right-clicked one, if it is outside the selection).
@@ -517,6 +519,15 @@ struct ItemTableView: NSViewRepresentable {
         ]
         /// Indices of `menuActions` after which a separator goes.
         private static let menuSeparatorsAfter: Set = [1, 5, 9, 11, 13]
+        /// Index of `menuActions` after which the author's affiliation submenu goes.
+        private static let affiliationAfter = 13
+        /// Its submenu is made when the menu opens, for the authors right-clicked.
+        private let affiliationItem: NSMenuItem = {
+            let item = NSMenuItem(title: "Author's Affiliation", action: nil, keyEquivalent: "")
+            item.image = NSImage(systemSymbolName: "building.2", accessibilityDescription: nil)
+            item.submenu = NSMenu()
+            return item
+        }()
 
         func makeContextMenu() -> NSMenu {
             let menu = NSMenu()
@@ -528,6 +539,7 @@ struct ItemTableView: NSViewRepresentable {
                 item.tag = index
                 item.target = self
                 menu.addItem(item)
+                if index == Self.affiliationAfter { menu.addItem(affiliationItem) }
                 if Self.menuSeparatorsAfter.contains(index) { menu.addItem(.separator()) }
             }
             menu.addItem(.separator())
@@ -557,6 +569,9 @@ struct ItemTableView: NSViewRepresentable {
         func menuNeedsUpdate(_ menu: NSMenu) {
             let targets = menuTargets
             for item in menu.items { item.isHidden = targets.isEmpty }
+            let authors = targets.compactMap(\.item.author)
+            affiliationItem.isHidden = authors.isEmpty
+            if !authors.isEmpty { affiliationItem.submenu = parent.affiliationMenu(authors) }
             // Check what all targets share; a dash when only some do.
             func state(_ matches: (ItemRow) -> Bool) -> NSControl.StateValue {
                 let count = targets.count(where: matches)

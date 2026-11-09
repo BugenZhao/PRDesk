@@ -21,7 +21,7 @@ struct AvatarView: View {
 }
 
 /// A login followed by the viewer's vote on that person, in italics for a first-timer nothing
-/// vouches for. Click to open their GitHub profile; right-click to vote.
+/// vouches for. Click to open their GitHub profile; right-click to vote or set their affiliation.
 struct LoginText: View {
     @Environment(AppModel.self) private var model
     let login: String?
@@ -59,6 +59,8 @@ struct LoginText: View {
                     VoteMenu(login: login)
                     Divider()
                 }
+                AffiliationSubmenu(login: login)
+                Divider()
                 Button("Open Profile on GitHub") { AppModel.openProfile(login) }
                 Button("Copy Username") {
                     NSPasteboard.general.clearContents()

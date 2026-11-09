@@ -1114,6 +1114,29 @@ final class AppModel {
         Task { try? await db.delete(override) }
     }
 
+    /// Gives `logins` the org's badge, or takes it away when they all have it (SPEC §5).
+    func toggleAffiliation(_ org: Org, for logins: [String]) {
+        let (save, delete) = affiliations.toggling(org, for: logins)
+        updateOverrides(saving: save, deleting: delete)
+    }
+
+    /// Drops every manual affiliation of `logins`, back to what is detected.
+    func clearManualAffiliations(for logins: [String]) {
+        let keys = Set(logins.map { $0.lowercased() })
+        updateOverrides(saving: [], deleting: affiliations.overrides.filter { keys.contains($0.login) })
+    }
+
+    private func updateOverrides(saving: [OrgOverride], deleting: [OrgOverride]) {
+        guard !saving.isEmpty || !deleting.isEmpty else { return }
+        Task {
+            do {
+                try await db.update(saving: saving, deleting: deleting)
+            } catch {
+                logger.error("Failed to set affiliations: \(error)")
+            }
+        }
+    }
+
     func requestFilterFocus() { filterFocusRequest += 1 }
     func requestTableFocus() { tableFocusRequest += 1 }
 
