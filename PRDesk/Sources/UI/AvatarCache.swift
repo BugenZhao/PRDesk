@@ -148,14 +148,12 @@ final class AvatarCache {
 }
 
 extension Badge {
-    /// The org's bundled logo or brand tile, else its GitHub avatar (nil while that loads); without
-    /// color for a secondary badge.
+    /// The org's brand tile or bundled logo, without color for a secondary badge.
     @MainActor
     var image: NSImage? {
         let cache = AvatarCache.shared
         if let tile = org.brandTile { return cache.brandTile(tile.text, hex: tile.hex) }
-        let key = org.logoAsset ?? org.avatarLogin.lowercased()
-        guard let image = org.logoAsset.flatMap(NSImage.init(named:)) ?? cache.image(for: org.avatarLogin) else { return nil }
+        guard let key = org.logoAsset, let image = NSImage(named: key) else { return nil }
         return isSecondary ? cache.grayscale(image, key: key) : image
     }
 }

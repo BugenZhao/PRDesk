@@ -468,12 +468,12 @@ final class AvatarSchemeHandler: NSObject, WKURLSchemeHandler {
         running.remove(ObjectIdentifier(task))
     }
 
-    /// The badge's image (a bundled logo, or the org's avatar), drawn for the page's appearance.
+    /// The badge's image (a bundled logo or brand tile), drawn for the page's appearance.
     private static func badgeData(_ name: String, appearance: NSAppearance) async -> Data? {
         let isSecondary = name.hasSuffix("-secondary")
         guard let org = Org(rawValue: isSecondary ? String(name.dropLast("-secondary".count)) : name) else { return nil }
         let badge = Badge(org: org, source: "", secondaryName: isSecondary ? "" : nil)
-        guard let image = badge.image else { return await AvatarCache.data(for: org.avatarLogin) }
+        guard let image = badge.image else { return nil }
         return png(image, side: 26, appearance: appearance)
     }
 

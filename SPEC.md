@@ -215,7 +215,7 @@ Settings → General → Yab 打开后（默认关），app 把 Pinned 单向同
 
 ## 5. 组织徽章
 
-徽章表示"可信"：**vLLM committer**、**Inferact**、**Red Hat**、**NVIDIA**，以及近半年贡献最多的公司（按总体和 Rust frontend 的 top contributors 选出）：**AMD**、**Intel**、**IBM**、**Hugging Face**、**Mistral AI**、**Meta**、**Google**、**DaoCloud**、**Huawei**、**Microsoft**、**Alibaba**、**Ant Group**、**ByteDance**、**Moonshot AI**、**Arm**、**Samsung**、**EmbeddedLLM**。图标尽量用透明底的图形标志、不带文字：内置的有 vLLM、Inferact、NVIDIA、AMD（箭头）、Meta、Huawei、Mistral AI、DaoCloud、Alibaba（阿里云标志）、Ant Group、Moonshot AI（多来自 Simple Icons；AMD、Moonshot 深色模式下为白色）；Red Hat、Google、Hugging Face、Microsoft、ByteDance 的 GitHub 组织头像本身就是透明底标志，直接用（缓存到本地）；只有文字 logo 的（Intel、IBM、Arm、Samsung、EmbeddedLLM）画成品牌色小方块加简写。vLLM 另有低一档的灰色徽章（logo 去色），给不是 committer 的 `vllm-project` 组织成员和仓库 collaborator（triage 及以上权限）。
+徽章表示"可信"：**vLLM committer**、**Inferact**、**Red Hat**、**NVIDIA**，以及近半年贡献最多的公司（按总体和 Rust frontend 的 top contributors 选出）：**AMD**、**Intel**、**IBM**、**Hugging Face**、**Mistral AI**、**Meta**、**Google**、**DaoCloud**、**Huawei**、**Microsoft**、**Alibaba**、**Ant Group**、**ByteDance**、**Moonshot AI**、**Arm**、**Samsung**、**EmbeddedLLM**。图标都内置在 app 里，不走网络，尽量用透明底的图形标志、不带文字：vLLM、Inferact、NVIDIA、AMD（箭头）、Meta、Huawei、Mistral AI、DaoCloud、Alibaba（阿里云标志）、Ant Group、Moonshot AI 多来自 Simple Icons（AMD、Moonshot 深色模式下为白色）；Red Hat、Google、Hugging Face、Microsoft、ByteDance 的 GitHub 组织头像本身就是透明底标志，取 128px 的 PNG 内置；只有文字 logo 的（Intel、IBM、Arm、Samsung、EmbeddedLLM）画成品牌色小方块加简写。vLLM 另有低一档的灰色徽章（logo 去色），给不是 committer 的 `vllm-project` 组织成员和仓库 collaborator（triage 及以上权限）。
 
 判定来源按优先级从高到低，命中即生效，悬停显示命中来源：
 

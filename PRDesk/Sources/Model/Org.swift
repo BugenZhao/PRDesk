@@ -12,21 +12,18 @@ enum Org: String, CaseIterable, Codable, Sendable, Identifiable {
 
     var displayName: String { profile.displayName }
 
-    /// Bundled mark on a transparent background (Simple Icons, or the company's own), used as the
-    /// badge icon instead of the avatar; some have a dark-mode variant.
+    /// Bundled mark on a transparent background (Simple Icons, the company's own, or its GitHub
+    /// organization's avatar), the badge icon of every org without a `brandTile`; some have a
+    /// dark-mode variant.
     var logoAsset: String? { profile.logoAsset }
 
-    /// GitHub organization whose avatar is the badge icon when there's no logo asset.
-    var avatarLogin: String { profile.githubOrgs[0] }
-
-    /// Fallback label while the avatar loads.
+    /// Fallback label should an icon be missing.
     var shortLabel: String { profile.shortLabel }
 
     /// Names accepted by the `org:` filter token.
     var filterNames: [String] { profile.filterNames }
 
-    /// GitHub organizations whose (public) members get this badge; the first one's avatar is the
-    /// badge icon.
+    /// GitHub organizations whose (public) members get this badge.
     var githubOrgs: [String] { profile.githubOrgs }
 
     /// Whole words or phrases that name the org in a profile's company field.
@@ -76,7 +73,7 @@ enum Org: String, CaseIterable, Codable, Sendable, Identifiable {
             Profile(displayName: "Red Hat", shortLabel: "RH", filterNames: ["redhat", "rh"],
                     githubOrgs: ["RedHatOfficial", "redhat-et", "neuralmagic"],
                     companyPatterns: ["red hat", "redhat", "redhatofficial", "redhatproductsecurity", "neural magic", "neuralmagic"],
-                    emailDomains: ["redhat.com"], loginSuffixes: ["-redhat", "-rh"])
+                    emailDomains: ["redhat.com"], loginSuffixes: ["-redhat", "-rh"], logoAsset: "org-redhat")
         case .nvidia:
             Profile(displayName: "NVIDIA", shortLabel: "NV", filterNames: ["nvidia", "nv"], githubOrgs: ["NVIDIA", "ai-dynamo"],
                     companyPatterns: ["nvidia", "ai dynamo"], emailDomains: ["nvidia.com"], loginSuffixes: ["-nv", "-nvidia"],
@@ -97,7 +94,7 @@ enum Org: String, CaseIterable, Codable, Sendable, Identifiable {
         case .huggingface:
             Profile(displayName: "Hugging Face", shortLabel: "HF", filterNames: ["huggingface", "hf"],
                     githubOrgs: ["huggingface"], companyPatterns: ["hugging face", "huggingface"],
-                    emailDomains: ["huggingface.co"])
+                    emailDomains: ["huggingface.co"], logoAsset: "org-huggingface")
         case .mistral:
             Profile(displayName: "Mistral AI", shortLabel: "Mi", filterNames: ["mistral"], githubOrgs: ["mistralai"],
                     companyPatterns: ["mistral", "mistralai"], emailDomains: ["mistral.ai"], logoAsset: "org-mistral")
@@ -108,7 +105,8 @@ enum Org: String, CaseIterable, Codable, Sendable, Identifiable {
         case .google:
             Profile(displayName: "Google", shortLabel: "G", filterNames: ["google"],
                     githubOrgs: ["google", "google-deepmind", "google-research", "GoogleCloudPlatform"],
-                    companyPatterns: ["google", "deepmind"], emailDomains: ["google.com", "deepmind.com"])
+                    companyPatterns: ["google", "deepmind"], emailDomains: ["google.com", "deepmind.com"],
+                    logoAsset: "org-google")
         case .daocloud:
             Profile(displayName: "DaoCloud", shortLabel: "DC", filterNames: ["daocloud"], githubOrgs: ["DaoCloud"],
                     companyPatterns: ["daocloud"], emailDomains: ["daocloud.io"], logoAsset: "org-daocloud")
@@ -118,7 +116,7 @@ enum Org: String, CaseIterable, Codable, Sendable, Identifiable {
         case .microsoft:
             Profile(displayName: "Microsoft", shortLabel: "MS", filterNames: ["microsoft", "msft"],
                     githubOrgs: ["microsoft", "Azure"], companyPatterns: ["microsoft", "msft"],
-                    emailDomains: ["microsoft.com"], loginSuffixes: ["-msft"])
+                    emailDomains: ["microsoft.com"], loginSuffixes: ["-msft"], logoAsset: "org-microsoft")
         case .alibaba:
             Profile(displayName: "Alibaba", shortLabel: "Al", filterNames: ["alibaba", "qwen"],
                     githubOrgs: ["alibaba", "QwenLM"], companyPatterns: ["alibaba", "aliyun", "qwen"],
@@ -129,7 +127,8 @@ enum Org: String, CaseIterable, Codable, Sendable, Identifiable {
                     emailDomains: ["antgroup.com", "antfin.com"], logoAsset: "org-antgroup")
         case .bytedance:
             Profile(displayName: "ByteDance", shortLabel: "BD", filterNames: ["bytedance"], githubOrgs: ["bytedance"],
-                    companyPatterns: ["bytedance", "byte dance"], emailDomains: ["bytedance.com"])
+                    companyPatterns: ["bytedance", "byte dance"], emailDomains: ["bytedance.com"],
+                    logoAsset: "org-bytedance")
         case .moonshot:
             Profile(displayName: "Moonshot AI", shortLabel: "Mo", filterNames: ["moonshot", "kimi"],
                     githubOrgs: ["MoonshotAI"], companyPatterns: ["moonshot", "moonshotai", "kimi"],
