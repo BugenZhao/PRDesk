@@ -220,7 +220,7 @@ Settings → General → Yab 打开后（默认关），app 把 Pinned 单向同
 判定来源按优先级从高到低，命中即生效，悬停显示命中来源：
 
 1. 手动设置：按人、按组织存在本地（`orgOverride`），可添加，也可强制排除（隐藏检测到的徽章）
-   - 右键列表行的 **Author's Affiliation**、右键详情头部或时间线里的人名 **Affiliation**：列出全部组织，已有完整徽章的打勾（vLLM 的灰色档不算）；列表和时间线的菜单在单个人时于每项下方注明来源（检测来源，或 "Added manually" / "Hidden manually"）；选一个组织切换：没有就手动加上（之前手动隐藏过的检测徽章则恢复），已有就去掉（手动加的删掉，检测到的改为手动隐藏）。多选行时作用于所有作者，部分有的显示短横、选了给全部加上
+   - 右键列表行的 **Author's Affiliation**、右键详情头部或时间线里的人名 **Affiliation**：列出全部组织（带各自的徽章图标），已有完整徽章的打勾（vLLM 的灰色档不算）；列表和时间线的菜单在单个人时于每项下方注明来源（检测来源，或 "Added manually" / "Hidden manually"）；选一个组织切换：没有就手动加上（之前手动隐藏过的检测徽章则恢复），已有就去掉（手动加的删掉，检测到的改为手动隐藏）。多选行时作用于所有作者，部分有的显示短横、选了给全部加上
    - **Clear Manual Affiliations** 删掉这个人的全部手动设置，回到检测结果
    - 设置 → Affiliations 里的表同样可增删；改动立即反映到列表和详情
 2. vLLM committer：解析仓库里的 `docs/governance/committers.md`，悬停时显示负责领域（如 "Rust frontend"）；不在其中、但在 `.github/CODEOWNERS` 里的人（code owner，需要 write 权限）也拿彩色徽章，悬停显示负责的路径（前 3 条，其余计数），`org:committer` 同样匹配。其次是灰色档：`vllm-project` 组织成员，再其次是仓库 collaborator（列 collaborator 需要 push 权限，没有就跳过）。不用 `author_association`：它挂在单个条目上，不按人，也随查看者权限变化

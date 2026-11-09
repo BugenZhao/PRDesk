@@ -23,6 +23,8 @@ enum AffiliationMenu {
             if let image = Badge(org: org, source: "").image?.copy() as? NSImage {
                 image.size = iconSize
                 item.image = image
+                // macOS 27 hides menu images unless asked; the badge is what the item is about.
+                if #available(macOS 27, *) { item.preferredImageVisibility = .visible }
             }
             // Why one person has (or lacks) the badge.
             if logins.count == 1, let login = logins.first {
