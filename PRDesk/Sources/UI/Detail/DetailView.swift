@@ -172,6 +172,10 @@ private struct DetailHeader: View {
             .font(.caption)
             .foregroundStyle(.secondary)
 
+            if let ladder = model.stackLadder, ladder.rungs.contains(where: { $0.entry.number == item.number }) {
+                StackPanel(item: item, ladder: ladder)
+            }
+
             if !item.labels.isEmpty {
                 FlowLayout(spacing: 4) {
                     ForEach(item.labels, id: \.name) { LabelChip(name: $0.name, hex: $0.color) }

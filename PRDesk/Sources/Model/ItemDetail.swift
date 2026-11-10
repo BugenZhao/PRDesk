@@ -9,6 +9,8 @@ struct ItemDetail: Codable, Equatable, Sendable {
     var bodyText: String
     var headRef: String?
     var baseRef: String?
+    /// The GitHub stack a PR is in.
+    var stack: PRStack? = nil
     /// Reactions to the description.
     var reactions: [Reaction]
     var entries: [TimelineEntry]
@@ -24,6 +26,7 @@ struct TimelineEntry: Codable, Equatable, Identifiable, Sendable {
         case approved, changesRequested, reviewed
         case commit, forcePush, merged, closed, reopened, readyForReview, convertToDraft
         case reviewRequested, reviewDismissed, labeled, unlabeled, crossReferenced, assigned, renamed
+        case addedToStack, removedFromStack
     }
 
     var id: String

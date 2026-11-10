@@ -250,6 +250,15 @@ final class AppDatabase: Sendable {
                 t.add(column: "yabTabID", .text)
             }
         }
+        migrator.registerMigration("v19") { db in
+            try db.alter(table: "item") { t in
+                t.add(column: "baseRef", .text)
+                t.add(column: "stackNumber", .integer)
+                t.add(column: "stackPosition", .integer)
+            }
+            // Fetch every item again for its base branch and stack.
+            try db.execute(sql: "DELETE FROM meta WHERE key = 'lastSyncStartedAt'")
+        }
         return migrator
     }
 }

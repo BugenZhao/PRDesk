@@ -86,6 +86,7 @@ final class AppModel {
             restoredSelection = nil
             if selection != oldValue { Defaults.set(selection, for: .selection) }
             selectionChanged(from: oldValue)
+            updateStackLadder()
         }
     }
 
@@ -133,6 +134,8 @@ final class AppModel {
     private(set) var parityWaitingCount = 0
     /// Where each item of the Parity tab is listed, as of the last rebuild.
     @ObservationIgnored private var paritySections: [Item.ID: ListSection] = [:]
+    /// The upstream PR promoted from each parity staging PR that has one, by the staging PR's id.
+    @ObservationIgnored private var stagingUpstream: [Item.ID: Item] = [:]
 
     private func updateDockBadge() {
         NSApp.dockTile.badgeLabel = unreadInboxCount == 0 ? nil : String(unreadInboxCount)
@@ -221,7 +224,35 @@ final class AppModel {
 
     /// Detail of the selected item; may briefly be a cached copy while a fresh one loads.
     private(set) var detail: ItemDetail? {
-        didSet { if let detail { rememberDetail(detail) } }
+        didSet {
+            if let detail { rememberDetail(detail) }
+            if detail?.stack != oldValue?.stack || detail?.id != oldValue?.id { updateStackLadder() }
+        }
+    }
+
+    /// The stack the selected PR is in, for the detail header.
+    private(set) var stackLadder: StackLadder?
+
+    private func updateStackLadder() {
+        let ladder = selectedItem.flatMap { item in
+            StackLadder.of(
+                item, stack: detail?.id == item.id ? detail?.stack : nil, items: snapshot.items,
+                upstreamOf: { [stagingUpstream] in stagingUpstream[$0.id] }
+            )
+        }
+        if ladder != stackLadder { stackLadder = ladder }
+    }
+
+    /// Moves the selection to the next PR along the selected one's stack: `offset` -1 toward the
+    /// base, 1 away from it.
+    /// False when the selected PR isn't in a stack.
+    @discardableResult
+    func stepInStack(_ offset: Int) -> Bool {
+        guard let item = selectedItem, let ladder = stackLadder else { return false }
+        if let number = ladder.neighbor(of: item.number, offset: offset) {
+            openItem(repo: ladder.repo, number: number)
+        }
+        return true
     }
 
     /// Recently shown details, so returning to an item shows it at once rather than after a
@@ -1346,9 +1377,14 @@ final class AppModel {
         let candidates = all.filter { $0.item.isUpstream && !$0.item.isParity }
         let parity = Parity.sections(of: all)
         paritySections = [:]
+        stagingUpstream = [:]
         for (section, rows) in parity {
-            for row in rows { paritySections[row.item.id] = section }
+            for row in rows {
+                paritySections[row.item.id] = section
+                if row.item.isParityUpstream, let staging = row.paired { stagingUpstream[staging.id] = row.item }
+            }
         }
+        updateStackLadder()
         let waiting = (parity[.parityReview]?.count ?? 0) + (parity[.parityUpstream] ?? []).count { $0.insight.turn == .me }
         if parityWaitingCount != waiting { parityWaitingCount = waiting }
 
@@ -1370,7 +1406,7 @@ final class AppModel {
                 let isCollapsed = filter.isEmpty && collapsed.contains(section)
                 rows.append(.header(section, count: members.count, collapsed: isCollapsed))
                 if !isCollapsed {
-                    rows += Self.yourMoveFirst(members).map { .item(section, $0) }
+                    rows += Stacks.grouped(Self.yourMoveFirst(members)).map { .item(section, $0) }
                 }
             }
             visibleCount = count
@@ -1408,6 +1444,10 @@ final class AppModel {
         // Downvoted authors still get triaged, just last.
         let triage = members[.triage] ?? []
         members[.triage] = triage.filter { $0.authorVote != .down } + triage.filter { $0.authorVote == .down }
+        // Stacks stay together, where their base sorts; Recently viewed and Pinned keep their order.
+        for section in Self.dashboardSections where section != .recent && section != .pinned {
+            if let rows = members[section] { members[section] = Stacks.grouped(rows) }
+        }
 
         // Promoted parity PRs live in the Parity tab; the sections they'd be in say how many.
         var inParity: [ListSection: Int] = [:]

@@ -156,6 +156,8 @@ Settings → General → Yab 打开后（默认关），app 把 Pinned 单向同
 
 除 Recently viewed 和 Pinned 外，每个条目只出现在一个组里。所有组始终显示，空的也显示（数量为 0）；组标题的 tooltip 说明这个组装的是什么、和 board 的关系。组的折叠状态持久化，展开 / 折叠不改变滚动位置。过滤时显示所有匹配项，忽略折叠。改了 Status 的条目带动画移到新的组（新的组折叠时淡出），选中落到原位置的下一条；展开 / 折叠和过滤也一样带动画，不论行数多少。组标题之间有分隔线
 
+**Stack**：同一组里属于同一个 stack 的 PR 排在一起，base 在上、栈顶在下（按 position），整组放在其中最靠 base 的那个成员按当前排序该在的位置（排序列任意）。stack 是 GitHub 官方的 stack（`stack` / `stackEntry`），也包括同一仓库里 base 分支正是另一个 PR head 分支的链（GitHub 不知道的 stack）。分在不同组里的成员各归各组，不另画占位行；组里只剩一个成员时不算 stack。Recently viewed、Pinned、Inbox 保持自己的顺序，不聚拢。Parity tab 的各组同样聚拢
+
 ### 4.2 列
 
 | 列 | 内容 |
@@ -163,6 +165,7 @@ Settings → General → Yab 打开后（默认关），app 把 Pinned 单向同
 | (标记) | `•` 有未读的他人动态（相对我上次查看） |
 | （整行） | 已关闭的条目整行变淡；draft PR 也整行变淡（只保留未读点），一眼和待 review 的 PR 分开 |
 | P | 优先级（来自 board），用 SF Symbol：H 双感叹号（红）、M 单感叹号（橙）、L 横杠（灰） |
+| （stack） | 窄列，在 # 左边：聚在一起的 stack 成员之间画一条竖线，节点是条目状态色的圆点（draft 为空心）；官方 stack 是实线，按分支推出的链是虚线。悬停显示 stack 编号和位置、base 分支 |
 | # | 编号；PR / Issue 用不同的小图标区分 |
 | Title | 状态图标 + 标题（开头的 `[..]` / `xx:` 标签变淡），被唤醒的条目带原因标签；发给过 Grok Bot 的条目带对应 emoji，board 上有 Session 的带 `terminal` 图标（§3.3）；有 board Comment 时接着显示备注；灰色的最新事件摘要（如 `@xx commented 2h`、`you reviewed 2d`）始终靠右对齐；被截断的文字（标题、备注、摘要）悬停时 tooltip 显示全文 |
 | Author | 头像 + 用户名（首次贡献者为斜体）+ 投票图标；可信标记（seal、组织徽章，见 §5、§5.2）靠右对齐 |
@@ -212,6 +215,7 @@ Settings → General → Yab 打开后（默认关），app 把 Pinned 单向同
 | `⌘B` | 显示 / 隐藏详情面板（重启后保持） |
 | `⌃⌥⌘D` | 全局：在 desk 里打开 Yab 当前 tab 的 issue / PR（§6 从浏览器回到 desk） |
 | `⌘V` | 列表有焦点时，打开剪贴板里链接指向的 issue / PR |
+| `⌥↑` / `⌥↓` | 沿选中 PR 的 stack 移到下一层（往 base / 往栈顶，§6） |
 
 ## 5. 组织徽章
 
@@ -254,6 +258,7 @@ Settings → General → Yab 打开后（默认关），app 把 Pinned 单向同
 ## 6. 详情面板
 
 - **头部**：标题、作者和徽章、状态（draft / open / merged / closed）、CI 汇总、mergeable / conflicts、labels、创建和更新时间
+- **Stack**：PR 在 stack 里时（官方 stack 取自详情查询；不在官方 stack 里的按分支在本地条目里找链），头部显示一个小表：标题行 `Stack 66533 · 3 of 4 · 2 merged`，第一行是 base 分支（`main`），往下是 position 1…N。一起合并的相邻 PR（合并时间相差一分钟内，即一次 stack merge）折叠成一行 `2 merged together · 5h ago`，点开展开；单独合并的照常一行。每行是状态图标、编号、标题，右侧注明：已合并 / 关闭的时间；parity staging PR 提升出的上游 PR（`⬆#65636` 及其状态，免得 fork 上 closed 的层被看成被拒）；open 的 PR 仍挂在已合并或关闭的 PR 的分支上时标橙 `on merged #N`。当前 PR 加粗高亮，点其他行在 app 内打开。`⌥↑` / `⌥↓`（列表或对话有焦点时）沿 stack 往 base / 往栈顶移动。时间线里显示加入 / 移出 stack 的事件
 - **操作**：Status（Triage / Working / Backlog / Skipped / Muted）、Priority（H / M / L / –）、Pin、Open ↗；parity 的 staging PR 换成 Park / Resume（§3.2）
 - **Conversation**：
   - 时间线包括评论、review（含行内评论的摘要和 diff hunk）、push、label、状态变化

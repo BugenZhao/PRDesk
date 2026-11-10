@@ -75,7 +75,8 @@ enum ItemQuery {
 
     static let fragments = """
     fragment PRFields on PullRequest {
-      id number title url state isDraft createdAt updatedAt closedAt headRefName
+      id number title url state isDraft createdAt updatedAt closedAt headRefName baseRefName
+      stack { number } stackEntry { position }
       repository { nameWithOwner }
       author { login avatarUrl }
       additions deletions reviewDecision mergeable
@@ -383,6 +384,9 @@ enum ItemQuery {
         }
     }
 
+    struct Stack: Decodable, Sendable { let number: Int }
+    struct StackEntry: Decodable, Sendable { let position: Int }
+
     struct PullRequest: Decodable, Sendable {
         let id: String
         let number: Int
@@ -394,6 +398,9 @@ enum ItemQuery {
         let updatedAt: Date
         let closedAt: Date?
         let headRefName: String
+        let baseRefName: String
+        let stack: Stack?
+        let stackEntry: StackEntry?
         let repository: Repository
         let author: Actor?
         let additions: Int
@@ -413,6 +420,9 @@ enum ItemQuery {
                 repo: repository.nameWithOwner,
                 number: number,
                 headRef: headRefName,
+                baseRef: baseRefName,
+                stackNumber: stack?.number,
+                stackPosition: stackEntry?.position,
                 kind: .pullRequest,
                 title: title,
                 url: url,

@@ -16,6 +16,8 @@ struct ItemRow: Hashable, Sendable {
     var paired: Item?
     /// Grok Bot sends still on their way; `state` already shows them as sent.
     var sending: Set<BotRequest> = []
+    /// Its place on a stack's rail, when other members of its stack are in the same section.
+    var rail: StackRail?
 
     var triage: TriageStatus? { board?.triage }
     var priority: Priority? { board?.priorityValue }

@@ -85,6 +85,12 @@ struct Item: Codable, Hashable, Identifiable, Sendable {
     var number: Int
     /// A PR's head branch, which pairs parity staging PRs with the upstream PRs promoted from them.
     var headRef: String?
+    /// A PR's base branch: a branch of another PR when stacked on it.
+    var baseRef: String? = nil
+    /// The GitHub stack a PR is in (numbered within its repository) and its place there, 1 being
+    /// the closest to the base branch.
+    var stackNumber: Int? = nil
+    var stackPosition: Int? = nil
     var kind: Kind
     var title: String
     var url: String

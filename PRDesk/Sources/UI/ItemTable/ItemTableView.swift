@@ -29,6 +29,8 @@ struct ItemTableView: NSViewRepresentable {
     var onAutoSelect: (TableSelection?) -> Void
     /// A GitHub link pasted (⌘V) or dropped on the list.
     var onOpenLink: (ItemLink) -> Void
+    /// ⌥↑ / ⌥↓: the PR before or after the selected one along its stack (-1 toward the base).
+    var onStepInStack: (Int) -> Bool
     /// Undo for list actions, answering ⌘Z while the table has focus.
     var listUndoManager: UndoManager
 
@@ -60,6 +62,12 @@ struct ItemTableView: NSViewRepresentable {
             guard author >= 0, index >= 0 else { continue }
             let target = index > author ? author + offset : author + offset - 1
             if index != target { table.moveColumn(index, toColumn: target) }
+        }
+        // The stack rail, new to a layout saved before it (which puts it last), goes left of the number.
+        let stack = table.column(withIdentifier: ItemColumn.stack.identifier)
+        let number = table.column(withIdentifier: ItemColumn.number.identifier)
+        if stack == table.numberOfColumns - 1, number >= 0, stack > number {
+            table.moveColumn(stack, toColumn: number)
         }
         // Review was gone for a while; a layout saved then has it last.
         let review = table.column(withIdentifier: ItemColumn.review.identifier)
@@ -298,6 +306,11 @@ struct ItemTableView: NSViewRepresentable {
             else { return false }
             // ⌥ with a Grok Bot key opens the send sheet to add a note.
             if event.modifierFlags.contains(.option) {
+                let up = String(UnicodeScalar(NSUpArrowFunctionKey)!), down = String(UnicodeScalar(NSDownArrowFunctionKey)!)
+                if key == up || key == down {
+                    // Otherwise the key goes on, e.g. to scroll the conversation.
+                    return parent.onStepInStack(key == up ? -1 : 1)
+                }
                 let request: BotRequest? = switch key {
                 case "e": .investigate
                 case "f": .track
@@ -686,6 +699,8 @@ struct ItemTableView: NSViewRepresentable {
         /// Closed items fade, and drafts nearly as much (all but the unread dot, which still has
         /// to catch the eye), so the PRs ready for review stand out.
         private static func opacity(of item: Item, in column: ItemColumn) -> CGFloat {
+            // A rail fading in some rows would look broken; its node shows the state.
+            if column == .stack { return 1 }
             if !item.isOpen { return 0.55 }
             if item.isDraft, column != .unread { return 0.6 }
             return 1
@@ -722,11 +737,21 @@ struct ItemTableView: NSViewRepresentable {
                     return lines.isEmpty ? nil : lines.joined(separator: "\n")
                 case .author, .avatar: return authorTooltip(itemRow.item.author)
                 case .link: return itemRow.paired.map { "\($0.repo)#\($0.number) \($0.title)" }
+                case .stack: return Self.stackTooltip(itemRow)
                 case .review: return ItemColumn.reviewTooltip(itemRow.item)
                 case .ci: return ItemColumn.ciTooltip(itemRow.item)
                 default: return nil
                 }
             }
+        }
+
+        private static func stackTooltip(_ row: ItemRow) -> String? {
+            guard row.rail != nil else { return nil }
+            let item = row.item
+            if let number = item.stackNumber, let position = item.stackPosition {
+                return "Stack \(number), position \(position)" + (item.baseRef.map { "\nBase: \($0)" } ?? "")
+            }
+            return item.baseRef.map { "Based on \($0)" }
         }
 
         private func authorTooltip(_ author: String?) -> String? {

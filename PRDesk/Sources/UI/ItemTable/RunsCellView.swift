@@ -24,6 +24,9 @@ indirect enum CellRun {
     case avatar(NSImage?)
     /// Takes whatever width is left over, pushing the runs after it to the far edge.
     case spring
+    /// A stack's rail through the row: lines to the rows above and below (dashed where they join
+    /// by branch alone), and a node in the item's state color, hollow for a draft.
+    case rail(StackRail, node: NSColor, hollow: Bool)
     /// A run drawn see-through, e.g. a mark for a write still under way. Only the run fades,
     /// not the cell (see `RunsCellView.opacity`).
     case faded(CellRun, opacity: CGFloat)
@@ -82,6 +85,8 @@ final class RunsCellView: NSTableCellView {
     nonisolated static let spacing: CGFloat = 4
     nonisolated static let inset: CGFloat = 2
     private static let dotSize: CGFloat = 7
+    nonisolated static let railWidth: CGFloat = 9
+    private static let railNode: CGFloat = 7
     private static let symbolSize: CGFloat = 13
     private static let imageSize: CGFloat = 13
     private static let chipHeight: CGFloat = 14
@@ -225,6 +230,8 @@ final class RunsCellView: NSTableCellView {
             Self.imageSize
         case .spring:
             0
+        case .rail:
+            Self.railWidth
         case let .segments(parts, font, _):
             Self.segmentsWidth(parts, font: font)
         }
@@ -302,6 +309,32 @@ final class RunsCellView: NSTableCellView {
             let size = Self.dotSize
             (emphasized ? NSColor.alternateSelectedControlTextColor : color).setFill()
             NSBezierPath(ovalIn: NSRect(x: rect.minX, y: rect.midY - size / 2, width: size, height: size)).fill()
+
+        case let .rail(rail, node, hollow):
+            // The cell spans the row's full height, so lines meet the next row's.
+            let x = rect.minX + Self.railWidth / 2
+            let size = Self.railNode
+            // Lines stop at the node, so a hollow one stays clear on any row background.
+            for (link, from, to) in [(rail.above, bounds.minY, rect.midY - size / 2), (rail.below, rect.midY + size / 2, bounds.maxY)] {
+                guard let link else { continue }
+                let line = NSBezierPath()
+                line.move(to: NSPoint(x: x, y: from))
+                line.line(to: NSPoint(x: x, y: to))
+                line.lineWidth = 1.5
+                if link == .branch { line.setLineDash([2.5, 2], count: 2, phase: 0) }
+                (emphasized ? NSColor.alternateSelectedControlTextColor.withAlphaComponent(0.7) : .tertiaryLabelColor).setStroke()
+                line.stroke()
+            }
+            let color = emphasized ? NSColor.alternateSelectedControlTextColor : node
+            let circle = NSBezierPath(ovalIn: NSRect(x: x - size / 2, y: rect.midY - size / 2, width: size, height: size))
+            if hollow {
+                circle.lineWidth = 1.3
+                color.setStroke()
+                circle.stroke()
+            } else {
+                color.setFill()
+                circle.fill()
+            }
 
         case let .faded(run, opacity):
             guard let context = NSGraphicsContext.current?.cgContext else { return draw(run, in: rect) }

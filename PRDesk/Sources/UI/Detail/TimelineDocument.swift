@@ -376,6 +376,7 @@ private extension TimelineEntry {
         case .crossReferenced: "link"
         case .assigned: "person.crop.circle.badge.checkmark"
         case .renamed: "pencil"
+        case .addedToStack, .removedFromStack: "square.stack.3d.up"
         case .reviewed, .approved, .changesRequested: "eye.circle"
         case .comment, .commit: "circle"
         }
@@ -393,6 +394,8 @@ private extension TimelineEntry {
         case .reviewDismissed: "dismissed a review"
         case .assigned: "assigned \(detail ?? "someone")"
         case .renamed: "changed the title to “\(detail ?? "")”"
+        case .addedToStack: "added this to stack \(detail ?? "")"
+        case .removedFromStack: "removed this from stack \(detail ?? "")"
         case .reviewed: "reviewed"
         default: ""
         }

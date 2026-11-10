@@ -2,7 +2,7 @@ import AppKit
 
 /// Columns of the item table and how each renders a row.
 enum ItemColumn: String, CaseIterable {
-    case unread, priority, number, title, author, avatar, link, review, turn, ci, size, age, updated
+    case unread, priority, stack, number, title, author, avatar, link, review, turn, ci, size, age, updated
 
     /// Shown in the Parity tab only, where it takes the place of Author (always the agent there).
     static let parityOnly: Set<ItemColumn> = [.link]
@@ -20,6 +20,7 @@ enum ItemColumn: String, CaseIterable {
         switch self {
         case .unread: ""
         case .priority: "P"
+        case .stack: ""
         case .number: "#"
         case .title: "Title"
         case .author: "Author"
@@ -39,6 +40,7 @@ enum ItemColumn: String, CaseIterable {
         switch self {
         case .unread: 8
         case .priority: 16
+        case .stack: RunsCellView.railWidth + 2 * RunsCellView.inset
         case .number: 42
         case .title: 520
         // Room for the picture, two marks and an 80-point login (three in four open items' authors);
@@ -77,6 +79,7 @@ enum ItemColumn: String, CaseIterable {
         switch self {
         case .unread: nil
         case .priority: .priority
+        case .stack: nil
         case .number: .number
         case .title: .title
         case .author, .avatar: .author
@@ -103,7 +106,7 @@ enum ItemColumn: String, CaseIterable {
             // Sized by the table to fill the remaining width; see `Coordinator.fitTitleColumn`.
             column.minWidth = 160
             column.resizingMask = []
-        } else if self == .avatar || self == .review {
+        } else if self == .avatar || self == .review || self == .stack {
             // Fixed: a wider width saved before can't leave them with empty room.
             column.minWidth = width
             column.maxWidth = width
@@ -128,6 +131,10 @@ enum ItemColumn: String, CaseIterable {
         case .priority:
             guard let priority = row.priority else { return [] }
             return [.symbol(priority.symbol, color: priority.color, pointSize: 11)]
+
+        case .stack:
+            guard let rail = row.rail else { return [] }
+            return [.rail(rail, node: item.stateColor, hollow: item.isOpen && item.isDraft)]
 
         case .number:
             return [.text(String(item.number), color: .secondaryLabelColor, font: CellFont.digits)]

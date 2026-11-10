@@ -32,10 +32,12 @@ enum DetailQuery {
       }
       ... on AssignedEvent { id actor \(actor) createdAt assignee { ... on User { login } } }
       ... on RenamedTitleEvent { id actor \(actor) createdAt currentTitle }
+      ... on AddedToStackEvent { id actor \(actor) createdAt stackNumber }
+      ... on RemovedFromStackEvent { id actor \(actor) createdAt stackNumber }
     }
     """
 
-    private static let prTypes = "[ISSUE_COMMENT, PULL_REQUEST_REVIEW, PULL_REQUEST_COMMIT, HEAD_REF_FORCE_PUSHED_EVENT, MERGED_EVENT, CLOSED_EVENT, REOPENED_EVENT, READY_FOR_REVIEW_EVENT, CONVERT_TO_DRAFT_EVENT, REVIEW_REQUESTED_EVENT, REVIEW_DISMISSED_EVENT, LABELED_EVENT, UNLABELED_EVENT, CROSS_REFERENCED_EVENT, ASSIGNED_EVENT, RENAMED_TITLE_EVENT]"
+    private static let prTypes = "[ISSUE_COMMENT, PULL_REQUEST_REVIEW, PULL_REQUEST_COMMIT, HEAD_REF_FORCE_PUSHED_EVENT, MERGED_EVENT, CLOSED_EVENT, REOPENED_EVENT, READY_FOR_REVIEW_EVENT, CONVERT_TO_DRAFT_EVENT, REVIEW_REQUESTED_EVENT, REVIEW_DISMISSED_EVENT, LABELED_EVENT, UNLABELED_EVENT, CROSS_REFERENCED_EVENT, ASSIGNED_EVENT, RENAMED_TITLE_EVENT, ADDED_TO_STACK_EVENT, REMOVED_FROM_STACK_EVENT]"
     private static let issueTypes = "[ISSUE_COMMENT, CLOSED_EVENT, REOPENED_EVENT, LABELED_EVENT, UNLABELED_EVENT, CROSS_REFERENCED_EVENT, ASSIGNED_EVENT, RENAMED_TITLE_EVENT]"
 
     static let text = """
@@ -45,6 +47,12 @@ enum DetailQuery {
           __typename
           ... on PullRequest {
             id bodyHTML bodyText headRefName baseRefName updatedAt \(reactions)
+            stack {
+              number
+              entries(first: 30) {
+                nodes { position pullRequest { number title state isDraft mergedAt closedAt baseRefName headRefName } }
+              }
+            }
             timelineItems(first: 100, after: $after, itemTypes: \(prTypes)) {
               pageInfo { hasNextPage endCursor }
               nodes { ...TimelineFields }
@@ -143,7 +151,41 @@ enum DetailQuery {
         let baseRefName: String?
         let updatedAt: Date
         let reactionGroups: [ReactionGroup]?
+        let stack: Stack?
         let timelineItems: Timeline
+    }
+
+    struct Stack: Decodable, Sendable {
+        struct Entry: Decodable, Sendable {
+            struct PullRequest: Decodable, Sendable {
+                let number: Int
+                let title: String
+                let state: String
+                let isDraft: Bool
+                let mergedAt: Date?
+                let closedAt: Date?
+                let baseRefName: String
+                let headRefName: String
+            }
+
+            let position: Int
+            let pullRequest: PullRequest?
+        }
+
+        let number: Int
+        let entries: Nodes<Entry>
+
+        var stack: PRStack {
+            PRStack(number: number, entries: entries.values.compactMap { entry in
+                entry.pullRequest.map { pr in
+                    PRStack.Entry(
+                        position: entry.position, number: pr.number, title: pr.title,
+                        state: pr.state == "MERGED" ? .merged : pr.state == "CLOSED" ? .closed : .open,
+                        isDraft: pr.isDraft, closedAt: pr.mergedAt ?? pr.closedAt, baseRef: pr.baseRefName, headRef: pr.headRefName
+                    )
+                }
+            }.sorted { $0.position < $1.position })
+        }
     }
 
     struct ReactionGroup: Decodable, Sendable {
@@ -297,11 +339,12 @@ enum DetailQuery {
         let source: Source?
         let assignee: Reviewer?
         let currentTitle: String?
+        let stackNumber: Int?
 
         private enum CodingKeys: String, CodingKey {
             case typename = "__typename"
             case id, author, actor, createdAt, submittedAt, state, bodyHTML, bodyText, url, reactionGroups, comments, commit
-            case afterCommit, requestedReviewer, label, source, assignee, currentTitle
+            case afterCommit, requestedReviewer, label, source, assignee, currentTitle, stackNumber
         }
 
         var entry: TimelineEntry? {
@@ -360,6 +403,8 @@ enum DetailQuery {
                 return entry
             case "AssignedEvent": return make(.assigned, at: createdAt, detail: assignee?.login)
             case "RenamedTitleEvent": return make(.renamed, at: createdAt, detail: currentTitle)
+            case "AddedToStackEvent": return make(.addedToStack, at: createdAt, detail: stackNumber.map(String.init))
+            case "RemovedFromStackEvent": return make(.removedFromStack, at: createdAt, detail: stackNumber.map(String.init))
             default: return nil
             }
         }
@@ -396,6 +441,7 @@ extension SyncEngine {
             bodyText: subject.bodyText,
             headRef: subject.headRefName,
             baseRef: subject.baseRefName,
+            stack: subject.stack?.stack,
             reactions: DetailQuery.ReactionGroup.reactions(subject.reactionGroups),
             entries: entries,
             checks: checks,

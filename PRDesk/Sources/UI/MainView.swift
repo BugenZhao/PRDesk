@@ -54,6 +54,7 @@ struct MainView: View {
                 },
                 onAutoSelect: { model.autoSelect($0) },
                 onOpenLink: { model.open($0) },
+                onStepInStack: { model.stepInStack($0) },
                 listUndoManager: model.undoManager
             )
         }
