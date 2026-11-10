@@ -154,9 +154,14 @@ struct StackPanel: View {
             .contentShape(Rectangle())
     }
 
-    /// The title with its leading tags dimmed, as in the list.
+    /// The title with its leading tags shortened ("[RF][Fix] ") and dimmed, as in a narrow list:
+    /// the panel is narrow, and a stack's PRs mostly share their tags.
     private func title(_ title: String) -> Text {
-        TitleMarkup.pieces(title).reduce(Text(verbatim: "")) { text, piece in
+        let pieces = TitleMarkup.pieces(title)
+        let short = TitlePrefix.abbreviate(TitlePrefix.split(title).prefix)
+        let start = short.map { Text(verbatim: $0).foregroundStyle(.tertiary) } ?? Text(verbatim: "")
+        return pieces.reduce(start) { text, piece in
+            if piece.isPrefix, short != nil { return text }
             var part = Text(verbatim: piece.text)
             if piece.isCode { part = part.font(.callout.monospaced()) }
             if piece.isPrefix { part = part.foregroundStyle(.tertiary) }
