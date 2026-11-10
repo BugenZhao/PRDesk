@@ -2,7 +2,7 @@ import AppKit
 
 /// Columns of the item table and how each renders a row.
 enum ItemColumn: String, CaseIterable {
-    case unread, priority, stack, number, title, author, avatar, link, review, turn, ci, size, age, updated
+    case stack, number, title, author, avatar, link, review, turn, ci, size, age, updated
 
     /// Shown in the Parity tab only, where it takes the place of Author (always the agent there).
     static let parityOnly: Set<ItemColumn> = [.link]
@@ -18,8 +18,6 @@ enum ItemColumn: String, CaseIterable {
 
     var header: String {
         switch self {
-        case .unread: ""
-        case .priority: "P"
         case .stack: ""
         case .number: "#"
         case .title: "Title"
@@ -38,8 +36,6 @@ enum ItemColumn: String, CaseIterable {
     /// The width a column starts with, and goes back to on Reset Columns.
     var width: CGFloat {
         switch self {
-        case .unread: 8
-        case .priority: 16
         case .stack: StackRailShape.width + 2 * RunsCellView.inset
         case .number: 42
         case .title: 520
@@ -77,8 +73,6 @@ enum ItemColumn: String, CaseIterable {
 
     var sortKey: ItemSort.Key? {
         switch self {
-        case .unread: nil
-        case .priority: .priority
         case .stack: nil
         case .number: .number
         case .title: .title
@@ -124,17 +118,13 @@ enum ItemColumn: String, CaseIterable {
     func runs(for row: ItemRow, viewer: String?, badges: (String) -> [Badge], contribution: (String) -> Contribution?, now: Date, abbreviatesTags: Bool = false) -> [CellRun] {
         let item = row.item
         switch self {
-        case .unread:
-            let unreadNote = row.note.map { !$0.isRead } ?? false
-            return row.insight.isUnread || unreadNote ? [.dot(.controlAccentColor)] : []
-
-        case .priority:
-            guard let priority = row.priority else { return [] }
-            return [.symbol(priority.symbol, color: priority.color, pointSize: 11)]
-
         case .stack:
-            guard let rail = row.rail else { return [] }
-            return [.rail(rail, node: item.stateColor, hollow: item.isOpen && item.isDraft)]
+            // The unread dot; on a stack's rail the node is the dot, gray when read (the title's
+            // icon already shows the state), hollow for a draft.
+            let unreadNote = row.note.map { !$0.isRead } ?? false
+            let isUnread = row.insight.isUnread || unreadNote
+            guard let rail = row.rail else { return isUnread ? [.dot(.controlAccentColor)] : [] }
+            return [.rail(rail, node: isUnread ? .controlAccentColor : .secondaryLabelColor, hollow: !isUnread && item.isOpen && item.isDraft)]
 
         case .number:
             return [.text(String(item.number), color: .secondaryLabelColor, font: CellFont.digits)]

@@ -699,10 +699,11 @@ struct ItemTableView: NSViewRepresentable {
         /// Closed items fade, and drafts nearly as much (all but the unread dot, which still has
         /// to catch the eye), so the PRs ready for review stand out.
         private static func opacity(of item: Item, in column: ItemColumn) -> CGFloat {
-            // A rail fading in some rows would look broken; its node shows the state.
+            // The unread dot still has to catch the eye, and a rail fading in some rows would
+            // look broken.
             if column == .stack { return 1 }
             if !item.isOpen { return 0.55 }
-            if item.isDraft, column != .unread { return 0.6 }
+            if item.isDraft { return 0.6 }
             return 1
         }
 
