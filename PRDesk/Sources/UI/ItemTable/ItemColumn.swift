@@ -396,8 +396,7 @@ extension Priority {
 
 /// The icon for an item's kind and state.
 enum StateIcon: Hashable {
-    /// A template image in the asset catalog: the PR state glyphs from the Claude app's
-    /// anthropicons font.
+    /// A template image in the asset catalog: the PR state glyphs (GitHub Octicons).
     case asset(String)
     case symbol(String)
 }
