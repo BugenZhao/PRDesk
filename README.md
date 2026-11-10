@@ -3,7 +3,7 @@
 A native macOS dashboard for the pull requests and issues I work on in
 [vllm-project/vllm](https://github.com/vllm-project/vllm).
 
-![PR Desk](docs/screenshot.jpg)
+![PR Desk](docs/screenshot.webp)
 
 > [!NOTE]
 > This is a personal app, built around my own workflow. It's hard-wired to `vllm-project/vllm`,
