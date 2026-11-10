@@ -8,6 +8,7 @@ struct StackPanel: View {
     let ladder: StackLadder
     /// Folded merge runs the viewer opened, by line id.
     @State private var unfolded: Set<String> = []
+    @State private var width: CGFloat = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -34,6 +35,7 @@ struct StackPanel: View {
             }
         }
         .font(.callout)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 6))
         .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.quaternary))
     }
@@ -77,7 +79,7 @@ struct StackPanel: View {
                 Text("#\(String(entry.number))")
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
-                title(entry.title)
+                title(entry.title, shortened: shortensTags)
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .fontWeight(isCurrent ? .semibold : .regular)
@@ -119,25 +121,57 @@ struct StackPanel: View {
     @ViewBuilder
     private func note(_ rung: StackLadder.Rung) -> some View {
         let entry = rung.entry
+        let text = noteText(rung)
         if let upstream = rung.upstream {
             HStack(spacing: 3) {
-                StateIconView(item: upstream, size: 11)
-                Text("⬆#\(String(upstream.number))")
+                StateIconView(item: upstream, size: Self.noteIconSize)
+                Text(text ?? "")
                     .monospacedDigit()
             }
             .foregroundStyle(.secondary)
             .font(.caption)
             .help("Promoted as \(upstream.repo)#\(upstream.number): \(upstream.stateDescription)")
-        } else if entry.state != .open {
-            Text("\(entry.state == .merged ? "merged" : "closed") \(entry.closedAt.map { "\($0.compactAge()) ago" } ?? "")")
+        } else if let text {
+            Text(text)
                 .font(.caption)
-                .foregroundStyle(.tertiary)
-        } else if let below = stalePR(under: rung) {
-            let gone = below.entry.state == .merged || below.upstream?.state == .merged ? "merged" : "closed"
-            Text("on \(gone) #\(String(below.entry.number))")
-                .font(.caption)
-                .foregroundStyle(.orange)
-                .help("Its base is still \(entry.baseRef), the branch of a PR no longer open")
+                .foregroundStyle(entry.state == .open ? AnyShapeStyle(.orange) : AnyShapeStyle(.tertiary))
+                .help(entry.state == .open ? "Its base is still \(entry.baseRef), the branch of a PR no longer open" : "")
+        }
+    }
+
+    private static let noteIconSize: CGFloat = 11
+
+    /// The note's text; see `note`.
+    private func noteText(_ rung: StackLadder.Rung) -> String? {
+        let entry = rung.entry
+        if let upstream = rung.upstream { return "⬆#\(String(upstream.number))" }
+        if entry.state != .open {
+            return "\(entry.state == .merged ? "merged" : "closed") \(entry.closedAt.map { "\($0.compactAge()) ago" } ?? "")"
+        }
+        guard let below = stalePR(under: rung) else { return nil }
+        let gone = below.entry.state == .merged || below.upstream?.state == .merged ? "merged" : "closed"
+        return "on \(gone) #\(String(below.entry.number))"
+    }
+
+    /// Whether every title's tags are shortened: when any row's title wouldn't fit with them in
+    /// full, as the list does, so a tag reads the same in every row.
+    private var shortensTags: Bool {
+        guard width > 0 else { return false }
+        let body = NSFont.preferredFont(forTextStyle: .callout)
+        let bold = NSFont.systemFont(ofSize: body.pointSize, weight: .semibold)
+        let caption = NSFont.preferredFont(forTextStyle: .caption1)
+        let digits = NSFont.monospacedDigitSystemFont(ofSize: body.pointSize, weight: .regular)
+        func measure(_ text: String, _ font: NSFont) -> CGFloat {
+            ceil((text as NSString).size(withAttributes: [.font: font]).width)
+        }
+        return ladder.rungs.contains { rung in
+            let font = rung.entry.number == item.number ? bold : body
+            var needed = 2 * 8 + StackRailShape.width + 6 + measure("#\(rung.entry.number)", digits) + 6
+                + measure(rung.entry.title, font) + 8
+            if let note = noteText(rung) {
+                needed += measure(note, caption) + (rung.upstream != nil ? Self.noteIconSize + 3 : 0)
+            }
+            return needed > width
         }
     }
 
@@ -160,11 +194,10 @@ struct StackPanel: View {
             .contentShape(Rectangle())
     }
 
-    /// The title with its leading tags shortened ("[RF][Fix] ") and dimmed, as in a narrow list:
-    /// the panel is narrow, and a stack's PRs mostly share their tags.
-    private func title(_ title: String) -> Text {
+    /// The title with its leading tags dimmed, and shortened ("[RF][Fix] ") when `shortened`.
+    private func title(_ title: String, shortened: Bool) -> Text {
         let pieces = TitleMarkup.pieces(title)
-        let short = TitlePrefix.abbreviate(TitlePrefix.split(title).prefix)
+        let short = shortened ? TitlePrefix.abbreviate(TitlePrefix.split(title).prefix) : nil
         let start = short.map { Text(verbatim: $0).foregroundStyle(.tertiary) } ?? Text(verbatim: "")
         return pieces.reduce(start) { text, piece in
             if piece.isPrefix, short != nil { return text }

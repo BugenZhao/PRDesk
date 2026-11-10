@@ -258,7 +258,7 @@ Settings → General → Yab 打开后（默认关），app 把 Pinned 单向同
 ## 6. 详情面板
 
 - **头部**：标题、作者和徽章、状态（draft / open / merged / closed）、CI 汇总、mergeable / conflicts、labels、创建和更新时间
-- **Stack**：PR 在 stack 里时（官方 stack 取自详情查询，加上往下按 base 分支找到的 PR、以及挂在其中任何分支上的 open PR，都在本地条目里找），头部显示一个小表，左侧画和列表一样的树状轨道（节点代替状态图标，提升后合并的 staging PR 为紫色）：标题行 `Stack 66533 · 3 of 4 · 2 merged`，第一行是 base 分支（`main`），往下是 position 1…N。一起合并的相邻 PR（合并时间相差一分钟内，即一次 stack merge）折叠成一行 `2 merged together · 5h ago`，点开展开；单独合并的照常一行。每行是状态图标、编号、标题（开头的标签总是简写，如 `[RF][Fix]`），右侧注明：已合并 / 关闭的时间；parity staging PR 提升出的上游 PR（`⬆#65636` 及其状态，免得 fork 上 closed 的层被看成被拒）；open 的 PR 仍挂在已合并或关闭的 PR 的分支上时标橙 `on merged #N`。当前 PR 加粗高亮，点其他行在 app 内打开。`⌥↑` / `⌥↓`（列表或对话有焦点时）沿 stack 往 base / 往栈顶移动。时间线里显示加入 / 移出 stack 的事件
+- **Stack**：PR 在 stack 里时（官方 stack 取自详情查询，加上往下按 base 分支找到的 PR、以及挂在其中任何分支上的 open PR，都在本地条目里找），头部显示一个小表，左侧画和列表一样的树状轨道（节点代替状态图标，提升后合并的 staging PR 为紫色）：标题行 `Stack 66533 · 3 of 4 · 2 merged`，第一行是 base 分支（`main`），往下是 position 1…N。一起合并的相邻 PR（合并时间相差一分钟内，即一次 stack merge）折叠成一行 `2 merged together · 5h ago`，点开展开；单独合并的照常一行。每行是状态图标、编号、标题（和列表一样：有任何一行的标题放不下时，所有行开头的标签统一简写，如 `[RF][Fix]`），右侧注明：已合并 / 关闭的时间；parity staging PR 提升出的上游 PR（`⬆#65636` 及其状态，免得 fork 上 closed 的层被看成被拒）；open 的 PR 仍挂在已合并或关闭的 PR 的分支上时标橙 `on merged #N`。当前 PR 加粗高亮，点其他行在 app 内打开。`⌥↑` / `⌥↓`（列表或对话有焦点时）沿 stack 往 base / 往栈顶移动。时间线里显示加入 / 移出 stack 的事件
 - **操作**：Status（Triage / Working / Backlog / Skipped / Muted）、Priority（H / M / L / –）、Pin、Open ↗；parity 的 staging PR 换成 Park / Resume（§3.2）
 - **Conversation**：
   - 时间线包括评论、review（含行内评论的摘要和 diff hunk）、push、label、状态变化
