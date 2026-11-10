@@ -40,7 +40,7 @@ enum ItemColumn: String, CaseIterable {
         switch self {
         case .unread: 8
         case .priority: 16
-        case .stack: RunsCellView.railWidth + 2 * RunsCellView.inset
+        case .stack: StackRailShape.width + 2 * RunsCellView.inset
         case .number: 42
         case .title: 520
         // Room for the picture, two marks and an 80-point login (three in four open items' authors);

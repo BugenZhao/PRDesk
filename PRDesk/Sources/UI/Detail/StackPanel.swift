@@ -14,6 +14,7 @@ struct StackPanel: View {
             header
             Divider()
             row {
+                Color.clear.frame(width: StackRailShape.width)
                 Text(baseBranch)
                     .font(.caption.monospaced())
                     .foregroundStyle(.tertiary)
@@ -24,8 +25,8 @@ struct StackPanel: View {
                 switch line {
                 case let .rung(rung):
                     rungRow(rung)
-                case let .merged(rungs):
-                    mergedRow(rungs, id: line.id)
+                case let .merged(rungs, rail):
+                    mergedRow(rungs, rail: rail, id: line.id)
                     if unfolded.contains(line.id) {
                         ForEach(rungs) { rungRow($0) }
                     }
@@ -70,7 +71,9 @@ struct StackPanel: View {
             model.openItem(repo: ladder.repo, number: entry.number)
         } label: {
             row {
-                StackStateIcon(state: entry.state, isDraft: entry.isDraft)
+                // A staging PR landed upstream is closed on the fork; it shows as merged.
+                RailView(rail: rung.rail, color: rung.upstream?.state == .merged ? .purple : entry.stateColor, hollow: entry.state == .open && entry.isDraft)
+                    .help(entry.stateDescription)
                 Text("#\(String(entry.number))")
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
@@ -89,7 +92,7 @@ struct StackPanel: View {
         .help(entry.title)
     }
 
-    private func mergedRow(_ rungs: [StackLadder.Rung], id: String) -> some View {
+    private func mergedRow(_ rungs: [StackLadder.Rung], rail: StackRail, id: String) -> some View {
         let isOpen = unfolded.contains(id)
         let at = rungs.compactMap(\.entry.closedAt).max()
         return Button {
@@ -98,7 +101,7 @@ struct StackPanel: View {
             }
         } label: {
             row {
-                StackStateIcon(state: .merged, isDraft: false)
+                RailView(rail: rail, color: .purple, hollow: false)
                 Text("\(rungs.count) merged together" + (at.map { " · \($0.compactAge()) ago" } ?? ""))
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 8)
@@ -147,10 +150,13 @@ struct StackPanel: View {
         return below
     }
 
+    static let rowHeight: CGFloat = 20
+
     private func row(@ViewBuilder _ content: () -> some View) -> some View {
+        // A fixed height, so the rail's lines meet from row to row.
         HStack(spacing: 6) { content() }
             .padding(.horizontal, 8)
-            .frame(maxWidth: .infinity, minHeight: 20, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: Self.rowHeight, maxHeight: Self.rowHeight, alignment: .leading)
             .contentShape(Rectangle())
     }
 
@@ -170,33 +176,46 @@ struct StackPanel: View {
     }
 }
 
-/// A PR state icon from a stack entry's state, which has no mergeability to show conflicts with.
-private struct StackStateIcon: View {
-    let state: Item.State
-    let isDraft: Bool
+/// A row's piece of a stack rail (see `StackRailShape`), the node in the PR's state color.
+private struct RailView: View {
+    let rail: StackRail
+    let color: Color
+    let hollow: Bool
 
     var body: some View {
-        Image(name)
-            .renderingMode(.template)
-            .resizable()
-            .scaledToFit()
-            .frame(width: 12, height: 12)
-            .foregroundStyle(color)
-    }
-
-    private var name: String {
-        switch state {
-        case .open: isDraft ? "pr-draft" : "pr-open"
-        case .merged: "pr-merged"
-        case .closed: "pr-closed"
+        Canvas { context, size in
+            let shape = StackRailShape.layout(rail, in: CGRect(origin: .zero, size: size))
+            for line in shape.lines {
+                context.stroke(
+                    Path(line.path), with: .style(.tertiary),
+                    style: StrokeStyle(lineWidth: StackRailShape.lineWidth, dash: line.isDashed ? StackRailShape.dash : [])
+                )
+            }
+            if hollow {
+                context.stroke(Path(ellipseIn: shape.node.insetBy(dx: 0.65, dy: 0.65)), with: .color(color), lineWidth: 1.3)
+            } else {
+                context.fill(Path(ellipseIn: shape.node), with: .color(color))
+            }
         }
+        .frame(width: StackRailShape.width, height: StackPanel.rowHeight)
     }
+}
 
-    private var color: Color {
+private extension PRStack.Entry {
+    /// As `Item.stateColor`, without mergeability to show conflicts with.
+    var stateColor: Color {
         switch state {
         case .open: isDraft ? .secondary : .green
         case .merged: .purple
         case .closed: .red
+        }
+    }
+
+    var stateDescription: String {
+        switch state {
+        case .open: isDraft ? "Draft" : "Open"
+        case .merged: "Merged"
+        case .closed: "Closed"
         }
     }
 }

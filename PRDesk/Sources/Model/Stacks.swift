@@ -1,31 +1,116 @@
 import Foundation
 
-/// Where a row sits on its stack's rail in the list: which neighbors it joins.
+/// Where a row sits on its stack's rail: its node's lane and the lines through the row. A stack
+/// is a tree, since several PRs can be based on one branch (GitHub's own stacks are chains): each
+/// PR's first child continues its lane, the others fork into lanes of their own to the right.
 struct StackRail: Hashable, Sendable {
-    /// How a row joins the next one along the rail: through a GitHub stack, or a base branch that
-    /// is another PR's head branch (a stack GitHub doesn't know of).
+    /// How a PR joins the one it is based on: through a GitHub stack, or a base branch that is the
+    /// other PR's head branch (a stack GitHub doesn't know of).
     enum Link: Hashable, Sendable { case stack, branch }
 
-    var above: Link?
-    var below: Link?
+    enum Segment: Hashable, Sendable {
+        /// From the top of the row down to the node, from the PR this one is based on.
+        case up(lane: Int, Link)
+        /// From the node down to the bottom of the row, to the PR's first child.
+        case down(lane: Int, Link)
+        /// Straight through the row, on the way to a PR further down.
+        case through(lane: Int, Link)
+        /// From the node out to another lane and down, to a child forking off.
+        case fork(to: Int, Link)
+    }
+
+    var lane: Int
+    /// Lanes the whole tree uses, so its rows lay their lanes out alike.
+    var laneCount: Int
+    var segments: [Segment]
+
+    var hasUp: Bool { segments.contains { if case .up = $0 { true } else { false } } }
+    var hasDown: Bool { segments.contains { if case .down = $0 { true } else { false } } }
+    /// Only the lines in and out of its own node on its own lane.
+    var isPlain: Bool {
+        segments.allSatisfy { segment in
+            switch segment {
+            case .up, .down: true
+            default: false
+            }
+        }
+    }
+}
+
+/// Lays a forest of PRs out as rows: each tree base first, depth first, a PR's first child right
+/// after it on its lane, other children after that child's whole subtree, each on a new lane.
+enum StackLayout {
+    /// `parents[i]`: the node `i` is based on and how. `before` orders siblings, the one to
+    /// continue the parent's lane first. Returns nodes in row order with their rails.
+    static func layout(parents: [(node: Int, link: StackRail.Link)?], before: (Int, Int) -> Bool) -> [(node: Int, rail: StackRail)] {
+        let count = parents.count
+        var children = [[Int]](repeating: [], count: count)
+        for (node, parent) in parents.enumerated() {
+            if let parent, parent.node != node { children[parent.node].append(node) }
+        }
+        for node in 0 ..< count { children[node].sort(by: before) }
+
+        var order: [Int] = []
+        var lanes = [Int](repeating: 0, count: count)
+        var visited = [Bool](repeating: false, count: count)
+        var nextLane = 1
+        func visit(_ node: Int, lane: Int) {
+            guard !visited[node] else { return }
+            visited[node] = true
+            lanes[node] = lane
+            order.append(node)
+            for (index, child) in children[node].enumerated() {
+                if index == 0 {
+                    visit(child, lane: lane)
+                } else {
+                    let forked = nextLane
+                    nextLane += 1
+                    visit(child, lane: forked)
+                }
+            }
+        }
+        let roots = (0 ..< count).filter { parents[$0] == nil }.sorted(by: before)
+        for root in roots { visit(root, lane: 0) }
+        // A cycle of base branches has no root; break it anywhere.
+        for node in 0 ..< count where !visited[node] { visit(node, lane: 0) }
+
+        var rowOf = [Int](repeating: 0, count: count)
+        for (row, node) in order.enumerated() { rowOf[node] = row }
+        var segments = [[StackRail.Segment]](repeating: [], count: count)
+        for (node, parent) in parents.enumerated() {
+            guard let parent, parent.node != node, rowOf[parent.node] < rowOf[node] else { continue }
+            let (from, to) = (rowOf[parent.node], rowOf[node])
+            let lane = lanes[node]
+            segments[from].append(lane == lanes[parent.node] ? .down(lane: lane, parent.link) : .fork(to: lane, parent.link))
+            for row in from + 1 ..< to { segments[row].append(.through(lane: lane, parent.link)) }
+            segments[to].append(.up(lane: lane, parent.link))
+        }
+        let laneCount = (lanes.max() ?? 0) + 1
+        return order.enumerated().map { row, node in
+            (node, StackRail(lane: lanes[node], laneCount: laneCount, segments: segments[row]))
+        }
+    }
 }
 
 /// Keeps PR stacks together in the list (SPEC §4.1): the members of one stack within a section
 /// follow one another, the base first, where the base itself sorts.
 enum Stacks {
     /// The repository's default branch, which a stack's base targets.
-    private static let defaultBranch = "main"
+    static let defaultBranch = "main"
 
     /// `rows`, already in their section's order, with each stack's members gathered at the place
-    /// of the one closest to the base, and their rails set. Stacks are GitHub's stacks, and chains
-    /// of PRs whose base branch is another PR's head branch in the same repository.
+    /// of its base, and their rails set. Stacks are GitHub's stacks, and PRs whose base branch is
+    /// another PR's head branch in the same repository, which can branch out into trees.
     static func grouped(_ rows: [ItemRow]) -> [ItemRow] {
         // Most sections have no stacks at all.
         guard rows.count > 1, rows.contains(where: { $0.item.stackNumber != nil || ($0.item.baseRef ?? defaultBranch) != defaultBranch }) else {
             return rows.map(clearingRail)
         }
-        let count = rows.count
-        var root = Array(0 ..< count)
+        let items = rows.map(\.item)
+        let parents = parents(of: items)
+        guard parents.contains(where: { $0 != nil }) else { return rows.map(clearingRail) }
+
+        var root = Array(0 ..< rows.count)
         func find(_ i: Int) -> Int {
             var i = i
             while root[i] != i {
@@ -34,89 +119,75 @@ enum Stacks {
             }
             return i
         }
-        func union(_ a: Int, _ b: Int) {
-            let (x, y) = (find(a), find(b))
+        for (node, parent) in parents.enumerated() {
+            guard let parent else { continue }
+            let (x, y) = (find(node), find(parent.node))
             if x != y { root[max(x, y)] = min(x, y) }
         }
+        var groups: [Int: [Int]] = [:]
+        for index in rows.indices { groups[find(index), default: []].append(index) }
 
-        // Members of one GitHub stack.
-        var byStack: [String: Int] = [:]
-        for (index, row) in rows.enumerated() {
-            guard let key = stackKey(row.item) else { continue }
-            if let other = byStack[key] { union(index, other) } else { byStack[key] = index }
-        }
-        // PRs on another PR's branch.
-        var byHead: [String: Int] = [:]
-        for (index, row) in rows.enumerated() where row.item.kind == .pullRequest {
-            guard let head = row.item.headRef else { continue }
-            byHead["\(row.item.repo.lowercased()):\(head)"] = index
-        }
-        var parent = [Int?](repeating: nil, count: count)
-        for (index, row) in rows.enumerated() where row.item.kind == .pullRequest {
-            guard let base = row.item.baseRef, base != defaultBranch,
-                  let other = byHead["\(row.item.repo.lowercased()):\(base)"], other != index
-            else { continue }
-            parent[index] = other
-            union(index, other)
-        }
-
-        var members: [Int: [Int]] = [:]
-        for index in 0 ..< count {
-            members[find(index), default: []].append(index)
-        }
-        guard members.count < count else { return rows.map(clearingRail) }
-
-        // Depth along the stack: GitHub's position, or one more than the PR it is based on.
-        var depths = [Int?](repeating: nil, count: count)
-        func depth(_ i: Int, _ seen: Int = 0) -> Int {
-            if let known = depths[i] { return known }
-            let value: Int = if let position = rows[i].item.stackPosition {
-                position
-            } else if let parent = parent[i], seen < count {
-                depth(parent, seen + 1) + 1
-            } else {
-                0
-            }
-            depths[i] = value
-            return value
+        // Each tree, laid out, goes where its base sorts.
+        var laidOut: [Int: [(node: Int, rail: StackRail)]] = [:]
+        for (key, members) in groups where members.count > 1 {
+            let local = Dictionary(uniqueKeysWithValues: members.enumerated().map { ($1, $0) })
+            let layout = StackLayout.layout(
+                parents: members.map { member in parents[member].flatMap { parent in local[parent.node].map { ($0, parent.link) } } },
+                before: { siblingOrder(items[members[$0]], items[members[$1]]) }
+            )
+            laidOut[key] = layout.map { (members[$0.node], $0.rail) }
         }
 
         var result: [ItemRow] = []
-        result.reserveCapacity(count)
-        var placed: Set<Int> = []
-        // Each group goes where its base sorts.
-        let order: [Int: [Int]] = members.mapValues { group in
-            // At one depth, a stack's own member before a PR based on a branch beside it.
-            group.sorted { a, b in
-                let (x, y) = (rows[a].item, rows[b].item)
-                return (depth(a), x.stackNumber == nil ? 1 : 0, x.number) < (depth(b), y.stackNumber == nil ? 1 : 0, y.number)
-            }
-        }
-        for index in 0 ..< count {
-            let group = order[find(index)]!
-            if group.count == 1 {
+        result.reserveCapacity(rows.count)
+        for index in rows.indices {
+            guard let tree = laidOut[find(index)] else {
                 result.append(clearingRail(rows[index]))
                 continue
             }
-            guard group[0] == index, placed.insert(find(index)).inserted else { continue }
-            for (offset, member) in group.enumerated() {
+            guard tree.first?.node == index else { continue }
+            for (member, rail) in tree {
                 var row = rows[member]
-                row.rail = StackRail(
-                    above: offset > 0 ? link(rows[group[offset - 1]].item, row.item) : nil,
-                    below: offset < group.count - 1 ? link(row.item, rows[group[offset + 1]].item) : nil
-                )
+                row.rail = rail
                 result.append(row)
             }
         }
         return result
     }
 
-    private static func stackKey(_ item: Item) -> String? {
-        item.stackNumber.map { "\(item.repo.lowercased())#\($0)" }
+    /// For each item, the one it is based on among `items`: the member before it in its GitHub
+    /// stack, or else the PR whose head branch is its base branch.
+    static func parents(of items: [Item]) -> [(node: Int, link: StackRail.Link)?] {
+        var byHead: [String: Int] = [:]
+        var byStack: [String: [(position: Int, index: Int)]] = [:]
+        for (index, item) in items.enumerated() where item.kind == .pullRequest {
+            if let head = item.headRef { byHead["\(item.repo.lowercased()):\(head)"] = index }
+            if let key = stackKey(item), let position = item.stackPosition { byStack[key, default: []].append((position, index)) }
+        }
+        return items.enumerated().map { index, item in
+            guard item.kind == .pullRequest else { return nil }
+            if let key = stackKey(item), let position = item.stackPosition,
+               let below = byStack[key]?.filter({ $0.position < position }).max(by: { $0.position < $1.position })
+            {
+                return (below.index, .stack)
+            }
+            if let base = item.baseRef, base != defaultBranch,
+               let other = byHead["\(item.repo.lowercased()):\(base)"], other != index
+            {
+                return (other, .branch)
+            }
+            return nil
+        }
     }
 
-    private static func link(_ a: Item, _ b: Item) -> StackRail.Link {
-        stackKey(a) != nil && stackKey(a) == stackKey(b) ? .stack : .branch
+    /// Siblings on one base: a GitHub stack's own next member first (it continues the lane), then
+    /// by number.
+    static func siblingOrder(_ a: Item, _ b: Item) -> Bool {
+        ((a.stackNumber == nil ? 1 : 0), a.number) < ((b.stackNumber == nil ? 1 : 0), b.number)
+    }
+
+    private static func stackKey(_ item: Item) -> String? {
+        item.stackNumber.map { "\(item.repo.lowercased())#\($0)" }
     }
 
     private static func clearingRail(_ row: ItemRow) -> ItemRow {
@@ -146,113 +217,180 @@ struct PRStack: Codable, Equatable, Sendable {
     var entries: [Entry]
 }
 
-/// The stack an item is in, as the detail header shows it: base first, merged runs folded.
+/// The stack an item is in, as the detail header shows it: its GitHub stack and the PRs based on
+/// their branches, as a tree from the base, merged runs folded.
 struct StackLadder: Equatable {
     struct Rung: Equatable, Identifiable {
         var entry: PRStack.Entry
         /// For a parity staging PR: the upstream PR promoted from it.
         var upstream: Item?
+        var rail: StackRail
+        /// The PR it is based on, if in the ladder.
+        var parent: Int?
         var id: Int { entry.number }
     }
 
     /// A line of the ladder: one PR, or PRs merged together (one stack merge) folded into one.
     enum Line: Equatable, Identifiable {
         case rung(Rung)
-        case merged([Rung])
+        case merged([Rung], rail: StackRail)
 
         var id: String {
             switch self {
             case let .rung(rung): "#\(rung.id)"
-            case let .merged(rungs): "merged-\(rungs.first?.id ?? 0)"
+            case let .merged(rungs, _): "merged-\(rungs.first?.id ?? 0)"
             }
         }
     }
 
     var repo: String
-    /// GitHub's stack number; nil for a chain of PRs on one another's branches.
+    /// GitHub's stack number; nil for PRs on one another's branches alone.
     var number: Int?
-    /// Base first.
+    /// In row order, the base first.
     var rungs: [Rung]
 
     /// Merges a few seconds apart are one stack merge.
     private static let mergeWindow: TimeInterval = 60
 
-    /// Rungs with each run of PRs merged together folded into one line. A PR merged on its own
-    /// stays a rung.
+    /// Rungs with each run of PRs merged together folded into one line: one after another on a
+    /// lane with nothing forking off. A PR merged on its own stays a rung.
     var lines: [Line] {
         var lines: [Line] = []
         var run: [Rung] = []
         func flush() {
-            if run.count > 1 { lines.append(.merged(run)) } else { lines += run.map(Line.rung) }
+            if run.count > 1, let first = run.first, let last = run.last {
+                var segments: [StackRail.Segment] = []
+                if first.rail.hasUp { segments.append(.up(lane: first.rail.lane, linkUp(first))) }
+                if last.rail.hasDown { segments.append(.down(lane: last.rail.lane, linkDown(last))) }
+                lines.append(.merged(run, rail: StackRail(lane: first.rail.lane, laneCount: first.rail.laneCount, segments: segments)))
+            } else {
+                lines += run.map(Line.rung)
+            }
             run = []
         }
         for rung in rungs {
-            if rung.entry.state == .merged, let at = rung.entry.closedAt,
-               let last = run.last?.entry.closedAt, abs(at.timeIntervalSince(last)) <= Self.mergeWindow
+            let foldable = rung.entry.state == .merged && rung.rail.isPlain
+            if foldable, let at = rung.entry.closedAt, let last = run.last, let lastAt = last.entry.closedAt,
+               abs(at.timeIntervalSince(lastAt)) <= Self.mergeWindow, rung.parent == last.entry.number
             {
                 run.append(rung)
                 continue
             }
             flush()
-            if rung.entry.state == .merged { run = [rung] } else { lines.append(.rung(rung)) }
+            if foldable { run = [rung] } else { lines.append(.rung(rung)) }
         }
         flush()
         return lines
     }
 
+    private func linkUp(_ rung: Rung) -> StackRail.Link {
+        for case let .up(_, link) in rung.rail.segments { return link }
+        return .stack
+    }
+
+    private func linkDown(_ rung: Rung) -> StackRail.Link {
+        for case let .down(_, link) in rung.rail.segments { return link }
+        return .stack
+    }
+
     var mergedCount: Int { rungs.count { $0.entry.state == .merged || $0.upstream?.state == .merged } }
 
-    /// The number of the PR before or after `number` along the stack (`offset` -1 toward the base).
+    /// The number of the PR before or after `number` in the ladder's rows (`offset` -1 toward the
+    /// base).
     func neighbor(of number: Int, offset: Int) -> Int? {
         guard let index = rungs.firstIndex(where: { $0.entry.number == number }) else { return nil }
         let target = index + offset
         return rungs.indices.contains(target) ? rungs[target].entry.number : nil
     }
 
-    /// The ladder for `item`: its GitHub stack from the detail, or else the chain of PRs on one
-    /// another's branches among `items`. Nil when the item isn't in a stack of two or more.
+    /// Most PRs the ladder gathers by branch.
+    private static let limit = 30
+
+    /// The ladder for `item`: its GitHub stack (from the detail, or else its members here), the
+    /// PRs below it by base branch, and the open PRs based on any of their branches, among
+    /// `items`. Nil when the item stands alone.
     static func of(_ item: Item, stack: PRStack?, items: [Item], upstreamOf: (Item) -> Item?) -> StackLadder? {
         guard item.kind == .pullRequest else { return nil }
         let local = items.filter { $0.kind == .pullRequest && $0.repo.caseInsensitiveCompare(item.repo) == .orderedSame }
         let byNumber = Dictionary(local.map { ($0.number, $0) }, uniquingKeysWith: { a, _ in a })
-        func rung(_ entry: PRStack.Entry) -> Rung {
-            Rung(entry: entry, upstream: byNumber[entry.number].flatMap(upstreamOf))
-        }
-        if let stack, stack.entries.count > 1 {
-            return StackLadder(repo: item.repo, number: stack.number, rungs: stack.entries.map(rung))
-        }
         func entry(_ item: Item, position: Int) -> PRStack.Entry {
             PRStack.Entry(
                 position: position, number: item.number, title: item.title, state: item.state, isDraft: item.isDraft,
                 closedAt: item.closedAt, baseRef: item.baseRef ?? "", headRef: item.headRef ?? ""
             )
         }
-        // Until the detail comes, the members of its GitHub stack that are here.
-        if stack == nil, let number = item.stackNumber {
-            let members = local.filter { $0.stackNumber == number }.sorted { ($0.stackPosition ?? 0) < ($1.stackPosition ?? 0) }
+
+        // The GitHub stack, base first; its members are linked by position, not branch, since a
+        // merged member keeps the base branch it had.
+        var number: Int?
+        var entries: [PRStack.Entry] = []
+        if let stack, stack.entries.count > 1, stack.entries.contains(where: { $0.number == item.number }) {
+            number = stack.number
+            entries = stack.entries
+        } else if stack == nil, let stackNumber = item.stackNumber {
+            let members = local.filter { $0.stackNumber == stackNumber }.sorted { ($0.stackPosition ?? 0) < ($1.stackPosition ?? 0) }
             if members.count > 1 {
-                return StackLadder(repo: item.repo, number: number, rungs: members.map { rung(entry($0, position: $0.stackPosition ?? 0)) })
+                number = stackNumber
+                entries = members.map { entry($0, position: $0.stackPosition ?? 0) }
             }
         }
-        // A chain by branch: down through base branches, up through PRs based on the head branch.
+        let stacked = Set(entries.map(\.number))
+        if entries.isEmpty { entries = [entry(item, position: 0)] }
+
+        // Down by base branch from the lowest PR.
+        var seen = Set(entries.map(\.number))
         func pick(_ candidates: [Item]) -> Item? {
             candidates.max { ($0.isOpen ? 1 : 0, $0.number) < ($1.isOpen ? 1 : 0, $1.number) }
         }
-        var chain = [item]
-        var seen: Set = [item.number]
-        while chain.count < 30, let base = chain[0].baseRef, base != "main",
+        while entries.count < limit, let base = entries.first?.baseRef, base != Stacks.defaultBranch,
               let below = pick(local.filter { $0.headRef == base && !seen.contains($0.number) })
         {
-            chain.insert(below, at: 0)
+            entries.insert(entry(below, position: 0), at: 0)
             seen.insert(below.number)
         }
-        while chain.count < 30, let head = chain.last?.headRef,
-              let above = pick(local.filter { $0.baseRef == head && $0.isOpen && !seen.contains($0.number) })
-        {
-            chain.append(above)
-            seen.insert(above.number)
+        // Up: open PRs based on any branch here, and on theirs.
+        var frontier = entries.map(\.headRef)
+        while !frontier.isEmpty, entries.count < limit {
+            let heads = Set(frontier)
+            let above = local.filter { $0.isOpen && !seen.contains($0.number) && heads.contains($0.baseRef ?? "") }
+                .sorted { $0.number < $1.number }
+                .prefix(limit - entries.count)
+            entries += above.map { entry($0, position: 0) }
+            seen.formUnion(above.map(\.number))
+            frontier = above.compactMap(\.headRef)
         }
-        guard chain.count > 1 else { return nil }
-        return StackLadder(repo: item.repo, number: nil, rungs: chain.enumerated().map { rung(entry($1, position: $0 + 1)) })
+        guard entries.count > 1 else { return nil }
+
+        // Each PR's GitHub stack and place in it: the detail's, or else as last fetched here.
+        let places: [(stack: Int, position: Int)?] = entries.map { entry in
+            if let number, stacked.contains(entry.number) { return (number, entry.position) }
+            guard let item = byNumber[entry.number], let stack = item.stackNumber, let position = item.stackPosition else { return nil }
+            return (stack, position)
+        }
+        // Parents: the stack member below, or the PR whose head branch is the base.
+        let indexByHead = Dictionary(entries.enumerated().map { ($1.headRef, $0) }, uniquingKeysWith: { a, _ in a })
+        let parents: [(node: Int, link: StackRail.Link)?] = entries.enumerated().map { index, entry in
+            if let place = places[index],
+               let below = entries.indices.filter({ places[$0]?.stack == place.stack && places[$0]!.position < place.position })
+               .max(by: { places[$0]!.position < places[$1]!.position })
+            {
+                return (below, .stack)
+            }
+            if entry.baseRef != Stacks.defaultBranch, let other = indexByHead[entry.baseRef], other != index {
+                return (other, .branch)
+            }
+            return nil
+        }
+        // Siblings: a stack's own next member first, as in the list.
+        let layout = StackLayout.layout(parents: parents) { a, b in
+            ((places[a] == nil ? 1 : 0), entries[a].number) < ((places[b] == nil ? 1 : 0), entries[b].number)
+        }
+        let rungs = layout.map { node, rail in
+            Rung(
+                entry: entries[node], upstream: byNumber[entries[node].number].flatMap(upstreamOf), rail: rail,
+                parent: parents[node].map { entries[$0.node].number }
+            )
+        }
+        return StackLadder(repo: item.repo, number: number, rungs: rungs)
     }
 }

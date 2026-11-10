@@ -85,8 +85,6 @@ final class RunsCellView: NSTableCellView {
     nonisolated static let spacing: CGFloat = 4
     nonisolated static let inset: CGFloat = 2
     private static let dotSize: CGFloat = 7
-    nonisolated static let railWidth: CGFloat = 9
-    private static let railNode: CGFloat = 7
     private static let symbolSize: CGFloat = 13
     private static let imageSize: CGFloat = 13
     private static let chipHeight: CGFloat = 14
@@ -231,7 +229,7 @@ final class RunsCellView: NSTableCellView {
         case .spring:
             0
         case .rail:
-            Self.railWidth
+            StackRailShape.width
         case let .segments(parts, font, _):
             Self.segmentsWidth(parts, font: font)
         }
@@ -312,28 +310,23 @@ final class RunsCellView: NSTableCellView {
 
         case let .rail(rail, node, hollow):
             // The cell spans the row's full height, so lines meet the next row's.
-            let x = rect.minX + Self.railWidth / 2
-            let size = Self.railNode
-            // Lines stop at the node, so a hollow one stays clear on any row background.
-            for (link, from, to) in [(rail.above, bounds.minY, rect.midY - size / 2), (rail.below, rect.midY + size / 2, bounds.maxY)] {
-                guard let link else { continue }
-                let line = NSBezierPath()
-                line.move(to: NSPoint(x: x, y: from))
-                line.line(to: NSPoint(x: x, y: to))
-                line.lineWidth = 1.5
-                if link == .branch { line.setLineDash([2.5, 2], count: 2, phase: 0) }
-                (emphasized ? NSColor.alternateSelectedControlTextColor.withAlphaComponent(0.7) : .tertiaryLabelColor).setStroke()
-                line.stroke()
+            let shape = StackRailShape.layout(rail, in: NSRect(x: rect.minX, y: bounds.minY, width: rect.width, height: bounds.height))
+            (emphasized ? NSColor.alternateSelectedControlTextColor.withAlphaComponent(0.7) : .tertiaryLabelColor).setStroke()
+            for line in shape.lines {
+                let path = NSBezierPath(cgPath: line.path)
+                path.lineWidth = StackRailShape.lineWidth
+                if line.isDashed { path.setLineDash(StackRailShape.dash, count: StackRailShape.dash.count, phase: 0) }
+                path.stroke()
             }
             let color = emphasized ? NSColor.alternateSelectedControlTextColor : node
-            let circle = NSBezierPath(ovalIn: NSRect(x: x - size / 2, y: rect.midY - size / 2, width: size, height: size))
             if hollow {
+                let circle = NSBezierPath(ovalIn: shape.node.insetBy(dx: 0.65, dy: 0.65))
                 circle.lineWidth = 1.3
                 color.setStroke()
                 circle.stroke()
             } else {
                 color.setFill()
-                circle.fill()
+                NSBezierPath(ovalIn: shape.node).fill()
             }
 
         case let .faded(run, opacity):
