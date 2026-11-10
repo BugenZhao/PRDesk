@@ -259,6 +259,11 @@ final class AppDatabase: Sendable {
             // Fetch every item again for its base branch and stack.
             try db.execute(sql: "DELETE FROM meta WHERE key = 'lastSyncStartedAt'")
         }
+        migrator.registerMigration("v20") { db in
+            try db.alter(table: "itemState") { t in
+                t.add(column: "markedUnreadAt", .datetime)
+            }
+        }
         return migrator
     }
 }

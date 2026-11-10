@@ -927,10 +927,14 @@ final class AppModel {
                 }
             } else {
                 // GitHub times are whole seconds: a second before the latest activity by others
-                // leaves just that unread.
+                // leaves just that unread. With none (say, only the viewer and bots so far), the
+                // item is marked unread until seen again.
                 for (item, insight) in rows {
-                    guard let latest = insight.othersActivityAt else { continue }
-                    updateState(item) { $0.seenAt = latest.addingTimeInterval(-1) }
+                    if let latest = insight.othersActivityAt {
+                        updateState(item) { $0.seenAt = latest.addingTimeInterval(-1) }
+                    } else {
+                        updateState(item) { $0.markedUnreadAt = now }
+                    }
                 }
             }
         case .openInBrowser:

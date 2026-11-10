@@ -81,7 +81,8 @@ struct ItemInsight: Hashable, Sendable {
         // The baseline only stands in until the item is first seen, so marking an older item
         // unread (seenAt before the baseline) works.
         let seen = state?.seenAt ?? baseline ?? .distantPast
-        isUnread = (othersActivityAt ?? .distantPast) > seen
+        // Or marked unread with nothing by others to go back to, until seen again.
+        isUnread = (othersActivityAt ?? .distantPast) > seen || (state?.markedUnreadAt).map { $0 > seen } ?? false
 
         isReviewRequestedFromMe = viewer.map(item.isReviewRequested(from:)) ?? false
         // Opinionated reviews are known for the whole PR; other activity only from recent events.

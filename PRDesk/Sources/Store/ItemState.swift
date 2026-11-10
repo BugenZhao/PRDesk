@@ -10,6 +10,8 @@ struct ItemState: Codable, Hashable, Sendable {
     /// Activity by others after this is unread. Opening an item or `n` moves it forward;
     /// `n` on a read item moves it back to just before the latest activity by others.
     var seenAt: Date?
+    /// `n` on a read item with no activity by others to go back to: unread until seen after this.
+    var markedUnreadAt: Date?
     /// The viewer's subscription when the item went Skipped or Muted, put back when it leaves them.
     var subscriptionBeforeQuiet: String?
     /// When the item was last sent to a Grok Bot for each request.
