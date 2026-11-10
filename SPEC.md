@@ -147,7 +147,7 @@ Settings → General → Yab 打开后（默认关），app 把 Pinned 单向同
 
 - **Recently viewed**：最近查看的 8 条（本地）。选中一条即算查看并标已读，没有延迟；只算我自己的选中，列表自己选中的（比如所在行离开列表后选中邻行、启动时恢复选中）不算。在 Recently viewed 里选中只标已读、不改它的顺序，免得 `j` 在最上面两行间来回跳
 - **Pinned**：`p` 置顶的条目（本地）
-- **Working**：Status = Working 的 open 条目，加上我自己开的、没有 Status 的 open 条目；approve 了的 PR 除外；我自己开的排最前，其次 Turn = me 的
+- **Working**：Status = Working 的 open 条目，加上我自己开的、没有 Status 的 open 条目；approve 了的 PR 除外；我自己开的排最前
 - **Good**：同上，已 approve 的 open PR；我自己开的排最前
 - **Triage**：别人开的、未分诊的 open 条目，加上被唤醒的 Skipped 条目；downvote 过的作者的条目沉到底部
 - **Backlog**：Status = Backlog 的 open 条目，默认折叠；我自己开的排最前

@@ -73,7 +73,7 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
         case .pinned:
             "Items you pinned (p). Kept on this Mac, not on the board; they also stay in their own section."
         case .working:
-            "Status Working on the board (old Good and Pending count too), except approved PRs, and your own items without a Status. Your own items go first, then those waiting on you. The subscription is left alone."
+            "Status Working on the board (old Good and Pending count too), except approved PRs, and your own items without a Status. Your own items go first. The subscription is left alone."
         case .good:
             "Status Working (or Good) and approved: waiting to be merged. A PR you approve (here or on the web) goes on the board as Good if it isn't on it yet. Your own items go first."
         case .triage:

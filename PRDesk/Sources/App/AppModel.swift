@@ -1352,9 +1352,9 @@ final class AppModel {
         let waiting = (parity[.parityReview]?.count ?? 0) + (parity[.parityUpstream] ?? []).count { $0.insight.turn == .me }
         if parityWaitingCount != waiting { parityWaitingCount = waiting }
 
-        workingItems = Self.mineFirst(Self.yourMoveFirst(candidates
+        workingItems = Self.mineFirst(candidates
             .filter { [.working, .good].contains(ListSection.triageSection(of: $0)) }
-            .sorted { $0.item.updatedAt > $1.item.updatedAt }))
+            .sorted { $0.item.updatedAt > $1.item.updatedAt })
         let visible = filter.isEmpty ? candidates : candidates.filter { filter.matches($0, badges: badges, contribution: contribution) }
 
         visibleCount = visible.count
@@ -1402,8 +1402,7 @@ final class AppModel {
         for row in ordered {
             if let section = ListSection.triageSection(of: row) { members[section, default: []].append(row) }
         }
-        members[.working] = Self.mineFirst(Self.yourMoveFirst(members[.working] ?? []))
-        for section in [ListSection.good, .backlog] {
+        for section in [ListSection.working, .good, .backlog] {
             members[section] = Self.mineFirst(members[section] ?? [])
         }
         // Downvoted authors still get triaged, just last.
