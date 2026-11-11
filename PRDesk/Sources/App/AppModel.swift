@@ -361,10 +361,10 @@ final class AppModel {
         }
         let board = board(for: item)
         var insight = insight(for: item, state: state)
-        // Merger drives a Merging PR through CI itself; it needs the viewer only for what it
-        // can't fix: conflicts, or an approval gone.
+        // Merger works a Merging PR through conflicts and CI itself; it needs the viewer only once
+        // the approval is gone.
         if item.isOpen, board?.triage == .merging {
-            insight.turn = item.mergeable == "CONFLICTING" || item.reviewDecision != "APPROVED" ? .me : .them
+            insight.turn = item.reviewDecision == "APPROVED" ? .them : .me
         }
         return ItemRow(
             item: item, state: state,

@@ -571,8 +571,8 @@ gray tier.
 - Assigned to me or mentioning me, with others' latest comment newer than mine → `me`
 - Otherwise → `them`
 
-**Merging PRs** (Status = Merging, whoever the author): `me` on conflicts or once the PR is no
-longer approved (what Merger can't fix on its own), `them` otherwise; Merger handles CI itself.
+**Merging PRs** (Status = Merging, whoever the author): `me` once the PR is no longer approved,
+`them` otherwise; Merger works through conflicts and CI itself.
 
 Empty for closed items.
 
