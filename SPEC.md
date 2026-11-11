@@ -193,9 +193,10 @@ Grok Bot as usual:
 **Merging**: Merger tracks what it is merging on the board, so the app sees every merge in flight,
 including ones I asked for in the chat rather than with `r`. Before working on a PR, Merger sets
 its Status to **Merging** (adding it to the board if it isn't there); once merged, the board's
-workflow sets Done. If Merger stops without merging (a conflict the author has to fix, an approval
-gone, a failure it can't get past), it sets the Status back to Working and writes why in the
-Comment field. Only Merger sets Merging: the app never offers it (the detail shows it while an item
+workflow sets Done. Merger works through what comes up on the way itself (trivial conflicts, CI
+failures, possibly in a short-lived Claude session); only when I explicitly take the PR over or
+call the merge off does it set the Status back to Working and write why in the Comment field.
+Only Merger sets Merging: the app never offers it (the detail shows it while an item
 has it), and `w` / `b` / `s` / `m` move an item out as usual. Merging PRs have no group of their
 own: they stay in Good (or Working, once no longer approved), at the bottom, with a purple icon
 (§4.1). The board's "Code review approved"
