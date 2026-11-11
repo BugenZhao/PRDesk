@@ -27,9 +27,6 @@ indirect enum CellRun {
     /// A stack's rail through the row: lines to the rows above and below (dashed where they join
     /// by branch alone), and a node in the item's state color, hollow for a draft.
     case rail(StackRail, node: NSColor, hollow: Bool)
-    /// A run drawn see-through, e.g. a mark for a write still under way. Only the run fades,
-    /// not the cell (see `RunsCellView.opacity`).
-    case faded(CellRun, opacity: CGFloat)
     /// A run left out while a flexible run that isn't optional (e.g. a title) would be cut short,
     /// or, when flexible itself, while it would get less than `minWidth`. The lowest `priority`
     /// goes first; runs of one priority go together.
@@ -220,7 +217,7 @@ final class RunsCellView: NSTableCellView {
             Self.dotSize
         case let .slot(_, width, _):
             width
-        case let .faded(run, _), let .optional(run, _, _):
+        case let .optional(run, _, _):
             naturalWidth(run)
         case .symbol, .icon:
             Self.symbolSize
@@ -328,13 +325,6 @@ final class RunsCellView: NSTableCellView {
                 color.setFill()
                 NSBezierPath(ovalIn: shape.node).fill()
             }
-
-        case let .faded(run, opacity):
-            guard let context = NSGraphicsContext.current?.cgContext else { return draw(run, in: rect) }
-            context.saveGState()
-            context.setAlpha(opacity)
-            draw(run, in: rect)
-            context.restoreGState()
 
         case let .optional(run, _, _):
             draw(run, in: rect)
@@ -554,7 +544,7 @@ private extension CellRun {
         switch self {
         case let .text(string, _, _, _, _), let .chip(string, _), let .tile(string, _): string
         case let .segments(parts, _, _): parts.map(\.text).joined()
-        case let .slot(run?, _, _), let .faded(run, _), let .optional(run, _, _): run.spokenText
+        case let .slot(run?, _, _), let .optional(run, _, _): run.spokenText
 
         default: nil
         }

@@ -289,7 +289,11 @@ private struct DetailHeader: View {
             )) {
                 Text("Triage").tag(TriageStatus?.none)
                 Divider()
-                ForEach(TriageStatus.allCases, id: \.self) { Text($0.rawValue).tag(Optional($0)) }
+                ForEach(TriageStatus.settable, id: \.self) { Text($0.rawValue).tag(Optional($0)) }
+                // Only Merger sets Merging; shown while the item has it, never offered.
+                if triage == .merging {
+                    Text(TriageStatus.merging.rawValue).tag(Optional(TriageStatus.merging)).selectionDisabled()
+                }
             }
             .labelsHidden()
             .fixedSize()

@@ -14,8 +14,6 @@ struct ItemRow: Hashable, Sendable {
     /// In the Parity tab, the other end of the item's pipeline: the upstream PR promoted from a
     /// staging PR, or the staging PR of an upstream one.
     var paired: Item?
-    /// Grok Bot sends still on their way; `state` already shows them as sent.
-    var sending: Set<BotRequest> = []
     /// Its place on a stack's rail, when other members of its stack are in the same section.
     var rail: StackRail?
 
@@ -39,7 +37,7 @@ struct ItemRow: Hashable, Sendable {
 }
 
 enum ListSection: String, CaseIterable, Codable, Sendable {
-    case opened, recent, pinned, working, good, triage, backlog, closed, skipped, muted, inbox
+    case opened, recent, pinned, working, good, merging, triage, backlog, closed, skipped, muted, inbox
     case parityReview, parityDiscussing, parityApproved, parityUpstream, parityParked, parityLanded, parityRejected
 
     var title: String {
@@ -49,6 +47,7 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
         case .pinned: "Pinned"
         case .working: "Working"
         case .good: "Good"
+        case .merging: "Merging"
         case .triage: "Triage"
         case .backlog: "Backlog"
         case .closed: "Recently closed"
@@ -78,6 +77,8 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
             "Status Working on the board (old Good and Pending count too), except approved PRs, and your own items without a Status. Your own items go first. The subscription is left alone."
         case .good:
             "Status Working (or Good) and approved: waiting to be merged. A PR you approve (here or on the web) goes on the board as Good if it isn't on it yet. Your own items go first."
+        case .merging:
+            "Status Merging: Merger has taken the PR on and drives it through CI to the merge, whoever asked it (🚀 here or in the chat). Merger sets it and moves the PR back to Working if it gives up; merged PRs go to Recently closed. Turn is yours only on conflicts or without approval."
         case .triage:
             "No Status yet: not on the board, on it without a Status, or Done but open again. Also Skipped items someone asked you about since, with the reason. Your own items count as Working instead. Downvoted authors go last."
         case .backlog:
@@ -129,6 +130,7 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
         case .backlog: return .backlog
         case .skipped: return .skipped
         case .muted: return .muted
+        case .merging: return .merging
         }
     }
 }

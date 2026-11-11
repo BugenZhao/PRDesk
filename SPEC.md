@@ -68,6 +68,7 @@ Status on its own, with the single exception of approvals below.
 | **Backlog** | I want to follow it, but later (including stalled items and ones I'd rather not think about for now) | Unchanged |
 | **Skipped** | Low quality or low priority; ignored for now | UNSUBSCRIBED (notified only when participating or mentioned) |
 | **Muted** | Not following at all; a friendly close | UNSUBSCRIBED (same as Skipped) |
+| **Merging** | Merger has taken the PR on to merge it; set only by Merger (§3.3), never by the app | Unchanged |
 | **Done** | Merged or closed; set by the board's own workflow, never by the app | Unchanged |
 
 - The names describe only what I did, not a verdict on the PR, since people in the org may see the
@@ -189,6 +190,15 @@ Grok Bot as usual:
   go through the parity agent). Giving a PR number is authorization, so it always asks before
   sending
 
+**Merging**: Merger tracks what it is merging on the board, so the app sees every merge in flight,
+including ones I asked for in the chat rather than with `r`. Before working on a PR, Merger sets
+its Status to **Merging** (adding it to the board if it isn't there); once merged, the board's
+workflow sets Done. If Merger stops without merging (a conflict the author has to fix, an approval
+gone, a failure it can't get past), it sets the Status back to Working and writes why in the
+Comment field. Only Merger sets Merging: the app never offers it (the detail shows it while an item
+has it), and `w` / `b` / `s` / `m` move an item out as usual. The board's "Code review approved"
+workflow may turn a Merging PR back to Good if someone approves it mid-merge; that's accepted
+
 👀 and 🔥 both have Richard open an agent session (Claude Code now, maybe Codex, Kimi and others
 later), and it appends the link to the board's **Session** text field (space-separated, oldest
 first; for 👀 it adds the item to the board if it isn't there, without setting Status). The app only
@@ -207,13 +217,13 @@ The message is `[Sent from PR Desk] <emoji> <link> <title>`; with several select
 a line per item (for 🚀, one batch). Holding ⌥ (`⌥E` / `⌥F` / `⌥R`, or the "…" items that appear in
 the context menu while holding ⌥) opens a send panel first, where a note for the bot can be added;
 it goes at the end of the message after a blank line, verbatim. 🚀 and re-sends always open this
-panel first (the note can be empty; `⌘↩` sends, `esc` cancels). On pressing, the emoji is drawn
-after the title: faint while sending, solid once the CLI returns success and it's stored in the
-local database, and removed (leaving no trace) on failure. Sent items show the matching emoji after
-the title; hovering shows who it went to, how long ago and the note (only the last send of each
-kind is kept). Bot names are set in Settings → Grok Bot (name, unique prefix or id); the CLI shares
-its sign-in with other grokbot copies (`grokbot login`). At build time `scripts/embed-grokbot.sh`
-compiles grokbot-cli at the commit pinned in the script (cached per commit), signs it and puts it in
+panel first (the note can be empty; `⌘↩` sends, `esc` cancels). Nothing is drawn on the row: the
+status bar shows the send, and what it leads to shows on the board (🔥 → Working, 👀 / 🔥 → a
+Session link, 🚀 → Merging). The local database keeps the last send of each kind (when, and the
+note), which is what makes a send a re-send; the context menu checks the kinds already sent. Bot
+names are set in Settings → Grok Bot (name, unique prefix or id); the CLI shares its sign-in with
+other grokbot copies (`grokbot login`). At build time `scripts/embed-grokbot.sh` compiles
+grokbot-cli at the commit pinned in the script (cached per commit), signs it and puts it in
 `Contents/Helpers/`. In tests, dry-run only logs instead of sending.
 
 ## 3.4 Syncing pins to Yab
@@ -275,6 +285,7 @@ Top to bottom:
 - **Working**: open items with Status = Working, plus open items I opened that have no Status;
   approved PRs excluded; mine first
 - **Good**: the same, for approved open PRs; mine first
+- **Merging**: open PRs with Status = Merging: Merger is driving them to the merge; mine first
 - **Triage**: untriaged open items opened by others, plus woken Skipped items; items by downvoted
   authors sink to the bottom
 - **Backlog**: open items with Status = Backlog, collapsed by default; mine first
@@ -555,6 +566,9 @@ gray tier.
 
 - Assigned to me or mentioning me, with others' latest comment newer than mine → `me`
 - Otherwise → `them`
+
+**Merging PRs** (Status = Merging, whoever the author): `me` on conflicts or once the PR is no
+longer approved (what Merger can't fix on its own), `them` otherwise; Merger handles CI itself.
 
 Empty for closed items.
 

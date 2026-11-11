@@ -356,17 +356,21 @@ final class AppModel {
 
     private func row(for item: Item) -> ItemRow {
         var state = state(for: item)
-        var sending: Set<BotRequest> = []
         for (request, send) in botSends[item.id] ?? [:] {
             state.setSent(at: send.at, note: send.note, for: request)
-            if !send.isSent { sending.insert(request) }
+        }
+        let board = board(for: item)
+        var insight = insight(for: item, state: state)
+        // Merger drives a Merging PR through CI itself; it needs the viewer only for what it
+        // can't fix: conflicts, or an approval gone.
+        if item.isOpen, board?.triage == .merging {
+            insight.turn = item.mergeable == "CONFLICTING" || item.reviewDecision != "APPROVED" ? .me : .them
         }
         return ItemRow(
             item: item, state: state,
-            insight: insight(for: item, state: state),
+            insight: insight,
             authorVote: vote(for: item.author),
-            board: board(for: item),
-            sending: sending
+            board: board
         )
     }
 
@@ -1249,7 +1253,7 @@ final class AppModel {
             let row = row(for: item)
             if row.board?.isForeign == true { return false }
             if item.isParity, item.isOpen, !item.isDraft { return true }
-            if let section = ListSection.triageSection(of: row), [.working, .good, .triage].contains(section) { return true }
+            if let section = ListSection.triageSection(of: row), [.working, .good, .merging, .triage].contains(section) { return true }
             return row.state.isPinned || inboxItems.contains(item.repoNumber) || recent.contains(item.id)
         }
         prefetchTask = Task { [weak self, db, engine, logger] in
@@ -1331,7 +1335,7 @@ final class AppModel {
 
     // MARK: Rows
 
-    private static let dashboardSections: [ListSection] = [.recent, .pinned, .working, .good, .triage, .backlog, .closed, .skipped, .muted]
+    private static let dashboardSections: [ListSection] = [.recent, .pinned, .working, .good, .merging, .triage, .backlog, .closed, .skipped, .muted]
 
     private func rebuild() {
         itemsByID = Dictionary(uniqueKeysWithValues: snapshot.items.map { ($0.id, $0) })
@@ -1442,7 +1446,7 @@ final class AppModel {
         for row in ordered {
             if let section = ListSection.triageSection(of: row) { members[section, default: []].append(row) }
         }
-        for section in [ListSection.working, .good, .backlog] {
+        for section in [ListSection.working, .good, .merging, .backlog] {
             members[section] = Self.mineFirst(members[section] ?? [])
         }
         // Downvoted authors still get triaged, just last.

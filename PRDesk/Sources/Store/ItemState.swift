@@ -55,9 +55,6 @@ struct ItemState: Codable, Hashable, Sendable {
         case .merge: (mergeSentAt, mergeNote) = (date, note)
         }
     }
-
-    /// The requests the item was sent with, in `BotRequest` order.
-    var sentRequests: [BotRequest] { BotRequest.allCases.filter { sentAt($0) != nil } }
 }
 
 extension ItemState: FetchableRecord, PersistableRecord {

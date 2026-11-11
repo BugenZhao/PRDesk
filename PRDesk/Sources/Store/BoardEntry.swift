@@ -7,13 +7,19 @@ enum TriageStatus: String, CaseIterable, Codable, Sendable {
     case backlog = "Backlog"
     case skipped = "Skipped"
     case muted = "Muted"
+    /// Merger has taken the PR on to merge it. Merger alone sets it (SPEC §3.3); the app only
+    /// reads it, and moving the item to another Status takes it out.
+    case merging = "Merging"
+
+    /// The Statuses the app sets, in the order it offers them.
+    static let settable: [TriageStatus] = [.working, .backlog, .skipped, .muted]
 
     /// The GitHub subscription that goes with the status; nil leaves it alone. GitHub can't
     /// ignore an issue or PR any more (neither `IGNORED` nor an ignored notification thread takes),
     /// so Muted only unsubscribes, like Skipped; the two differ only in the app.
     var subscription: String? {
         switch self {
-        case .working, .backlog: nil
+        case .working, .backlog, .merging: nil
         case .skipped, .muted: "UNSUBSCRIBED"
         }
     }
@@ -103,6 +109,7 @@ struct BoardEntry: Codable, Hashable, Sendable {
         case "Backlog", "Stale": .backlog
         case "Skipped": .skipped
         case "Muted": .muted
+        case "Merging": .merging
         default: nil
         }
     }
