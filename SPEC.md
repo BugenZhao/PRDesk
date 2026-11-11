@@ -313,8 +313,9 @@ out depth first, each PR's first child (the next level of an official stack firs
 right after it on the same line, other children after the first child's whole subtree, each on a
 new line (like `git log --graph`). Members in different groups stay in their own groups with no
 placeholder rows; a group with only one member of a stack doesn't treat it as a stack. Recently
-viewed, Pinned and Inbox keep their own order and don't gather stacks. The Parity tab's groups
-gather them as well
+viewed (ordered by when each item was opened) and Inbox keep their own order and don't gather
+stacks; Pinned sorts like the other groups and gathers them. The Parity tab's groups gather them as
+well
 
 ### 4.2 Columns
 

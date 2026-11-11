@@ -1455,8 +1455,9 @@ final class AppModel {
         // Downvoted authors still get triaged, just last.
         let triage = members[.triage] ?? []
         members[.triage] = triage.filter { $0.authorVote != .down } + triage.filter { $0.authorVote == .down }
-        // Stacks stay together, where their base sorts; Recently viewed and Pinned keep their order.
-        for section in Self.dashboardSections where section != .recent && section != .pinned {
+        // Stacks stay together, where their base sorts; Recently viewed keeps its order (by when
+        // each item was opened). Pinned sorts like the rest, so its stacks group too.
+        for section in Self.dashboardSections where section != .recent {
             if let rows = members[section] { members[section] = Stacks.grouped(rows) }
         }
 
