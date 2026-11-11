@@ -43,7 +43,7 @@ struct StackPanel: View {
     private var header: some View {
         let index = ladder.rungs.firstIndex { $0.entry.number == item.number }
         let parts = [
-            ladder.number.map { "Stack \($0)" } ?? "Stacked by branch",
+            ladder.number.map { "Stack \($0)" } ?? unofficialTitle,
             index.map { "\($0 + 1) of \(ladder.rungs.count)" },
             ladder.mergedCount > 0 ? "\(ladder.mergedCount) merged" : nil,
         ].compactMap(\.self)
@@ -59,6 +59,13 @@ struct StackPanel: View {
         .foregroundStyle(.secondary)
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
+    }
+
+    /// A stack GitHub doesn't know of: joined by base branches, by commits (from a fork), or both.
+    private var unofficialTitle: String {
+        let links = Set(ladder.rungs.compactMap(\.link))
+        if links == [.commits] { return "Stacked by commits" }
+        return links.contains(.commits) ? "Stacked by branch and commits" : "Stacked by branch"
     }
 
     /// The branch the stack's base PR targets.
@@ -135,7 +142,7 @@ struct StackPanel: View {
             Text(text)
                 .font(.caption)
                 .foregroundStyle(entry.state == .open ? AnyShapeStyle(.orange) : AnyShapeStyle(.tertiary))
-                .help(entry.state == .open ? "Its base is still \(entry.baseRef), the branch of a PR no longer open" : "")
+                .help(entry.state == .open ? staleHelp(rung) : "")
         }
     }
 
@@ -175,13 +182,23 @@ struct StackPanel: View {
         }
     }
 
-    /// The PR below an open one whose branch it is still based on, if that PR is closed or merged.
-    /// A staging PR landed upstream is closed on the fork; it counts as merged.
+    /// The PR below an open one whose branch it is still based on, or whose commits it still
+    /// carries, if that PR is closed or merged. A staging PR landed upstream is closed on the fork;
+    /// it counts as merged.
     private func stalePR(under rung: StackLadder.Rung) -> StackLadder.Rung? {
         guard let index = ladder.rungs.firstIndex(of: rung), index > 0 else { return nil }
         let below = ladder.rungs[index - 1]
-        guard below.entry.state != .open, below.entry.headRef == rung.entry.baseRef else { return nil }
+        guard below.entry.state != .open else { return nil }
+        let onCommits = rung.link == .commits && rung.parent == below.entry.number
+        guard below.entry.headRef == rung.entry.baseRef || onCommits else { return nil }
         return below
+    }
+
+    private func staleHelp(_ rung: StackLadder.Rung) -> String {
+        if rung.link == .commits, let below = stalePR(under: rung) {
+            return "It still carries the commits of #\(below.entry.number), a PR no longer open"
+        }
+        return "Its base is still \(rung.entry.baseRef), the branch of a PR no longer open"
     }
 
     static let rowHeight: CGFloat = 20

@@ -75,8 +75,9 @@ enum ItemQuery {
 
     static let fragments = """
     fragment PRFields on PullRequest {
-      id number title url state isDraft createdAt updatedAt closedAt headRefName baseRefName
+      id number title url state isDraft createdAt updatedAt closedAt headRefName headRefOid baseRefName
       stack { number } stackEntry { position }
+      firstCommit: commits(first: 1) { nodes { commit { oid } } }
       repository { nameWithOwner }
       author { login avatarUrl }
       additions deletions reviewDecision mergeable
@@ -129,6 +130,25 @@ enum ItemQuery {
       }
     }
     """
+
+    /// The commits of PRs that may be stacked by commits (`Stacks.commitParents`).
+    static let commits = """
+    query($ids: [ID!]!) {
+      nodes(ids: $ids) {
+        ... on PullRequest { id headRefOid commits(first: 100) { nodes { commit { oid } } } }
+      }
+    }
+    """
+
+    struct CommitsResponse: Decodable, Sendable {
+        struct Node: Decodable, Sendable {
+            let id: String
+            let headRefOid: String
+            let commits: CommitList
+        }
+
+        let nodes: [Node?]
+    }
 
     static let byNumber = """
     query($owner: String!, $name: String!, $number: Int!) {
@@ -283,6 +303,16 @@ enum ItemQuery {
         let submittedAt: Date?
     }
 
+    /// Some of a PR's commits.
+    struct CommitList: Decodable, Sendable {
+        struct Node: Decodable, Sendable {
+            struct Inner: Decodable, Sendable { let oid: String }
+            let commit: Inner
+        }
+
+        let nodes: [Node?]?
+    }
+
     struct Commit: Decodable, Sendable {
         struct Inner: Decodable, Sendable {
             let statusCheckRollup: Rollup?
@@ -398,9 +428,11 @@ enum ItemQuery {
         let updatedAt: Date
         let closedAt: Date?
         let headRefName: String
+        let headRefOid: String
         let baseRefName: String
         let stack: Stack?
         let stackEntry: StackEntry?
+        let firstCommit: CommitList?
         let repository: Repository
         let author: Actor?
         let additions: Int
@@ -423,6 +455,8 @@ enum ItemQuery {
                 baseRef: baseRefName,
                 stackNumber: stack?.number,
                 stackPosition: stackEntry?.position,
+                firstCommit: firstCommit?.nodes?.first??.commit.oid,
+                headCommit: headRefOid,
                 kind: .pullRequest,
                 title: title,
                 url: url,

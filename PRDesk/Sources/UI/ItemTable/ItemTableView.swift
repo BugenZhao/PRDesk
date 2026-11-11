@@ -750,6 +750,7 @@ struct ItemTableView: NSViewRepresentable {
             } else if let base = item.baseRef {
                 lines.append("Based on \(base)")
             }
+            if let number = rail.onCommitsOf { lines.append("On the commits of #\(number)") }
             if let below = rail.belowElsewhere { lines.append("Based on #\(below), in another group") }
             if !rail.aboveElsewhere.isEmpty {
                 lines.append(rail.aboveElsewhere.map { "#\($0)" }.joined(separator: ", ") + " on top, in another group")

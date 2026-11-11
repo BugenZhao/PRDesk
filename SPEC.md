@@ -307,8 +307,16 @@ too, however many rows. Group headers are separated by lines
 **Stacks**: PRs of one stack in the same group sit together, base on top and the top of the stack at
 the bottom, the whole run placed where the base would sort under the current sort (on any column).
 Stacks are GitHub's official stacks (`stack` / `stackEntry`, members joined by position), plus PRs
-in the same repository whose base branch is another PR's head branch (stacks GitHub doesn't know
-about). Joined by branches, one PR can have several PRs on top of it, so a stack is a tree: laid
+in the same repository whose base branch is another PR's head branch, plus PRs whose commits start
+with another PR's (stacks GitHub doesn't know about). The last are stacks from forks, whose authors
+can't push branches upstream: every level is based on `main` and carries the commits of the levels
+below it until they merge. The list query fetches each PR's first and head commits; for PRs that
+share their first commit (and repository and base branch) with another, each sync fetches their
+first 100 commits once per head. A PR is on the one whose head commit comes last among its own
+commits; with none there (the PR below moved on, e.g. merged `main` in, after this one was cut from
+it), on the earlier PR its commits share the longest start with, where both went on past it.
+Joined by branches or commits, one PR can have several PRs
+on top of it, so a stack is a tree: laid
 out depth first, each PR's first child (the next level of an official stack first, then by number)
 right after it on the same line, other children after the first child's whole subtree, each on a
 new line (like `git log --graph`). Members in different groups stay in their own groups with no
@@ -326,7 +334,7 @@ well
 | Column | Content |
 |---|---|
 | (row) | Closed items are faded as a whole row; so are draft PRs (keeping only the unread dot), setting them apart from PRs waiting for review at a glance |
-| (marker) | The first, narrow column: `•` for unread activity from others (since I last viewed). When the item is in a stack, this column draws the stack's lines (see §4.1), with this dot as the node: the accent color when unread, otherwise gray (the icon before the title shows state), hollow for drafts; a forked child turns from its parent onto its own line to the right; official stacks are joined by solid lines, branch-joined ones by dashed lines. Two lines fit, with narrower spacing for more. Hovering shows the stack number and position, the base branch, and which members are in other groups. Priority has no column of its own, only the row's background (§4.3) |
+| (marker) | The first, narrow column: `•` for unread activity from others (since I last viewed). When the item is in a stack, this column draws the stack's lines (see §4.1), with this dot as the node: the accent color when unread, otherwise gray (the icon before the title shows state), hollow for drafts; a forked child turns from its parent onto its own line to the right; official stacks are joined by solid lines, branch- and commit-joined ones by dashed lines. Two lines fit, with narrower spacing for more. Hovering shows the stack number and position, the base branch, the PR whose commits it starts with (for a commit-joined one), and which members are in other groups. Priority has no column of its own, only the row's background (§4.3) |
 | # | Number; small icons tell PRs and issues apart |
 | Title | State icon + title (leading `[..]` / `xx:` tags faded), a reason tag on woken items; the matching emoji on items sent to Grok Bots, and a `terminal` icon on items with a board Session (§3.3); then the board Comment, if any; a gray summary of the latest event (e.g. `@xx commented 2h`, `you reviewed 2d`) always right-aligned; truncated text (title, comment, summary) shows in full in a tooltip on hover |
 | Author | Avatar + login (italic for first-time contributors) + vote icon; trust marks (seal, org badges, see §5, §5.2) right-aligned |
@@ -470,17 +478,19 @@ gray tier.
 - **Header**: title, author and badges, state (draft / open / merged / closed), CI summary,
   mergeable / conflicts, labels, created and updated times
 - **Stack**: when the PR is in a stack (the official stack from the detail query, plus PRs found by
-  following base branches down and open PRs on any of those branches, all looked up among local
-  items), the header shows a small table with the same tree rail as the list on its left (nodes in
-  place of state icons; staging PRs merged by promotion in purple): a title row
-  `Stack 66533 · 3 of 4 · 2 merged`, then the base branch (`main`) as the first row, then positions
+  following base branches (or the commits a PR starts with) down and open PRs on any of those
+  branches (or starting with those PRs' commits), all looked up among local items), the header
+  shows a small table with the same tree rail as the list on its left (nodes in place of state
+  icons; staging PRs merged by promotion in purple): a title row `Stack 66533 · 3 of 4 · 2 merged`
+  (`Stacked by branch` / `Stacked by commits` in place of the number for stacks GitHub doesn't
+  know about), then the base branch (`main`) as the first row, then positions
   1…N. Adjacent PRs merged together (within a minute, i.e. one stack merge) fold into one row
   `2 merged together · 5h ago` that expands on click; PRs merged on their own get a row each as
   usual. Each row is a state icon, number and title (as in the list: when any row's title doesn't
   fit, every row's leading tags are abbreviated alike, e.g. `[RF][Fix]`), with notes on the right:
   when it was merged / closed; the upstream PR a parity staging PR was promoted to (`⬆#65636` and its
   state, so a closed level on the fork isn't mistaken for a rejection); an orange `on merged #N` for
-  an open PR still on the branch of a merged or closed PR. The current PR is bold and highlighted;
+  an open PR still on the branch, or still carrying the commits, of a merged or closed PR. The current PR is bold and highlighted;
   clicking another row opens it in the app. `⌥↑` / `⌥↓` (with the list or conversation focused)
   move along the stack toward the base / the top. The timeline shows stack join / leave events
 - **Actions**: Status (Triage / Working / Backlog / Skipped / Muted), Priority (H / M / L / –), Pin,

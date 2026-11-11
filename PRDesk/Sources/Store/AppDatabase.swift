@@ -264,6 +264,23 @@ final class AppDatabase: Sendable {
                 t.add(column: "markedUnreadAt", .datetime)
             }
         }
+        migrator.registerMigration("v21") { db in
+            try db.alter(table: "item") { t in
+                t.add(column: "firstCommit", .text)
+                t.add(column: "commitCount", .integer) // no longer stored
+            }
+            // Fetch every item again for its first commit.
+            try db.execute(sql: "DELETE FROM meta WHERE key = 'lastSyncStartedAt'")
+        }
+        migrator.registerMigration("v22") { db in
+            try db.alter(table: "item") { t in
+                t.add(column: "headCommit", .text)
+                t.add(column: "commitOids", .text)
+                t.add(column: "commitsHead", .text)
+            }
+            // Fetch every item again for its head commit.
+            try db.execute(sql: "DELETE FROM meta WHERE key = 'lastSyncStartedAt'")
+        }
         return migrator
     }
 }
@@ -275,7 +292,38 @@ extension AppDatabase {
         guard !items.isEmpty else { return }
         try await writer.write { db in
             for item in items {
-                try item.upsert(db)
+                // The commits a stack is worked out from are fetched apart; keep them.
+                _ = try item.upsertAndFetch(db) { _ in
+                    [Column("commitOids").noOverwrite, Column("commitsHead").noOverwrite]
+                }
+            }
+        }
+    }
+
+    /// PRs sharing their first commit (and repository and base branch) with another, whose
+    /// commits haven't been fetched at their current head: the candidates for a stack from a fork.
+    func stackCommitsDue() async throws -> [String] {
+        try await reader.read { db in
+            try String.fetchAll(db, sql: """
+                SELECT id FROM item
+                WHERE kind = 'pr' AND headCommit IS NOT NULL AND commitsHead IS NOT headCommit
+                  AND (repo, IFNULL(baseRef, ''), firstCommit) IN (
+                    SELECT repo, IFNULL(baseRef, ''), firstCommit FROM item
+                    WHERE kind = 'pr' AND firstCommit IS NOT NULL
+                    GROUP BY repo, IFNULL(baseRef, ''), firstCommit HAVING COUNT(*) > 1)
+                """)
+        }
+    }
+
+    func setCommits(_ commits: [(id: String, oids: [String], head: String)]) async throws {
+        guard !commits.isEmpty else { return }
+        try await writer.write { db in
+            for commit in commits {
+                let json = String(decoding: try JSONEncoder().encode(commit.oids), as: UTF8.self)
+                try db.execute(
+                    sql: "UPDATE item SET commitOids = ?, commitsHead = ? WHERE id = ?",
+                    arguments: [json, commit.head, commit.id]
+                )
             }
         }
     }

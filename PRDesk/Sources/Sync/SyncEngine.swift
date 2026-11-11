@@ -101,12 +101,33 @@ actor SyncEngine {
             await followApprovals(viewer: viewer, readAt: startedAt)
         }
 
+        await fetchStackCommits()
+
         try await db.setMeta(Self.lastSyncKey, Self.format(startedAt))
         if try await db.meta(AppDatabase.baselineKey) == nil {
             try await db.setMeta(AppDatabase.baselineKey, Self.format(startedAt))
         }
         logger.info("Synced \(fetched) items updated since \(since, privacy: .public)")
         return await SyncResult(viewer: viewer, fetched: fetched, finishedAt: Date(), rateLimit: client.rateLimit)
+    }
+
+    /// Fetches the commits of PRs that may be stacked by commits, where their heads moved; a
+    /// failure waits for the next round.
+    private func fetchStackCommits() async {
+        do {
+            let ids = try await db.stackCommitsDue()
+            guard !ids.isEmpty else { return }
+            let fetched = try await Self.concurrently(ids.chunked(ItemQuery.pageSize)) { chunk in
+                try await self.client.query(ItemQuery.commits, variables: ItemQuery.NodesVariables(ids: chunk), as: ItemQuery.CommitsResponse.self)
+                    .nodes.compactMap(\.self)
+            }.flatMap(\.self)
+            try await db.setCommits(fetched.map { node in
+                (node.id, node.commits.nodes?.compactMap { $0?.commit.oid } ?? [], node.headRefOid)
+            })
+            logger.info("Fetched the commits of \(fetched.count) PRs that may be stacked")
+        } catch {
+            logger.error("Failed to fetch stack commits: \(String(describing: error), privacy: .public)")
+        }
     }
 
     private static let approvalsKey = "approvalsFollowedAt"

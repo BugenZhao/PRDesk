@@ -59,7 +59,7 @@ enum StackRailShape {
                     return Line(path: piece, isDashed: false, opacity: opacity)
                 }
             }
-            return [Line(path: path, isDashed: link == .branch)]
+            return [Line(path: path, isDashed: link != .stack)]
         }
         return (lines, node)
     }

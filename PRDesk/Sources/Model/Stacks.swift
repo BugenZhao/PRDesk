@@ -4,9 +4,10 @@ import Foundation
 /// is a tree, since several PRs can be based on one branch (GitHub's own stacks are chains): each
 /// PR's first child continues its lane, the others fork into lanes of their own to the right.
 struct StackRail: Hashable, Sendable {
-    /// How a PR joins the one it is based on: through a GitHub stack, or a base branch that is the
-    /// other PR's head branch (a stack GitHub doesn't know of).
-    enum Link: Hashable, Sendable { case stack, branch }
+    /// How a PR joins the one it is based on: through a GitHub stack, a base branch that is the
+    /// other PR's head branch, or commits that start with the other PR's (the last two are stacks
+    /// GitHub doesn't know of; the commits are how a fork stacks without branches upstream).
+    enum Link: Hashable, Sendable { case stack, branch, commits }
 
     enum Segment: Hashable, Sendable {
         /// From the top of the row down to the node, from the PR this one is based on.
@@ -31,6 +32,8 @@ struct StackRail: Hashable, Sendable {
     /// based on it.
     var belowElsewhere: Int? = nil
     var aboveElsewhere: [Int] = []
+    /// The PR whose commits this one's start with, when that is how it joins the stack.
+    var onCommitsOf: Int? = nil
 
     var hasUp: Bool { segments.contains { if case .up = $0 { true } else { false } } }
     var hasDown: Bool { segments.contains { if case .down = $0 { true } else { false } } }
@@ -115,14 +118,19 @@ enum Stacks {
         // Most sections have no stacks at all.
         func related(_ item: Item) -> Bool { item.stackNumber != nil || (item.baseRef ?? defaultBranch) != defaultBranch }
         let others = elsewhere(of: items, among: pool)
-        guard items.contains(where: related) || !others.isEmpty else { return rows.map(clearingRail) }
+        guard items.contains(where: related) || !others.isEmpty || sharesFirstCommit(items) else { return rows.map(clearingRail) }
         let parents = parents(of: items)
 
         // Stack members in other sections: the PR each row is based on, and those based on it.
         var below = [Int?](repeating: nil, count: rows.count)
         var above = [[Int]](repeating: [], count: rows.count)
+        var onCommits = [Int?](repeating: nil, count: rows.count)
+        let all = others.isEmpty ? parents : Self.parents(of: items + others)
+        let pooled = items + others
+        for (index, parent) in all.enumerated() where index < rows.count {
+            if let parent, parent.link == .commits { onCommits[index] = pooled[parent.node].number }
+        }
         if !others.isEmpty {
-            let all = Self.parents(of: items + others)
             for (index, parent) in all.enumerated() {
                 guard let parent else { continue }
                 if index < rows.count {
@@ -162,13 +170,18 @@ enum Stacks {
         }
 
         /// Adds stubs for the members elsewhere, where the rail has no line of its own that way.
-        func withStubs(_ rail: StackRail?, _ index: Int) -> StackRail? {
-            guard below[index] != nil || !above[index].isEmpty else { return rail }
-            var rail = rail ?? StackRail(lane: 0, laneCount: 1, segments: [])
+        func withStubs(_ laidOut: StackRail?, _ index: Int) -> StackRail? {
+            guard below[index] != nil || !above[index].isEmpty else {
+                var rail = laidOut
+                rail?.onCommitsOf = onCommits[index]
+                return rail
+            }
+            var rail = laidOut ?? StackRail(lane: 0, laneCount: 1, segments: [])
             if below[index] != nil, !rail.hasUp { rail.segments.append(.elsewhereUp(lane: rail.lane)) }
             if !above[index].isEmpty, !rail.hasDown { rail.segments.append(.elsewhereDown(lane: rail.lane)) }
             rail.belowElsewhere = below[index]
             rail.aboveElsewhere = above[index].sorted()
+            rail.onCommitsOf = onCommits[index]
             return rail
         }
 
@@ -198,6 +211,7 @@ enum Stacks {
         var stacks: Set<String> = []
         var heads: Set<String> = []
         var bases: Set<String> = []
+        var commits: Set<String> = []
         var ids: Set<Item.ID> = []
         for item in items {
             ids.insert(item.id)
@@ -206,6 +220,7 @@ enum Stacks {
             if let key = stackKey(item) { stacks.insert(key) }
             if let head = item.headRef { heads.insert("\(repo):\(head)") }
             if let base = item.baseRef, base != defaultBranch { bases.insert("\(repo):\(base)") }
+            if let key = commitKey(item) { commits.insert(key) }
         }
         return pool.filter { item in
             guard item.kind == .pullRequest, !ids.contains(item.id) else { return false }
@@ -213,13 +228,16 @@ enum Stacks {
             if let key = stackKey(item), stacks.contains(key) { return true }
             if let base = item.baseRef, base != defaultBranch, heads.contains("\(repo):\(base)") { return true }
             if let head = item.headRef, bases.contains("\(repo):\(head)") { return true }
+            if let key = commitKey(item), commits.contains(key) { return true }
             return false
         }
     }
 
     /// For each item, the one it is based on among `items`: the member before it in its GitHub
-    /// stack, or else the PR whose head branch is its base branch.
+    /// stack, or else the PR whose head branch is its base branch, or else the PR whose commits
+    /// its own start with.
     static func parents(of items: [Item]) -> [(node: Int, link: StackRail.Link)?] {
+        let onCommits = commitParents(of: items)
         var byHead: [String: Int] = [:]
         var byStack: [String: [(position: Int, index: Int)]] = [:]
         for (index, item) in items.enumerated() where item.kind == .pullRequest {
@@ -242,8 +260,69 @@ enum Stacks {
             {
                 return (other, .branch)
             }
+            if let other = onCommits[index] { return (other, .commits) }
             return nil
         }
+    }
+
+    /// For each item, the PR among `items` whose commits its own start with. A stack from a fork
+    /// looks like this: each PR based on the default branch, carrying the commits of those below
+    /// it until they merge. Candidates share the item's repository, base branch and first commit;
+    /// the parent is the one whose head commit comes last among the item's commits (the closest
+    /// below). With none there (the PR below moved on, e.g. merged the default branch in, after
+    /// this one was cut from it), it is the earlier PR (by number) its commits share the longest
+    /// start with, where both went on past it. Needs the commits fetched for the stack
+    /// (`Item.commitOids`); none is found without them.
+    static func commitParents(of items: [Item]) -> [Int?] {
+        var byKey: [String: [Int]] = [:]
+        for (index, item) in items.enumerated() {
+            if let key = commitKey(item), item.commitOids != nil { byKey[key, default: []].append(index) }
+        }
+        var result = [Int?](repeating: nil, count: items.count)
+        for members in byKey.values where members.count > 1 {
+            for index in members {
+                let item = items[index]
+                guard let commits = item.commitOids, !commits.isEmpty else { continue }
+                let head = item.commitsHead ?? item.headCommit
+                var position: [String: Int] = [:]
+                for (offset, oid) in commits.enumerated() where position[oid] == nil { position[oid] = offset }
+                let carried = members.compactMap { other -> (index: Int, at: Int)? in
+                    guard other != index, let otherHead = items[other].commitsHead ?? items[other].headCommit,
+                          otherHead != head, let at = position[otherHead] else { return nil }
+                    return (other, at)
+                }
+                if let closest = carried.max(by: { ($0.at, items[$0.index].isOpen ? 1 : 0, $0.index) < ($1.at, items[$1.index].isOpen ? 1 : 0, $1.index) }) {
+                    result[index] = closest.index
+                    continue
+                }
+                let diverged = members.compactMap { other -> (index: Int, shared: Int)? in
+                    guard other != index, items[other].number < item.number, let theirs = items[other].commitOids else { return nil }
+                    let shared = zip(commits, theirs).prefix { $0 == $1 }.count
+                    guard shared > 0, shared < commits.count, shared < theirs.count else { return nil }
+                    return (other, shared)
+                }
+                if let closest = diverged.max(by: { ($0.shared, items[$0.index].number) < ($1.shared, items[$1.index].number) }) {
+                    result[index] = closest.index
+                }
+            }
+        }
+        return result
+    }
+
+    /// Whether two of `items` could be stacked by their commits.
+    private static func sharesFirstCommit(_ items: [Item]) -> Bool {
+        var keys: Set<String> = []
+        for item in items {
+            guard let key = commitKey(item) else { continue }
+            if !keys.insert(key).inserted { return true }
+        }
+        return false
+    }
+
+    /// Repository, base branch and first commit: PRs stacked by commits share all three.
+    private static func commitKey(_ item: Item) -> String? {
+        guard item.kind == .pullRequest, let first = item.firstCommit else { return nil }
+        return "\(item.repo.lowercased()):\(item.baseRef ?? defaultBranch):\(first)"
     }
 
     /// Siblings on one base: a GitHub stack's own next member first (it continues the lane), then
@@ -291,8 +370,9 @@ struct StackLadder: Equatable {
         /// For a parity staging PR: the upstream PR promoted from it.
         var upstream: Item?
         var rail: StackRail
-        /// The PR it is based on, if in the ladder.
+        /// The PR it is based on, if in the ladder, and how.
         var parent: Int?
+        var link: StackRail.Link?
         var id: Int { entry.number }
     }
 
@@ -379,6 +459,11 @@ struct StackLadder: Equatable {
         guard item.kind == .pullRequest else { return nil }
         let local = items.filter { $0.kind == .pullRequest && $0.repo.caseInsensitiveCompare(item.repo) == .orderedSame }
         let byNumber = Dictionary(local.map { ($0.number, $0) }, uniquingKeysWith: { a, _ in a })
+        // The PR each one's commits start with.
+        let onCommits = Dictionary(
+            zip(local, Stacks.commitParents(of: local)).compactMap { item, parent in parent.map { (item.number, local[$0].number) } },
+            uniquingKeysWith: { a, _ in a }
+        )
         func entry(_ item: Item, position: Int) -> PRStack.Entry {
             PRStack.Entry(
                 position: position, number: item.number, title: item.title, state: item.state, isDraft: item.isDraft,
@@ -403,27 +488,37 @@ struct StackLadder: Equatable {
         let stacked = Set(entries.map(\.number))
         if entries.isEmpty { entries = [entry(item, position: 0)] }
 
-        // Down by base branch from the lowest PR.
+        // Down by base branch, or the commits it starts with, from the lowest PR.
         var seen = Set(entries.map(\.number))
         func pick(_ candidates: [Item]) -> Item? {
             candidates.max { ($0.isOpen ? 1 : 0, $0.number) < ($1.isOpen ? 1 : 0, $1.number) }
         }
-        while entries.count < limit, let base = entries.first?.baseRef, base != Stacks.defaultBranch,
-              let below = pick(local.filter { $0.headRef == base && !seen.contains($0.number) })
-        {
+        func below(_ lowest: PRStack.Entry) -> Item? {
+            if lowest.baseRef != Stacks.defaultBranch {
+                return pick(local.filter { $0.headRef == lowest.baseRef && !seen.contains($0.number) })
+            }
+            return onCommits[lowest.number].flatMap { seen.contains($0) ? nil : byNumber[$0] }
+        }
+        while entries.count < limit, let lowest = entries.first, let below = below(lowest) {
             entries.insert(entry(below, position: 0), at: 0)
             seen.insert(below.number)
         }
-        // Up: open PRs based on any branch here, and on theirs.
-        var frontier = entries.map(\.headRef)
+        // Up: open PRs based on any branch here or starting with the commits of a PR here, and on
+        // theirs.
+        var frontier = entries
         while !frontier.isEmpty, entries.count < limit {
-            let heads = Set(frontier)
-            let above = local.filter { $0.isOpen && !seen.contains($0.number) && heads.contains($0.baseRef ?? "") }
-                .sorted { $0.number < $1.number }
-                .prefix(limit - entries.count)
-            entries += above.map { entry($0, position: 0) }
+            let heads = Set(frontier.map(\.headRef))
+            let numbers = Set(frontier.map(\.number))
+            let above = local.filter { candidate in
+                candidate.isOpen && !seen.contains(candidate.number)
+                    && (heads.contains(candidate.baseRef ?? "") || onCommits[candidate.number].map(numbers.contains) == true)
+            }
+            .sorted { $0.number < $1.number }
+            .prefix(limit - entries.count)
+            let added = above.map { entry($0, position: 0) }
+            entries += added
             seen.formUnion(above.map(\.number))
-            frontier = above.compactMap(\.headRef)
+            frontier = added
         }
         guard entries.count > 1 else { return nil }
 
@@ -433,8 +528,10 @@ struct StackLadder: Equatable {
             guard let item = byNumber[entry.number], let stack = item.stackNumber, let position = item.stackPosition else { return nil }
             return (stack, position)
         }
-        // Parents: the stack member below, or the PR whose head branch is the base.
+        // Parents: the stack member below, the PR whose head branch is the base, or the PR whose
+        // commits it starts with.
         let indexByHead = Dictionary(entries.enumerated().map { ($1.headRef, $0) }, uniquingKeysWith: { a, _ in a })
+        let indexByNumber = Dictionary(entries.enumerated().map { ($1.number, $0) }, uniquingKeysWith: { a, _ in a })
         let parents: [(node: Int, link: StackRail.Link)?] = entries.enumerated().map { index, entry in
             if let place = places[index],
                let below = entries.indices.filter({ places[$0]?.stack == place.stack && places[$0]!.position < place.position })
@@ -445,6 +542,11 @@ struct StackLadder: Equatable {
             if entry.baseRef != Stacks.defaultBranch, let other = indexByHead[entry.baseRef], other != index {
                 return (other, .branch)
             }
+            if entry.baseRef == Stacks.defaultBranch, let number = onCommits[entry.number],
+               let other = indexByNumber[number], other != index
+            {
+                return (other, .commits)
+            }
             return nil
         }
         // Siblings: a stack's own next member first, as in the list.
@@ -454,7 +556,7 @@ struct StackLadder: Equatable {
         let rungs = layout.map { node, rail in
             Rung(
                 entry: entries[node], upstream: byNumber[entries[node].number].flatMap(upstreamOf), rail: rail,
-                parent: parents[node].map { entries[$0.node].number }
+                parent: parents[node].map { entries[$0.node].number }, link: parents[node]?.link
             )
         }
         return StackLadder(repo: item.repo, number: number, rungs: rungs)

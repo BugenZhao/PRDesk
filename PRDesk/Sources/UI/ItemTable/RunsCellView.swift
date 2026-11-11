@@ -25,7 +25,7 @@ indirect enum CellRun {
     /// Takes whatever width is left over, pushing the runs after it to the far edge.
     case spring
     /// A stack's rail through the row: lines to the rows above and below (dashed where they join
-    /// by branch alone), and a node in the item's state color, hollow for a draft.
+    /// by branch or commits alone), and a node in the item's state color, hollow for a draft.
     case rail(StackRail, node: NSColor, hollow: Bool)
     /// A run left out while a flexible run that isn't optional (e.g. a title) would be cut short,
     /// or, when flexible itself, while it would get less than `minWidth`. The lowest `priority`

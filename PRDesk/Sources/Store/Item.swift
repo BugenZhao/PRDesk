@@ -91,6 +91,16 @@ struct Item: Codable, Hashable, Identifiable, Sendable {
     /// the closest to the base branch.
     var stackNumber: Int? = nil
     var stackPosition: Int? = nil
+    /// A PR's first commit: PRs that share it may be stacked by commits (a stack from a fork, each
+    /// based on the default branch; see `Stacks.commitParents`).
+    var firstCommit: String? = nil
+    /// A PR's head commit.
+    var headCommit: String? = nil
+    /// For a PR that shares its first commit with another, its commits (the first 100) as of the
+    /// head `commitsHead`, which tell which of them it carries. Fetched apart from the list
+    /// (`SyncEngine.fetchStackCommits`), and kept when the list stores the item again.
+    var commitOids: [String]? = nil
+    var commitsHead: String? = nil
     var kind: Kind
     var title: String
     var url: String
