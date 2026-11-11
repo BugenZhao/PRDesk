@@ -219,6 +219,8 @@ private struct RailView: View {
         Canvas { context, size in
             let shape = StackRailShape.layout(rail, in: CGRect(origin: .zero, size: size))
             for line in shape.lines {
+                var context = context
+                context.opacity = line.opacity
                 context.stroke(
                     Path(line.path), with: .style(.tertiary),
                     style: StrokeStyle(lineWidth: StackRailShape.lineWidth, dash: line.isDashed ? StackRailShape.dash : [])

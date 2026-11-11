@@ -312,7 +312,11 @@ about). Joined by branches, one PR can have several PRs on top of it, so a stack
 out depth first, each PR's first child (the next level of an official stack first, then by number)
 right after it on the same line, other children after the first child's whole subtree, each on a
 new line (like `git log --graph`). Members in different groups stay in their own groups with no
-placeholder rows; a group with only one member of a stack doesn't treat it as a stack. Recently
+placeholder rows; a group with only one member of a stack doesn't link it to anything. A member
+whose neighbor in the stack is in another group (or filtered out) gets a short line fading out
+from its node toward the top of the row (the PR it is based on is elsewhere) or the bottom (a PR on
+it is elsewhere), stopping short of the row's edge so it stays apart from in-group links; a lone
+member gets its node for this too. Not drawn where the node already has a line that way. Recently
 viewed (ordered by when each item was opened) and Inbox keep their own order and don't gather
 stacks; Pinned sorts like the other groups and gathers them. The Parity tab's groups gather them as
 well
@@ -322,7 +326,7 @@ well
 | Column | Content |
 |---|---|
 | (row) | Closed items are faded as a whole row; so are draft PRs (keeping only the unread dot), setting them apart from PRs waiting for review at a glance |
-| (marker) | The first, narrow column: `•` for unread activity from others (since I last viewed). When the item is in a stack, this column draws the stack's lines (see §4.1), with this dot as the node: the accent color when unread, otherwise gray (the icon before the title shows state), hollow for drafts; a forked child turns from its parent onto its own line to the right; official stacks are joined by solid lines, branch-joined ones by dashed lines. Two lines fit, with narrower spacing for more. Hovering shows the stack number and position and the base branch. Priority has no column of its own, only the row's background (§4.3) |
+| (marker) | The first, narrow column: `•` for unread activity from others (since I last viewed). When the item is in a stack, this column draws the stack's lines (see §4.1), with this dot as the node: the accent color when unread, otherwise gray (the icon before the title shows state), hollow for drafts; a forked child turns from its parent onto its own line to the right; official stacks are joined by solid lines, branch-joined ones by dashed lines. Two lines fit, with narrower spacing for more. Hovering shows the stack number and position, the base branch, and which members are in other groups. Priority has no column of its own, only the row's background (§4.3) |
 | # | Number; small icons tell PRs and issues apart |
 | Title | State icon + title (leading `[..]` / `xx:` tags faded), a reason tag on woken items; the matching emoji on items sent to Grok Bots, and a `terminal` icon on items with a board Session (§3.3); then the board Comment, if any; a gray summary of the latest event (e.g. `@xx commented 2h`, `you reviewed 2d`) always right-aligned; truncated text (title, comment, summary) shows in full in a tooltip on hover |
 | Author | Avatar + login (italic for first-time contributors) + vote icon; trust marks (seal, org badges, see §5, §5.2) right-aligned |

@@ -1406,6 +1406,8 @@ final class AppModel {
         if mode == .parity {
             var rows = openedRows
             var count = 0
+            // Stack members in other sections (or filtered out) show as stubs.
+            let pool = parity.values.flatMap { $0.map(\.item) }
             for section in Parity.sections {
                 let members = (parity[section] ?? [])
                     .filter { filter.isEmpty || filter.matches($0, badges: badges, contribution: contribution) }
@@ -1414,7 +1416,7 @@ final class AppModel {
                 let isCollapsed = filter.isEmpty && collapsed.contains(section)
                 rows.append(.header(section, count: members.count, collapsed: isCollapsed))
                 if !isCollapsed {
-                    rows += Stacks.grouped(Self.yourMoveFirst(members)).map { .item(section, $0) }
+                    rows += Stacks.grouped(Self.yourMoveFirst(members), among: pool).map { .item(section, $0) }
                 }
             }
             visibleCount = count
@@ -1457,8 +1459,10 @@ final class AppModel {
         members[.triage] = triage.filter { $0.authorVote != .down } + triage.filter { $0.authorVote == .down }
         // Stacks stay together, where their base sorts; Recently viewed keeps its order (by when
         // each item was opened). Pinned sorts like the rest, so its stacks group too.
+        // Members in other sections (or filtered out) show as stubs on the rail.
+        let pool = candidates.map(\.item)
         for section in Self.dashboardSections where section != .recent {
-            if let rows = members[section] { members[section] = Stacks.grouped(rows) }
+            if let rows = members[section] { members[section] = Stacks.grouped(rows, among: pool) }
         }
 
         // Promoted parity PRs live in the Parity tab; the sections they'd be in say how many.

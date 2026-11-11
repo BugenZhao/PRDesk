@@ -741,12 +741,20 @@ struct ItemTableView: NSViewRepresentable {
         }
 
         private static func stackTooltip(_ row: ItemRow) -> String? {
-            guard row.rail != nil else { return nil }
+            guard let rail = row.rail else { return nil }
             let item = row.item
+            var lines: [String] = []
             if let number = item.stackNumber, let position = item.stackPosition {
-                return "Stack \(number), position \(position)" + (item.baseRef.map { "\nBase: \($0)" } ?? "")
+                lines.append("Stack \(number), position \(position)")
+                if let base = item.baseRef { lines.append("Base: \(base)") }
+            } else if let base = item.baseRef {
+                lines.append("Based on \(base)")
             }
-            return item.baseRef.map { "Based on \($0)" }
+            if let below = rail.belowElsewhere { lines.append("Based on #\(below), in another group") }
+            if !rail.aboveElsewhere.isEmpty {
+                lines.append(rail.aboveElsewhere.map { "#\($0)" }.joined(separator: ", ") + " on top, in another group")
+            }
+            return lines.isEmpty ? nil : lines.joined(separator: "\n")
         }
 
         private func authorTooltip(_ author: String?) -> String? {

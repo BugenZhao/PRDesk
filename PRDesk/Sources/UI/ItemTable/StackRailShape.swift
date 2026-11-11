@@ -13,7 +13,12 @@ enum StackRailShape {
     struct Line {
         var path: CGPath
         var isDashed: Bool
+        /// Drawn this much see-through, for the stubs that fade out.
+        var opacity: CGFloat = 1
     }
+
+    /// A stub fades out in two pieces this long, stopping short of the row's edge.
+    private static let stubPiece: CGFloat = 2
 
     /// The lines through a row spanning `rect` (top to bottom, y growing downward) and the
     /// node's frame, with lanes from `rect.minX`.
@@ -24,7 +29,7 @@ enum StackRailShape {
         let radius = nodeSize / 2
         let node = CGRect(x: x(rail.lane) - radius, y: mid - radius, width: nodeSize, height: nodeSize)
         // Lines stop at the node, so a hollow one stays clear on any background.
-        let lines = rail.segments.map { segment -> Line in
+        let lines = rail.segments.flatMap { segment -> [Line] in
             let path = CGMutablePath()
             let link: StackRail.Link
             switch segment {
@@ -44,8 +49,17 @@ enum StackRailShape {
                 link = l
                 path.move(to: CGPoint(x: x(rail.lane) + radius, y: mid))
                 path.addQuadCurve(to: CGPoint(x: x(lane), y: rect.maxY), control: CGPoint(x: x(lane), y: mid))
+            case let .elsewhereUp(lane), let .elsewhereDown(lane):
+                let sign: CGFloat = if case .elsewhereUp = segment { -1 } else { 1 }
+                let start = mid + sign * radius
+                return [0.8, 0.4].enumerated().map { index, opacity in
+                    let piece = CGMutablePath()
+                    piece.move(to: CGPoint(x: x(lane), y: start + sign * stubPiece * CGFloat(index)))
+                    piece.addLine(to: CGPoint(x: x(lane), y: start + sign * stubPiece * CGFloat(index + 1)))
+                    return Line(path: piece, isDashed: false, opacity: opacity)
+                }
             }
-            return Line(path: path, isDashed: link == .branch)
+            return [Line(path: path, isDashed: link == .branch)]
         }
         return (lines, node)
     }

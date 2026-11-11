@@ -17,12 +17,20 @@ struct StackRail: Hashable, Sendable {
         case through(lane: Int, Link)
         /// From the node out to another lane and down, to a child forking off.
         case fork(to: Int, Link)
+        /// A short line fading out from the node toward the top or bottom of the row, short of
+        /// it: the PR it is based on (`up`) or one based on it is in another section.
+        case elsewhereUp(lane: Int)
+        case elsewhereDown(lane: Int)
     }
 
     var lane: Int
     /// Lanes the whole tree uses, so its rows lay their lanes out alike.
     var laneCount: Int
     var segments: [Segment]
+    /// Members of the stack in other sections, for the tooltip: the PR it is based on, and those
+    /// based on it.
+    var belowElsewhere: Int? = nil
+    var aboveElsewhere: [Int] = []
 
     var hasUp: Bool { segments.contains { if case .up = $0 { true } else { false } } }
     var hasDown: Bool { segments.contains { if case .down = $0 { true } else { false } } }
@@ -100,15 +108,30 @@ enum Stacks {
 
     /// `rows`, already in their section's order, with each stack's members gathered at the place
     /// of its base, and their rails set. Stacks are GitHub's stacks, and PRs whose base branch is
-    /// another PR's head branch in the same repository, which can branch out into trees.
-    static func grouped(_ rows: [ItemRow]) -> [ItemRow] {
-        // Most sections have no stacks at all.
-        guard rows.count > 1, rows.contains(where: { $0.item.stackNumber != nil || ($0.item.baseRef ?? defaultBranch) != defaultBranch }) else {
-            return rows.map(clearingRail)
-        }
+    /// another PR's head branch in the same repository, which can branch out into trees. Members
+    /// among `pool` (the tab's other items) but not in `rows` show as stubs on the rail.
+    static func grouped(_ rows: [ItemRow], among pool: [Item] = []) -> [ItemRow] {
         let items = rows.map(\.item)
+        // Most sections have no stacks at all.
+        func related(_ item: Item) -> Bool { item.stackNumber != nil || (item.baseRef ?? defaultBranch) != defaultBranch }
+        let others = elsewhere(of: items, among: pool)
+        guard items.contains(where: related) || !others.isEmpty else { return rows.map(clearingRail) }
         let parents = parents(of: items)
-        guard parents.contains(where: { $0 != nil }) else { return rows.map(clearingRail) }
+
+        // Stack members in other sections: the PR each row is based on, and those based on it.
+        var below = [Int?](repeating: nil, count: rows.count)
+        var above = [[Int]](repeating: [], count: rows.count)
+        if !others.isEmpty {
+            let all = Self.parents(of: items + others)
+            for (index, parent) in all.enumerated() {
+                guard let parent else { continue }
+                if index < rows.count {
+                    if parent.node >= rows.count, parents[index] == nil { below[index] = others[parent.node - rows.count].number }
+                } else if parent.node < rows.count {
+                    above[parent.node].append(others[index - rows.count].number)
+                }
+            }
+        }
 
         var root = Array(0 ..< rows.count)
         func find(_ i: Int) -> Int {
@@ -138,21 +161,60 @@ enum Stacks {
             laidOut[key] = layout.map { (members[$0.node], $0.rail) }
         }
 
+        /// Adds stubs for the members elsewhere, where the rail has no line of its own that way.
+        func withStubs(_ rail: StackRail?, _ index: Int) -> StackRail? {
+            guard below[index] != nil || !above[index].isEmpty else { return rail }
+            var rail = rail ?? StackRail(lane: 0, laneCount: 1, segments: [])
+            if below[index] != nil, !rail.hasUp { rail.segments.append(.elsewhereUp(lane: rail.lane)) }
+            if !above[index].isEmpty, !rail.hasDown { rail.segments.append(.elsewhereDown(lane: rail.lane)) }
+            rail.belowElsewhere = below[index]
+            rail.aboveElsewhere = above[index].sorted()
+            return rail
+        }
+
         var result: [ItemRow] = []
         result.reserveCapacity(rows.count)
         for index in rows.indices {
             guard let tree = laidOut[find(index)] else {
-                result.append(clearingRail(rows[index]))
+                var row = rows[index]
+                row.rail = withStubs(nil, index)
+                result.append(row)
                 continue
             }
             guard tree.first?.node == index else { continue }
             for (member, rail) in tree {
                 var row = rows[member]
-                row.rail = rail
+                row.rail = withStubs(rail, member)
                 result.append(row)
             }
         }
         return result
+    }
+
+    /// The items of `pool` not among `items` that could be in a stack with one of them: in the
+    /// same GitHub stack, based on one's branch, or holding the branch one is based on.
+    private static func elsewhere(of items: [Item], among pool: [Item]) -> [Item] {
+        guard !pool.isEmpty else { return [] }
+        var stacks: Set<String> = []
+        var heads: Set<String> = []
+        var bases: Set<String> = []
+        var ids: Set<Item.ID> = []
+        for item in items {
+            ids.insert(item.id)
+            guard item.kind == .pullRequest else { continue }
+            let repo = item.repo.lowercased()
+            if let key = stackKey(item) { stacks.insert(key) }
+            if let head = item.headRef { heads.insert("\(repo):\(head)") }
+            if let base = item.baseRef, base != defaultBranch { bases.insert("\(repo):\(base)") }
+        }
+        return pool.filter { item in
+            guard item.kind == .pullRequest, !ids.contains(item.id) else { return false }
+            let repo = item.repo.lowercased()
+            if let key = stackKey(item), stacks.contains(key) { return true }
+            if let base = item.baseRef, base != defaultBranch, heads.contains("\(repo):\(base)") { return true }
+            if let head = item.headRef, bases.contains("\(repo):\(head)") { return true }
+            return false
+        }
     }
 
     /// For each item, the one it is based on among `items`: the member before it in its GitHub
@@ -161,7 +223,11 @@ enum Stacks {
         var byHead: [String: Int] = [:]
         var byStack: [String: [(position: Int, index: Int)]] = [:]
         for (index, item) in items.enumerated() where item.kind == .pullRequest {
-            if let head = item.headRef { byHead["\(item.repo.lowercased()):\(head)"] = index }
+            // A branch name can come back on a later PR; the open one, else the first listed.
+            if let head = item.headRef {
+                let key = "\(item.repo.lowercased()):\(head)"
+                if byHead[key].map({ items[$0].isOpen || !item.isOpen }) != true { byHead[key] = index }
+            }
             if let key = stackKey(item), let position = item.stackPosition { byStack[key, default: []].append((position, index)) }
         }
         return items.enumerated().map { index, item in

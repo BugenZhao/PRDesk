@@ -313,7 +313,14 @@ final class RunsCellView: NSTableCellView {
                 let path = NSBezierPath(cgPath: line.path)
                 path.lineWidth = StackRailShape.lineWidth
                 if line.isDashed { path.setLineDash(StackRailShape.dash, count: StackRailShape.dash.count, phase: 0) }
+                guard line.opacity < 1, let context = NSGraphicsContext.current?.cgContext else {
+                    path.stroke()
+                    continue
+                }
+                context.saveGState()
+                context.setAlpha(line.opacity)
                 path.stroke()
+                context.restoreGState()
             }
             let color = emphasized ? NSColor.alternateSelectedControlTextColor : node
             if hollow {
