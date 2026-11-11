@@ -142,6 +142,7 @@ struct BadgeTile: View {
 struct StateIconView: View {
     let item: Item
     var size: CGFloat = 14
+    var isMerging = false
 
     var body: some View {
         Group {
@@ -152,8 +153,8 @@ struct StateIconView: View {
         }
         .scaledToFit()
         .frame(width: size, height: size)
-        .foregroundStyle(Color(nsColor: item.stateColor))
-        .help(item.stateDescription)
+        .foregroundStyle(Color(nsColor: item.stateColor(isMerging: isMerging)))
+        .help(item.stateDescription(isMerging: isMerging))
     }
 }
 

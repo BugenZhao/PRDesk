@@ -196,7 +196,9 @@ its Status to **Merging** (adding it to the board if it isn't there); once merge
 workflow sets Done. If Merger stops without merging (a conflict the author has to fix, an approval
 gone, a failure it can't get past), it sets the Status back to Working and writes why in the
 Comment field. Only Merger sets Merging: the app never offers it (the detail shows it while an item
-has it), and `w` / `b` / `s` / `m` move an item out as usual. The board's "Code review approved"
+has it), and `w` / `b` / `s` / `m` move an item out as usual. Merging PRs have no group of their
+own: they stay in Good (or Working, once no longer approved), at the bottom, with a purple icon
+(§4.1). The board's "Code review approved"
 workflow may turn a Merging PR back to Good if someone approves it mid-merge; that's accepted
 
 👀 and 🔥 both have Richard open an agent session (Claude Code now, maybe Codex, Kimi and others
@@ -253,8 +255,8 @@ through Yab's `yab exec`, with no confirmation prompts.
 │                                                   │ #56492 [Core] Extensible KV cache                  │
 │ ▾ Recently viewed 8                               │ by njhill ◆◆  draft  CI ● 16 failed  conflicts     │
 │ ▾ Pinned 2                                        │ [Triage Working Backlog Skipped Muted] [H M L –]   │
-│ ▾ Working 9                                       │ [Pin] [Open ↗]   Comment: ...                      │
-│ ▾ Good 1                                          │ Conversation | Checks | Files                      │
+│ ▾ Good 1                                          │ [Pin] [Open ↗]   Comment: ...                      │
+│ ▾ Working 9                                       │ Conversation | Checks | Files                      │
 │ ▾ Triage 180                                      │ ...timeline...                                     │
 │ ▸ Backlog 31                                      │                                                    │
 │                                                   │ ┌ Comment box ──────────── Comment / Approve … ┐  │
@@ -282,10 +284,11 @@ Top to bottom:
   Selecting inside Recently viewed only marks read and doesn't reorder it, so `j` doesn't bounce
   between the top two rows
 - **Pinned**: items pinned with `p` (local)
-- **Working**: open items with Status = Working, plus open items I opened that have no Status;
-  approved PRs excluded; mine first
-- **Good**: the same, for approved open PRs; mine first
-- **Merging**: open PRs with Status = Merging: Merger is driving them to the merge; mine first
+- **Good**: open items with Status = Working (or Merging), plus open items I opened that have no
+  Status, that are approved PRs; mine first, then PRs Merger is merging (Status = Merging) last, so
+  what waits for 🚀 comes first. A Merging PR draws its open icon purple (the merge color), unless
+  it is a draft or has conflicts, which keep their own icon
+- **Working**: the same, without approval; mine first
 - **Triage**: untriaged open items opened by others, plus woken Skipped items; items by downvoted
   authors sink to the bottom
 - **Backlog**: open items with Status = Backlog, collapsed by default; mine first

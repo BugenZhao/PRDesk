@@ -195,7 +195,7 @@ enum ItemColumn: String, CaseIterable {
     @MainActor private func titleRuns(_ row: ItemRow, now: Date, abbreviatesTags: Bool) -> [CellRun] {
         let item = row.item
         var runs: [CellRun] = [
-            .icon(item.stateIcon, color: item.stateColor),
+            .icon(item.stateIcon, color: item.stateColor(isMerging: row.isMerging)),
             titleRun(item.title, bold: row.insight.isUnread, abbreviatesTags: abbreviatesTags),
         ]
         if row.board?.sessionLinks.isEmpty == false {
@@ -417,6 +417,20 @@ extension Item {
         case (_, .closed): "Closed"
         case (.issue, .open): "Open"
         }
+    }
+
+    /// An open PR Merger is merging draws its open icon purple, the merge color, unless what the
+    /// icon shows matters more (a draft, conflicts).
+    private func showsMerging(_ isMerging: Bool) -> Bool {
+        isMerging && kind == .pullRequest && state == .open && !isDraft && !hasConflicts
+    }
+
+    func stateColor(isMerging: Bool) -> NSColor {
+        showsMerging(isMerging) ? .systemPurple : stateColor
+    }
+
+    func stateDescription(isMerging: Bool) -> String {
+        showsMerging(isMerging) ? "Open, being merged by Merger" : stateDescription
     }
 
     /// GitHub's state colors: open green, draft gray, merged/completed purple, closed PR red;

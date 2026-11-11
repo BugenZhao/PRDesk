@@ -147,7 +147,7 @@ private struct DetailHeader: View {
                 AvatarView(login: item.author, size: 16)
                 LoginText(login: item.author)
                 BadgeIcons(login: item.author)
-                StateIconView(item: item)
+                StateIconView(item: item, isMerging: item.isOpen && model.board(for: item)?.triage == .merging)
                 stateChip
                 if let ci = item.ci {
                     Button { tab = .checks } label: { CISummary(ci: ci) }

@@ -1253,7 +1253,7 @@ final class AppModel {
             let row = row(for: item)
             if row.board?.isForeign == true { return false }
             if item.isParity, item.isOpen, !item.isDraft { return true }
-            if let section = ListSection.triageSection(of: row), [.working, .good, .merging, .triage].contains(section) { return true }
+            if let section = ListSection.triageSection(of: row), [.working, .good, .triage].contains(section) { return true }
             return row.state.isPinned || inboxItems.contains(item.repoNumber) || recent.contains(item.id)
         }
         prefetchTask = Task { [weak self, db, engine, logger] in
@@ -1335,7 +1335,7 @@ final class AppModel {
 
     // MARK: Rows
 
-    private static let dashboardSections: [ListSection] = [.recent, .pinned, .working, .good, .merging, .triage, .backlog, .closed, .skipped, .muted]
+    private static let dashboardSections: [ListSection] = [.recent, .pinned, .good, .working, .triage, .backlog, .closed, .skipped, .muted]
 
     private func rebuild() {
         itemsByID = Dictionary(uniqueKeysWithValues: snapshot.items.map { ($0.id, $0) })
@@ -1446,9 +1446,12 @@ final class AppModel {
         for row in ordered {
             if let section = ListSection.triageSection(of: row) { members[section, default: []].append(row) }
         }
-        for section in [ListSection.working, .good, .merging, .backlog] {
+        for section in [ListSection.working, .good, .backlog] {
             members[section] = Self.mineFirst(members[section] ?? [])
         }
+        // What waits for 🚀 comes before what Merger is already merging.
+        let good = members[.good] ?? []
+        members[.good] = good.filter { !$0.isMerging } + good.filter(\.isMerging)
         // Downvoted authors still get triaged, just last.
         let triage = members[.triage] ?? []
         members[.triage] = triage.filter { $0.authorVote != .down } + triage.filter { $0.authorVote == .down }
