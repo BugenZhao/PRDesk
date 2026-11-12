@@ -481,6 +481,11 @@ gray tier.
 
 - **Header**: title, author and badges, state (draft / open / merged / closed), CI summary,
   mergeable / conflicts, labels, created and updated times
+  - Double-clicking the title renames the item in place, as in Finder: the title becomes a field
+    in the same font and place with its text selected; Return or clicking away renames it on
+    GitHub, Escape leaves it as it was (an empty or unchanged title does nothing; line breaks
+    become spaces). The new title shows in the header and the list at once and the old one comes
+    back if the write fails
 - **Stack**: when the PR is in a stack (the official stack from the detail query, plus PRs found by
   following base branches (or the commits a PR starts with) down and open PRs on any of those
   branches (or starting with those PRs' commits), all looked up among local items), the header

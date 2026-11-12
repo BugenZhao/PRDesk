@@ -310,8 +310,13 @@ final class AppModel {
     }
 
     var selectedItem: Item? {
-        selection.flatMap { itemsByID[$0.itemID] }
+        _ = selectedItemRevision
+        return selection.flatMap { itemsByID[$0.itemID] }
     }
+
+    /// Bumped when the stored selected item changes, so the detail pane follows changes that don't
+    /// reload its detail (e.g. a rename, which leaves `updatedAt` until the next fetch).
+    private var selectedItemRevision = 0
 
     /// Votes on people, by lowercased login.
     private(set) var votes: [String: Vote] = [:]
@@ -621,6 +626,30 @@ final class AppModel {
         updateState(item) { $0.seenAt = Date() }
         _ = try? await engine.refresh(ids: [item.id])
         loadDetail(force: true)
+    }
+
+    /// Renames the item: the list and detail show the new title at once, and get the old one back
+    /// if GitHub refuses. An empty or unchanged title does nothing; line breaks become spaces.
+    func rename(_ item: Item, to newTitle: String) {
+        let title = newTitle.split(whereSeparator: \.isNewline).joined(separator: " ")
+            .trimmingCharacters(in: .whitespaces)
+        let old = item.title
+        guard !title.isEmpty, title != old else { return }
+        Task {
+            do {
+                try await db.setTitle(title, id: item.id)
+            } catch {
+                logger.error("Storing the new title of #\(item.number) failed: \(String(describing: error), privacy: .public)")
+            }
+            do {
+                try await withActivity("Rename #\(item.number)") {
+                    try await engine.setTitle(title, subjectID: item.id, isPullRequest: item.kind == .pullRequest)
+                }
+            } catch {
+                try? await db.setTitle(old, id: item.id, expected: title)
+                writeError = "Couldn't rename #\(item.number): \(error.localizedDescription)"
+            }
+        }
     }
 
     func renderMarkdown(_ text: String, in item: Item) async throws -> String {
@@ -1352,7 +1381,9 @@ final class AppModel {
     private static let dashboardSections: [ListSection] = [.recent, .pinned, .good, .working, .triage, .backlog, .closed, .skipped, .muted]
 
     private func rebuild() {
+        let selectedBefore = selection.flatMap { itemsByID[$0.itemID] }
         itemsByID = Dictionary(uniqueKeysWithValues: snapshot.items.map { ($0.id, $0) })
+        if let selection, itemsByID[selection.itemID] != selectedBefore { selectedItemRevision += 1 }
         // Sent marks the database now has need no overlay. Stored dates keep milliseconds only.
         for (id, sends) in botSends {
             let stored = snapshot.states[id]

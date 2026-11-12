@@ -328,6 +328,18 @@ extension AppDatabase {
         }
     }
 
+    /// Changes a stored item's title, only while it is still `expected` (when given): a local
+    /// rename shown ahead of GitHub, or taken back.
+    func setTitle(_ title: String, id: String, expected: String? = nil) async throws {
+        try await writer.write { db in
+            if let expected {
+                try db.execute(sql: "UPDATE item SET title = ? WHERE id = ? AND title = ?", arguments: [title, id, expected])
+            } else {
+                try db.execute(sql: "UPDATE item SET title = ? WHERE id = ?", arguments: [title, id])
+            }
+        }
+    }
+
     func items(ids: [String]) async throws -> [Item] {
         try await reader.read { db in try Item.fetchAll(db, keys: ids) }
     }

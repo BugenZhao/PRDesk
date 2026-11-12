@@ -128,6 +128,9 @@ private struct DetailHeader: View {
     let state: ItemState
     @Binding var tab: DetailView.DetailTab
     @State private var isParking = false
+    /// The title being edited in place, and the item it belongs to (kept, so a rename committed
+    /// as another item is selected still goes to this one).
+    @State private var titleEdit: (item: Item, text: String)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
@@ -137,9 +140,15 @@ private struct DetailHeader: View {
                     .monospacedDigit()
                 // No vertical fixedSize: while the window measures its minimum size it proposes a
                 // tiny width, and a fixed-height title would wrap to a window-sized column.
-                titleText
-                    .lineLimit(3)
-                    .textSelection(.enabled)
+                if titleEdit?.item.id == item.id {
+                    titleField
+                } else {
+                    titleText
+                        .lineLimit(3)
+                        .textSelection(.enabled)
+                        // Double-clicking also selects a word; the field then selects the lot.
+                        .simultaneousGesture(TapGesture(count: 2).onEnded { beginTitleEdit() })
+                }
             }
             .font(.title3.weight(.semibold))
 
@@ -185,6 +194,30 @@ private struct DetailHeader: View {
             controls
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        // Moving to another item (e.g. going back) while renaming renames the one being edited.
+        .onChange(of: item.id) { commitTitleEdit() }
+    }
+
+    /// The title as a field in the same place and font, as renaming in Finder: Return or clicking
+    /// away renames the item, Escape leaves it as it was.
+    private var titleField: some View {
+        RenameField(
+            text: Binding(get: { titleEdit?.text ?? "" }, set: { titleEdit?.text = $0 }),
+            font: .systemFont(ofSize: NSFont.preferredFont(forTextStyle: .title3).pointSize, weight: .semibold),
+            onEnd: { commit in
+                if commit { commitTitleEdit() } else { titleEdit = nil }
+            }
+        )
+    }
+
+    private func beginTitleEdit() {
+        titleEdit = (item, item.title)
+    }
+
+    private func commitTitleEdit() {
+        guard let edit = titleEdit else { return }
+        titleEdit = nil
+        model.rename(edit.item, to: edit.text)
     }
 
     /// The title with its leading tags ("[Core] ", "fix(x): ") dimmed and its inline code monospaced.

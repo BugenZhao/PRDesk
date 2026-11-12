@@ -117,6 +117,31 @@ extension SyncEngine {
         }
     }
 
+    /// Renames a PR or issue, then fetches it again so the stored item has GitHub's version.
+    func setTitle(_ title: String, subjectID: String, isPullRequest: Bool) async throws {
+        if isDryRun("rename \(subjectID) to \(title)") { return }
+        if isPullRequest {
+            struct Input: Encodable, Sendable { let pullRequestId: String; let title: String }
+            struct Variables: Encodable, Sendable { let input: Input }
+            _ = try await client.query(
+                "mutation($input: UpdatePullRequestInput!) { updatePullRequest(input: $input) { clientMutationId } }",
+                variables: Variables(input: Input(pullRequestId: subjectID, title: title)),
+                as: [String: Ignored].self,
+                strict: true
+            )
+        } else {
+            struct Input: Encodable, Sendable { let id: String; let title: String }
+            struct Variables: Encodable, Sendable { let input: Input }
+            _ = try await client.query(
+                "mutation($input: UpdateIssueInput!) { updateIssue(input: $input) { clientMutationId } }",
+                variables: Variables(input: Input(id: subjectID, title: title)),
+                as: [String: Ignored].self,
+                strict: true
+            )
+        }
+        _ = try? await refresh(ids: [subjectID])
+    }
+
     /// Adds the viewer's reaction to a comment, review, review comment or description, or takes it back.
     func setReaction(_ content: Reaction.Content, on subjectID: String, reacted: Bool) async throws {
         if isDryRun("\(reacted ? "add" : "remove") \(content.rawValue) reaction on \(subjectID)") { return }
