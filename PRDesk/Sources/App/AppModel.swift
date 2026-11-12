@@ -1267,7 +1267,8 @@ final class AppModel {
                 detail = fresh
                 detailState = .idle
                 let actors = Set(fresh.entries.compactMap(\.actor))
-                Task { try? await self.affiliationEngine.refresh(logins: actors) }
+                // Merged counts too, for what hovering a login in the conversation shows.
+                Task { try? await self.affiliationEngine.refresh(logins: actors, authors: actors) }
             } catch is CancellationError {
             } catch {
                 guard !Task.isCancelled else { return }

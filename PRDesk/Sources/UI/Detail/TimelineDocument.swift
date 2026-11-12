@@ -306,7 +306,8 @@ struct TimelineDocument {
             // A first-timer nothing vouches for is set in italics, as in the list.
             let unvouched = contribution.map { $0.isUnvouched(badges: badges) } ?? false
             let cls = unvouched ? "login unvouched" : "login"
-            let title = unvouched ? #" title="\#(contribution!.summary.htmlEscaped)""# : ""
+            let facts = personFacts(contribution: contribution, badges: badges)
+            let title = facts.isEmpty ? "" : #" title="\#(facts.joined(separator: "\n").htmlEscaped)""#
             var html = #"<span class="person"><span class="\#(cls)"\#(title) data-login="\#(escaped)">\#(escaped)</span>"#
             if let vote = people.vote(for: login) {
                 let title = vote == .up ? "Upvoted" : "Downvoted: sinks to the bottom of Triage"

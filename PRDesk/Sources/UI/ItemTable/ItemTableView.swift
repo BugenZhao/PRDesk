@@ -760,10 +760,8 @@ struct ItemTableView: NSViewRepresentable {
 
         private func authorTooltip(_ author: String?) -> String? {
             guard let author else { return nil }
-            let lines = [author]
-                + (parent.contribution(author).map { [$0.summary] } ?? [])
-                + parent.badges(author).map { "\($0.name) — \($0.source)" }
-            return lines.joined(separator: "\n")
+            return ([author] + personFacts(contribution: parent.contribution(author), badges: parent.badges(author)))
+                .joined(separator: "\n")
         }
 
         private func reusableCell(_ tableView: NSTableView, id: String) -> RunsCellView {

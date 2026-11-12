@@ -31,7 +31,8 @@ struct LoginText: View {
     var body: some View {
         let isMe = sameLogin(login, model.viewer)
         let contribution = model.contribution(for: login)
-        let unvouched = contribution?.isUnvouched(badges: login.map(model.affiliations.badges(for:)) ?? []) ?? false
+        let badges = login.map(model.affiliations.badges(for:)) ?? []
+        let unvouched = contribution?.isUnvouched(badges: badges) ?? false
         HStack(spacing: 3) {
             Button {
                 if let login { AppModel.openProfile(login) }
@@ -45,7 +46,8 @@ struct LoginText: View {
             .disabled(login == nil)
             .pointerStyle(login == nil ? nil : .link)
             .onHover { isHovered = $0 }
-            .help([unvouched ? contribution?.summary : nil, login.map { "Open \($0)'s profile on GitHub" }].compactMap(\.self).joined(separator: "\n"))
+            .help((personFacts(contribution: contribution, badges: badges) + (login.map { ["Open \($0)'s profile on GitHub"] } ?? []))
+                .joined(separator: "\n"))
             if let vote = model.vote(for: login) {
                 Image(systemName: vote.symbol)
                     .font(.caption2)

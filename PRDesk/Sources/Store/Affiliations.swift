@@ -55,6 +55,11 @@ struct Contribution: Hashable, Sendable {
     }
 }
 
+/// What hovering a login says about the person: PRs merged, then each affiliation and its source.
+func personFacts(contribution: Contribution?, badges: [Badge]) -> [String] {
+    (contribution.map { [$0.summary] } ?? []) + badges.map { "\($0.name) — \($0.source)" }
+}
+
 struct Badge: Hashable, Sendable {
     var org: Org
     /// Why the badge applies, shown as a tooltip.
