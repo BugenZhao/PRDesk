@@ -40,3 +40,4 @@ open .build/DerivedData/Build/Products/Debug/PRDesk.app
 - [GRDB.swift](https://github.com/groue/GRDB.swift) (MIT)
 - [highlight.js](https://highlightjs.org) (BSD-3-Clause, `PRDesk/Web/highlight.LICENSE`)
 - [Octicons](https://primer.style/octicons) for the PR state icons (MIT, `PRDesk/octicons.LICENSE`)
+- [Lobe Icons](https://github.com/lobehub/lobe-icons) for the Cohere badge (MIT, `PRDesk/lobe-icons.LICENSE`)

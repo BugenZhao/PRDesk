@@ -402,12 +402,13 @@ Badges mean "trusted": **vLLM committer**, **Inferact**, **Red Hat**, **NVIDIA**
 contributing most in the last six months (picked from the top contributors overall and to the Rust
 frontend): **AMD**, **Intel**, **IBM**, **Hugging Face**, **Mistral AI**, **Meta**, **Google**,
 **DaoCloud**, **Huawei**, **Microsoft**, **Alibaba**, **Ant Group**, **ByteDance**, **Moonshot AI**,
-**Arm**, **Samsung**, **EmbeddedLLM**; and **llm-d**, a project several of those companies run
+**Arm**, **Samsung**, **EmbeddedLLM**, **Cohere**; and **llm-d**, a project several of those companies run
 together, which doesn't stand in for anyone's employer. Projects come before companies: vLLM, then
 llm-d, then the employer (e.g. llm-d then Red Hat). The icons are bundled in the app, never fetched, and are
 transparent graphic marks without text where possible: vLLM, Inferact, NVIDIA, AMD (the arrow),
 Meta, Huawei, Mistral AI, DaoCloud, Alibaba (the Alibaba Cloud mark), Ant Group and Moonshot AI
-mostly come from Simple Icons (AMD and Moonshot white in dark mode); the GitHub org avatars of Red
+mostly come from Simple Icons (AMD and Moonshot white in dark mode); Cohere's from Lobe Icons (MIT,
+its dark green lightened in dark mode); the GitHub org avatars of Red
 Hat, Google, Hugging Face, Microsoft and ByteDance are transparent marks themselves, bundled as
 128 px PNGs; text-only logos (Intel, IBM, Arm, Samsung, EmbeddedLLM) are drawn as small squares in
 the brand color with an abbreviation; llm-d's is the hexagon mark from its website's logo
@@ -453,7 +454,7 @@ matched:
    `Intel Corporation`, not `Intelligence`), e.g. `@Inferact`, `Red Hat`, `AMD`, `@ROCm`
 5. The email domain of the commit authors on the user's PRs (subdomains included, e.g.
    `us.ibm.com`): `redhat.com`, `nvidia.com`, `amd.com`, `intel.com` and so on
-6. Login suffixes, e.g. `-redhat`, `-nv`, `-amd`, `-intel`, `-ibm`
+6. Login suffixes, e.g. `-redhat`, `-nv`, `-amd`, `-intel`, `-ibm`, `-cohere`
 
 `ai-dynamo` stays under NVIDIA rather than getting a badge of its own: nearly everyone working on
 Dynamo whom the repository sees is at NVIDIA anyway.

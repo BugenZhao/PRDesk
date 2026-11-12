@@ -7,7 +7,7 @@ enum Org: String, CaseIterable, Codable, Sendable, Identifiable {
     case vllm, llmd
     case inferact, redhat, nvidia
     case amd, intel, ibm, huggingface, mistral, meta, google, daocloud, huawei, microsoft
-    case alibaba, antgroup, bytedance, moonshot, arm, samsung, embeddedllm
+    case alibaba, antgroup, bytedance, moonshot, arm, samsung, embeddedllm, cohere
 
     var id: String { rawValue }
 
@@ -149,6 +149,10 @@ enum Org: String, CaseIterable, Codable, Sendable, Identifiable {
             Profile(displayName: "EmbeddedLLM", shortLabel: "EL", filterNames: ["embeddedllm"],
                     githubOrgs: ["EmbeddedLLM"], companyPatterns: ["embeddedllm"], emailDomains: ["embeddedllm.com"],
                     brandTile: ("E", "2E1A47"))
+        case .cohere:
+            Profile(displayName: "Cohere", shortLabel: "Co", filterNames: ["cohere"],
+                    githubOrgs: ["cohere-ai", "Cohere-Labs"], companyPatterns: ["cohere"],
+                    emailDomains: ["cohere.com", "cohere.ai"], loginSuffixes: ["-cohere"], logoAsset: "org-cohere")
         case .llmd:
             Profile(displayName: "llm-d", shortLabel: "ld", filterNames: ["llm-d", "llmd"],
                     githubOrgs: ["llm-d", "llm-d-incubation"], companyPatterns: ["llm d"], logoAsset: "org-llmd")
