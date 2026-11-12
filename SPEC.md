@@ -402,13 +402,15 @@ Badges mean "trusted": **vLLM committer**, **Inferact**, **Red Hat**, **NVIDIA**
 contributing most in the last six months (picked from the top contributors overall and to the Rust
 frontend): **AMD**, **Intel**, **IBM**, **Hugging Face**, **Mistral AI**, **Meta**, **Google**,
 **DaoCloud**, **Huawei**, **Microsoft**, **Alibaba**, **Ant Group**, **ByteDance**, **Moonshot AI**,
-**Arm**, **Samsung**, **EmbeddedLLM**. The icons are bundled in the app, never fetched, and are
+**Arm**, **Samsung**, **EmbeddedLLM**; and **llm-d**, a project several of those companies run
+together, so its badge sits after the employer's rather than standing in for it. The icons are bundled in the app, never fetched, and are
 transparent graphic marks without text where possible: vLLM, Inferact, NVIDIA, AMD (the arrow),
 Meta, Huawei, Mistral AI, DaoCloud, Alibaba (the Alibaba Cloud mark), Ant Group and Moonshot AI
 mostly come from Simple Icons (AMD and Moonshot white in dark mode); the GitHub org avatars of Red
 Hat, Google, Hugging Face, Microsoft and ByteDance are transparent marks themselves, bundled as
 128 px PNGs; text-only logos (Intel, IBM, Arm, Samsung, EmbeddedLLM) are drawn as small squares in
-the brand color with an abbreviation. vLLM also has a lower, gray tier (the logo desaturated) for
+the brand color with an abbreviation; llm-d's is the hexagon mark from its website's logo
+(Apache-2.0, with its own dark variant). vLLM also has a lower, gray tier (the logo desaturated) for
 members of the `vllm-project` org and repository collaborators (triage permission or above) who
 aren't committers.
 
@@ -436,8 +438,13 @@ matched:
    members, then repository collaborators (listing collaborators needs push permission; skipped
    without it). `author_association` isn't used: it's attached to a single item, not a person, and
    varies with the viewer's permissions
-3. GitHub org membership: the member lists of `Inferact`, `NVIDIA` / `ai-dynamo` and
-   `RedHatOfficial` / `redhat-et` / `neuralmagic` are fetched daily (all members are visible for
+   - llm-d works the same way: the people in `MAINTAINERS.md` of `llm-d/llm-d` (with their section,
+     e.g. "Project Leadership", on hover), then the approvers and reviewers in the `OWNERS` files
+     and the people in the `CODEOWNERS` files of every active `llm-d` repository (e.g. "approver of
+     llm-d-kv-cache"), fetched in one query; its maintainers are spread across companies (Google,
+     IBM, Red Hat and more), and most aren't public members of the org
+3. GitHub org membership: the member lists of `Inferact`, `NVIDIA` / `ai-dynamo`,
+   `RedHatOfficial` / `redhat-et` / `neuralmagic` and `llm-d` / `llm-d-incubation` are fetched daily (all members are visible for
    orgs you're in, such as Inferact; only public members for the rest); big companies (`amd`,
    `intel`, `google` and so on) have too many public members to list, so only the user's own public
    orgs are checked
@@ -447,7 +454,10 @@ matched:
    `us.ibm.com`): `redhat.com`, `nvidia.com`, `amd.com`, `intel.com` and so on
 6. Login suffixes, e.g. `-redhat`, `-nv`, `-amd`, `-intel`, `-ibm`
 
-User info is cached for 7 days; committers.md, CODEOWNERS, org members and collaborators refresh
+`ai-dynamo` stays under NVIDIA rather than getting a badge of its own: nearly everyone working on
+Dynamo whom the repository sees is at NVIDIA anyway.
+
+User info is cached for 7 days; committers.md, CODEOWNERS, llm-d's maintainers, org members and collaborators refresh
 daily.
 
 Filtering: `org:vllm` matches both tiers, `org:committer` only committers, `org:member` only the

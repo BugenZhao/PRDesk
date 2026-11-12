@@ -240,6 +240,7 @@ private struct AffiliationSettingsView: View {
                 ForEach([Org.inferact, .redhat, .nvidia]) { org in
                     LabeledContent(org.displayName, value: "\(affiliations.members[org]?.count ?? 0) members")
                 }
+                LabeledContent("llm-d", value: "\(affiliations.llmdMaintainers.count) maintainers, \(affiliations.members[.llmd]?.count ?? 0) members")
                 LabeledContent("User profiles", value: "\(affiliations.users.count) fetched")
                 HStack {
                     Spacer()
@@ -256,7 +257,7 @@ private struct AffiliationSettingsView: View {
             } header: {
                 Text("Inferred from public data")
             } footer: {
-                Text("Also matched: profile company, commit email domains and username suffixes such as -redhat. Code owners in CODEOWNERS get the full vLLM badge like committers; vLLM members and collaborators (triage access or more) who are neither get a gray one; filter with org:committer, org:member, or org:vllm for both.")
+                Text("Also matched: profile company, commit email domains and username suffixes such as -redhat. Code owners in CODEOWNERS get the full vLLM badge like committers; vLLM members and collaborators (triage access or more) who are neither get a gray one; filter with org:committer, org:member, or org:vllm for both. llm-d's badge comes from its MAINTAINERS.md, OWNERS and CODEOWNERS files and its org members; filter with org:llm-d.")
                     .foregroundStyle(.secondary)
             }
 

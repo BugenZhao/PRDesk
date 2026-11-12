@@ -88,6 +88,9 @@ struct Affiliations: Equatable, Sendable {
     var members: [Org: Set<String>] = [:]
     /// Lowercased login → role (triage and up), for collaborators on the repository.
     var collaborators: [String: String] = [:]
+    /// Lowercased login → their roles in llm-d, e.g. "llm-d Project Leadership", "approver of
+    /// llm-d, llm-d-kv-cache".
+    var llmdMaintainers: [String: [String]] = [:]
     var users: [String: UserInfo] = [:]
     var overrides: [OrgOverride] = []
 
@@ -95,6 +98,7 @@ struct Affiliations: Equatable, Sendable {
     static let codeOwnersKey = "codeOwners"
     static let membersKey = "orgMembers"
     static let collaboratorsKey = "collaborators"
+    static let llmdMaintainersKey = "llmdMaintainers"
 
     /// Sources in priority order: manual, committers.md (and CODEOWNERS for vLLM), org membership,
     /// profile company, commit email domain, username suffix.
@@ -119,6 +123,9 @@ struct Affiliations: Equatable, Sendable {
     func detectedBadge(org: Org, for login: String) -> Badge? {
         let key = login.lowercased()
         if org == .vllm { return vllmBadge(for: key) }
+        if org == .llmd, let roles = llmdMaintainers[key], !roles.isEmpty {
+            return Badge(org: .llmd, source: roles.joined(separator: "; "))
+        }
         return source(of: org, for: key).map { Badge(org: org, source: $0) }
     }
 
@@ -229,6 +236,7 @@ extension AppDatabase {
                         Org(rawValue: key).map { ($0, Set(logins)) }
                     }),
                     collaborators: meta(Affiliations.collaboratorsKey) ?? [:],
+                    llmdMaintainers: meta(Affiliations.llmdMaintainersKey) ?? [:],
                     users: Dictionary(uniqueKeysWithValues: UserInfo.fetchAll(db).map { ($0.login, $0) }),
                     overrides: OrgOverride.order(Column("login")).fetchAll(db)
                 )

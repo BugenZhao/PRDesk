@@ -2,11 +2,13 @@ import Foundation
 
 /// Affiliations shown as badges next to author names: vLLM itself, then the companies whose people
 /// do most of the work in the repository (picked from the top contributors over half a year,
-/// overall and in the Rust frontend), in roughly that order.
+/// overall and in the Rust frontend), in roughly that order, then llm-d, a project several of
+/// those companies work on, after the employer it doesn't replace.
 enum Org: String, CaseIterable, Codable, Sendable, Identifiable {
     case vllm, inferact, redhat, nvidia
     case amd, intel, ibm, huggingface, mistral, meta, google, daocloud, huawei, microsoft
     case alibaba, antgroup, bytedance, moonshot, arm, samsung, embeddedllm
+    case llmd
 
     var id: String { rawValue }
 
@@ -43,10 +45,14 @@ enum Org: String, CaseIterable, Codable, Sendable, Identifiable {
     /// profiles instead.
     var listsMembers: Bool {
         switch self {
-        case .vllm, .inferact, .redhat, .nvidia: true
+        case .vllm, .inferact, .redhat, .nvidia, .llmd: true
         default: false
         }
     }
+
+    /// An open source project rather than an employer: its badge says nothing about where
+    /// someone works.
+    var isProject: Bool { self == .vllm || self == .llmd }
 
     private struct Profile {
         var displayName: String
@@ -144,6 +150,9 @@ enum Org: String, CaseIterable, Codable, Sendable, Identifiable {
             Profile(displayName: "EmbeddedLLM", shortLabel: "EL", filterNames: ["embeddedllm"],
                     githubOrgs: ["EmbeddedLLM"], companyPatterns: ["embeddedllm"], emailDomains: ["embeddedllm.com"],
                     brandTile: ("E", "2E1A47"))
+        case .llmd:
+            Profile(displayName: "llm-d", shortLabel: "ld", filterNames: ["llm-d", "llmd"],
+                    githubOrgs: ["llm-d", "llm-d-incubation"], companyPatterns: ["llm d"], logoAsset: "org-llmd")
         }
     }
 

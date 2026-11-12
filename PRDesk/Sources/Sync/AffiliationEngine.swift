@@ -41,15 +41,26 @@ actor AffiliationEngine {
         let committersStale = try await isStale(Self.committersFetchedKey, Self.listRefreshInterval)
         // No code owners entry means the lists predate them; fetch them now.
         let predatesCodeOwners = try await db.meta(Affiliations.codeOwnersKey) == nil
-        if force || committersStale || predatesCodeOwners {
+        let predatesLLMD = try await db.meta(Affiliations.llmdMaintainersKey) == nil
+        if force || committersStale || predatesCodeOwners || predatesLLMD {
             try await db.setMetaJSON(Affiliations.committersKey, fetchCommitters())
             try await db.setMetaJSON(Affiliations.codeOwnersKey, fetchCodeOwners())
+            do {
+                try await db.setMetaJSON(Affiliations.llmdMaintainersKey, fetchLLMDMaintainers())
+            } catch {
+                logger.error("llm-d maintainers unavailable: \(error.localizedDescription)")
+                if predatesLLMD { try await db.setMetaJSON(Affiliations.llmdMaintainersKey, [String: [String]]()) }
+            }
             try await db.setMeta(Self.committersFetchedKey, SyncEngine.format(Date()))
         }
         let membersStale = try await isStale(Self.membersFetchedKey, Self.listRefreshInterval)
         // No collaborators entry means the lists predate the vLLM member tier; fetch them now.
         let predatesTier = try await db.meta(Affiliations.collaboratorsKey) == nil
-        if force || membersStale || predatesTier {
+        // An org whose members are listed but missing from the stored lists was just added.
+        let listed: [String: [String]] = try await db.meta(Affiliations.membersKey)
+            .flatMap { try? JSONDecoder().decode([String: [String]].self, from: Data($0.utf8)) } ?? [:]
+        let predatesOrg = Org.allCases.contains { $0.listsMembers && listed[$0.rawValue] == nil }
+        if force || membersStale || predatesTier || predatesOrg {
             try await db.setMetaJSON(Affiliations.membersKey, fetchMembers())
             do {
                 try await db.setMetaJSON(Affiliations.collaboratorsKey, fetchCollaborators())
@@ -98,7 +109,7 @@ actor AffiliationEngine {
             }
             // Commit emails cost a search each, so only look them up when nothing else matched.
             // Being in vllm-project says nothing about an employer.
-            let employers = Org.allCases.filter { $0 != .vllm }
+            let employers = Org.allCases.filter { !$0.isProject }
             let unknown = users.values.filter { user in
                 user.company == nil && !user.orgs.contains { org in employers.contains { $0.githubOrgs.contains { sameLogin($0, org) } } }
             }
@@ -157,6 +168,111 @@ actor AffiliationEngine {
         }
         logger.info("Parsed \(result.count) code owners")
         return result
+    }
+
+    private struct LLMDFiles: Decodable, Sendable {
+        struct Blob: Decodable, Sendable { let text: String? }
+        struct Repo: Decodable, Sendable {
+            let name: String
+            let owners: Blob?
+            let codeOwners: Blob?
+            let githubCodeOwners: Blob?
+        }
+
+        struct Repos: Decodable, Sendable { let nodes: [Repo?]? }
+        struct Organization: Decodable, Sendable { let repositories: Repos }
+        struct Main: Decodable, Sendable { let maintainers: Blob? }
+
+        let organization: Organization?
+        let repository: Main?
+    }
+
+    /// The people who run llm-d and what they do there, in one query: the sections of
+    /// MAINTAINERS.md they're listed under (e.g. "llm-d Project Leadership"), then their strongest
+    /// role in each active repository, the most starred first, grouped by role ("approver of
+    /// llm-d, llm-d-kv-cache"): approver or reviewer in OWNERS, or code owner in CODEOWNERS.
+    /// Teams (`@org/team`), OWNERS aliases and dot repositories (`.github`) are left out.
+    private func fetchLLMDMaintainers() async throws -> [String: [String]] {
+        let query = """
+        query {
+          organization(login: "llm-d") {
+            repositories(first: 100, isArchived: false, orderBy: {field: STARGAZERS, direction: DESC}) {
+              nodes {
+                name
+                owners: object(expression: "HEAD:OWNERS") { ... on Blob { text } }
+                codeOwners: object(expression: "HEAD:CODEOWNERS") { ... on Blob { text } }
+                githubCodeOwners: object(expression: "HEAD:.github/CODEOWNERS") { ... on Blob { text } }
+              }
+            }
+          }
+          repository(owner: "llm-d", name: "llm-d") {
+            maintainers: object(expression: "HEAD:MAINTAINERS.md") { ... on Blob { text } }
+          }
+        }
+        """
+        let files = try await client.query(query, variables: [String: String](), as: LLMDFiles.self)
+        var sections: [String: [String]] = [:]
+        // Tables under "## Section" headings, one person a row: `| Name | Employer | @login |`.
+        if let text = files.repository?.maintainers?.text {
+            var section = "maintainer"
+            for line in text.split(separator: "\n") {
+                if line.hasPrefix("## ") {
+                    section = line.dropFirst(3).trimmingCharacters(in: .whitespaces)
+                } else if line.hasPrefix("|"), let match = line.firstMatch(of: /@([A-Za-z0-9-]+)/) {
+                    let key = match.1.lowercased()
+                    if sections[key]?.contains(section) != true { sections[key, default: []].append(section) }
+                }
+            }
+        }
+        // Login → role → repositories, in order; roles strongest first.
+        let roles = ["approver", "code owner", "reviewer"]
+        var repos: [String: [String: [String]]] = [:]
+        for case let repo? in files.organization?.repositories.nodes ?? [] where !repo.name.hasPrefix(".") {
+            var found: [String: String] = [:]
+            for (login, role) in Self.owners(in: repo.owners?.text ?? "") { found[login] = role }
+            for text in [repo.codeOwners?.text, repo.githubCodeOwners?.text].compactMap(\.self) {
+                for line in text.split(separator: "\n") {
+                    let fields = line.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false)[0].split(whereSeparator: \.isWhitespace)
+                    for owner in fields.dropFirst() where owner.hasPrefix("@") && !owner.contains("/") {
+                        let login = owner.dropFirst().lowercased()
+                        if found[login] != "approver" { found[login] = "code owner" }
+                    }
+                }
+            }
+            for (login, role) in found { repos[login, default: [:]][role, default: []].append(repo.name) }
+        }
+        var result: [String: [String]] = [:]
+        for login in Set(sections.keys).union(repos.keys) where Self.isSafeLogin(login) {
+            result[login] = (sections[login] ?? []).map { "llm-d \($0)" }
+                + roles.compactMap { role in
+                    repos[login]?[role].map { names in
+                        let more = names.count > 3 ? " (+\(names.count - 3))" : ""
+                        return "\(role) of \(names.prefix(3).joined(separator: ", "))\(more)"
+                    }
+                }
+        }
+        logger.info("Parsed \(result.count) llm-d maintainers")
+        return result
+    }
+
+    /// Approvers and reviewers in a Prow OWNERS file (top-level `approvers:` / `reviewers:` lists),
+    /// approvers first.
+    static func owners(in text: String) -> [(login: String, role: String)] {
+        var key: Substring = ""
+        var approvers: [String] = []
+        var reviewers: [String] = []
+        for raw in text.split(separator: "\n") {
+            let line = raw.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false)[0]
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty { continue }
+            if trimmed.hasPrefix("- ") {
+                let login = trimmed.dropFirst(2).trimmingCharacters(in: .whitespaces).lowercased()
+                if key == "approvers" { approvers.append(login) } else if key == "reviewers" { reviewers.append(login) }
+            } else if !line.hasPrefix(" "), !line.hasPrefix("\t"), let colon = line.firstIndex(of: ":") {
+                key = line[..<colon]
+            }
+        }
+        return approvers.map { ($0, "approver") } + reviewers.filter { !approvers.contains($0) }.map { ($0, "reviewer") }
     }
 
     private struct Member: Decodable, Sendable {
