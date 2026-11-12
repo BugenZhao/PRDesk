@@ -7,8 +7,8 @@ enum TriageStatus: String, CaseIterable, Codable, Sendable {
     case backlog = "Backlog"
     case skipped = "Skipped"
     case muted = "Muted"
-    /// Merger has taken the PR on to merge it. Merger alone sets it (SPEC §3.3); the app only
-    /// reads it, and moving the item to another Status takes it out.
+    /// Merger has taken the PR on to merge it. Set by Merger, and by the app on a 🚀 send (SPEC
+    /// §3.3); never offered, and moving the item to another Status takes it out.
     case merging = "Merging"
 
     /// The Statuses the app sets, in the order it offers them.

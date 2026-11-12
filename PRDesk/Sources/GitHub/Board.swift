@@ -292,6 +292,71 @@ extension SyncEngine {
         }
     }
 
+    /// Sets Status Merging on a PR just sent to Merger with 🚀 (SPEC §3.3). The board's automation
+    /// sets an approved PR it has just been given to Good, which would overwrite Merging; so a PR
+    /// not on the board yet (or archived) is put on it first, and Merging goes on once the
+    /// automation has set its Status (or after a while without it). The app shows Merging all along.
+    func setMerging(number: Int, contentID: String) async throws {
+        var entry = try await db.boardEntry(number: number)
+            ?? BoardEntry(number: number, itemID: "", contentID: contentID, isArchived: false)
+        if entry.isForeign { return }
+        if entry.itemID.isEmpty || entry.isArchived {
+            let wasArchived = entry.isArchived
+            entry.isArchived = false
+            entry.status = TriageStatus.merging.rawValue
+            entry.statusAt = Date()
+            boardWrites[number] = Date()
+            try await db.saveBoardEntry(entry)
+            if !isDryRun("add #\(number) to the board and wait for its automation to set the Status") {
+                let schema = try await schema()
+                if entry.itemID.isEmpty {
+                    entry.itemID = try await addToBoard(projectID: schema.projectID, contentID: contentID)
+                    try await db.saveBoardEntry(entry)
+                } else if wasArchived {
+                    try await mutate(
+                        "mutation($input: UnarchiveProjectV2ItemInput!) { unarchiveProjectV2Item(input: $input) { clientMutationId } }",
+                        ["projectId": schema.projectID, "itemId": entry.itemID]
+                    )
+                }
+                try await waitForAutomation(itemID: entry.itemID, number: number)
+            }
+        }
+        try await setTriage(.merging, number: number, contentID: contentID)
+    }
+
+    /// Waits until the board's automation has given a newly added item a Status, keeping the
+    /// sync from undoing the local entry meanwhile.
+    private func waitForAutomation(itemID: String, number: Int) async throws {
+        struct Response: Decodable, Sendable {
+            struct Node: Decodable, Sendable {
+                struct Status: Decodable, Sendable { let name: String? }
+                let status: Status?
+            }
+
+            let node: Node?
+        }
+        let query = """
+        query($id: ID!) {
+          node(id: $id) {
+            ... on ProjectV2Item {
+              status: fieldValueByName(name: "Status") { ... on ProjectV2ItemFieldSingleSelectValue { name } }
+            }
+          }
+        }
+        """
+        let deadline = Date().addingTimeInterval(Self.automationWait)
+        while Date() < deadline {
+            boardWrites[number] = Date()
+            try await Task.sleep(for: .seconds(2))
+            boardWrites[number] = Date()
+            let status = try? await client.query(query, variables: ["id": itemID], as: Response.self).node?.status?.name
+            if status != nil { return }
+        }
+        Self.boardLogger.notice("No Status from the board's automation on #\(number) after \(Self.automationWait) s")
+    }
+
+    private static let automationWait: TimeInterval = 30
+
     /// Sets (or with nil clears) the item's Status, and moves its subscription along with it:
     /// quiet statuses turn notifications down, leaving them turns them back on.
     func setTriage(_ status: TriageStatus?, number: Int, contentID: String) async throws {

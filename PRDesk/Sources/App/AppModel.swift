@@ -1006,6 +1006,7 @@ final class AppModel {
             }
             for item in items { botSends[item.id]?[request]?.isSent = true }
             rebuild()
+            if request == .merge { setMerging(items) }
             for item in items {
                 do {
                     try await db.updateState(item.id) { $0.setSent(at: now, note: note, for: request) }
@@ -1050,6 +1051,19 @@ final class AppModel {
         writeBoard("set the status of \(what)", activity: "\(what) → \(to)", numbers: changes.map(\.item.number)) { engine in
             for change in changes {
                 try await engine.setTriage(change.status, number: change.item.number, contentID: change.item.id)
+            }
+        }
+    }
+
+    /// Marks PRs just sent with 🚀 as Merging on the board, without waiting for Merger to (SPEC
+    /// §3.3). Not undoable, like the send itself.
+    private func setMerging(_ items: [Item]) {
+        let items = items.filter { board(for: $0)?.isForeign != true && board(for: $0)?.triage != .merging }
+        guard !items.isEmpty else { return }
+        let what = items.count == 1 ? "#\(items[0].number)" : "\(items.count) items"
+        writeBoard("set \(what) to Merging", activity: "\(what) → Merging", numbers: items.map(\.number)) { engine in
+            for item in items {
+                try await engine.setMerging(number: item.number, contentID: item.id)
             }
         }
     }

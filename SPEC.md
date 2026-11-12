@@ -68,7 +68,7 @@ Status on its own, with the single exception of approvals below.
 | **Backlog** | I want to follow it, but later (including stalled items and ones I'd rather not think about for now) | Unchanged |
 | **Skipped** | Low quality or low priority; ignored for now | UNSUBSCRIBED (notified only when participating or mentioned) |
 | **Muted** | Not following at all; a friendly close | UNSUBSCRIBED (same as Skipped) |
-| **Merging** | Merger has taken the PR on to merge it; set only by Merger (§3.3), never by the app | Unchanged |
+| **Merging** | Merger has taken the PR on to merge it; set by Merger and by the app on 🚀 (§3.3), never offered as a choice | Unchanged |
 | **Done** | Merged or closed; set by the board's own workflow, never by the app | Unchanged |
 
 - The names describe only what I did, not a verdict on the PR, since people in the org may see the
@@ -196,8 +196,12 @@ its Status to **Merging** (adding it to the board if it isn't there); once merge
 workflow sets Done. Merger works through what comes up on the way itself (trivial conflicts, CI
 failures, possibly in a short-lived Claude session); only when I explicitly take the PR over or
 call the merge off does it set the Status back to Working and write why in the Comment field.
-Only Merger sets Merging: the app never offers it (the detail shows it while an item
-has it), and `w` / `b` / `s` / `m` move an item out as usual. Merging PRs have no group of their
+The app sets Merging itself once a 🚀 send goes through, so it shows at once rather than when
+Merger gets to it. A PR not on the board yet (or archived) is put on it first, and Merging goes on
+only once the board's automation has given it a Status (it sets an approved PR it is given to Good,
+which would overwrite Merging), or after 30 s without one; the app shows Merging all along. Merging
+is never offered as a choice (the detail shows it while an item has it), and `w` / `b` / `s` / `m`
+move an item out as usual. Merging PRs have no group of their
 own: they stay in Good (or Working, once no longer approved), at the bottom, with a purple icon
 (§4.1). The board's "Code review approved"
 workflow may turn a Merging PR back to Good if someone approves it mid-merge; that's accepted
@@ -222,7 +226,7 @@ the context menu while holding ⌥) opens a send panel first, where a note for t
 it goes at the end of the message after a blank line, verbatim. 🚀 and re-sends always open this
 panel first (the note can be empty; `⌘↩` sends, `esc` cancels). Nothing is drawn on the row: the
 status bar shows the send, and what it leads to shows on the board (🔥 → Working, 👀 / 🔥 → a
-Session link, 🚀 → Merging). The local database keeps the last send of each kind (when, and the
+Session link; 🚀 → Merging, which the app sets itself). The local database keeps the last send of each kind (when, and the
 note), which is what makes a send a re-send; the context menu checks the kinds already sent. Bot
 names are set in Settings → Grok Bot (name, unique prefix or id); the CLI shares its sign-in with
 other grokbot copies (`grokbot login`). At build time `scripts/embed-grokbot.sh` compiles
