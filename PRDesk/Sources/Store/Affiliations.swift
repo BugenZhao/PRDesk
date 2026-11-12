@@ -10,6 +10,8 @@ struct UserInfo: Codable, Hashable, Sendable {
     var orgs: [String]
     /// Domains of the user's commit emails in the repository.
     var emailDomains: [String]
+    /// Domain of the public email on the profile; empty when there is none, nil until fetched.
+    var profileEmailDomain: String?
     var fetchedAt: Date
     /// PRs merged in the repository, refreshed on its own schedule.
     var mergedCount: Int?
@@ -194,12 +196,22 @@ struct Affiliations: Equatable, Sendable {
             if let company = user.company, org.matches(company: company) {
                 return "profile company: \(company)"
             }
+            // A public email can be left over from a past job: it counts only when the company
+            // field doesn't name another org.
+            if let domain = user.profileEmailDomain, org.matches(emailDomain: domain),
+               !Org.allCases.contains(where: { $0 != org && !$0.isProject && user.company.map($0.matches(company:)) == true })
+            {
+                return "profile email @\(domain)"
+            }
             if let domain = user.emailDomains.first(where: org.matches(emailDomain:)) {
                 return "commit email @\(domain)"
             }
         }
         if let suffix = org.loginSuffixes.first(where: key.hasSuffix) {
             return "username ends with \(suffix)"
+        }
+        if let prefix = org.loginPrefixes.first(where: key.hasPrefix) {
+            return "username starts with \(prefix)"
         }
         return nil
     }
@@ -208,6 +220,14 @@ struct Affiliations: Equatable, Sendable {
 // MARK: - Database
 
 extension AppDatabase {
+    func saveProfileEmailDomains(_ domains: [String: String]) async throws {
+        try await writer.write { db in
+            for (login, domain) in domains {
+                try db.execute(sql: "UPDATE userInfo SET profileEmailDomain = ? WHERE login = ?", arguments: [domain, login])
+            }
+        }
+    }
+
     func saveMergedCounts(_ counts: [String: Int]) async throws {
         let now = Date()
         try await writer.write { db in

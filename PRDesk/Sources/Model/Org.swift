@@ -8,6 +8,7 @@ enum Org: String, CaseIterable, Codable, Sendable, Identifiable {
     case inferact, redhat, nvidia
     case amd, intel, ibm, huggingface, mistral, meta, google, daocloud, huawei, microsoft
     case alibaba, antgroup, bytedance, moonshot, arm, samsung, embeddedllm, cohere
+    case amazon, baseten, digitalocean, tencent, coreweave
 
     var id: String { rawValue }
 
@@ -35,6 +36,9 @@ enum Org: String, CaseIterable, Codable, Sendable, Identifiable {
 
     var loginSuffixes: [String] { profile.loginSuffixes }
 
+    /// Work accounts named like `amd-someone`.
+    var loginPrefixes: [String] { profile.loginPrefixes }
+
     /// A short label on the brand color (hex), drawn as the badge icon for orgs whose avatar is a
     /// wordmark that can't be read at badge size.
     var brandTile: (text: String, hex: String)? { profile.brandTile }
@@ -61,6 +65,7 @@ enum Org: String, CaseIterable, Codable, Sendable, Identifiable {
         var companyPatterns: [String] = []
         var emailDomains: [String] = []
         var loginSuffixes: [String] = []
+        var loginPrefixes: [String] = []
         var logoAsset: String?
         var brandTile: (text: String, hex: String)?
     }
@@ -82,16 +87,17 @@ enum Org: String, CaseIterable, Codable, Sendable, Identifiable {
         case .nvidia:
             Profile(displayName: "NVIDIA", shortLabel: "NV", filterNames: ["nvidia", "nv"], githubOrgs: ["NVIDIA", "ai-dynamo"],
                     companyPatterns: ["nvidia", "ai dynamo"], emailDomains: ["nvidia.com"], loginSuffixes: ["-nv", "-nvidia"],
+                    loginPrefixes: ["nv-", "nvidia-"],
                     logoAsset: "org-nvidia")
         case .amd:
             Profile(displayName: "AMD", shortLabel: "A", filterNames: ["amd"], githubOrgs: ["AMD", "ROCm", "AMD-AGI"],
                     companyPatterns: ["amd", "rocm", "advanced micro devices"], emailDomains: ["amd.com"],
-                    loginSuffixes: ["-amd"], logoAsset: "org-amd")
+                    loginSuffixes: ["-amd"], loginPrefixes: ["amd-"], logoAsset: "org-amd")
         case .intel:
             Profile(displayName: "Intel", shortLabel: "In", filterNames: ["intel"],
                     githubOrgs: ["intel", "IntelLabs", "intel-analytics", "otcshare", "HabanaAI"],
                     companyPatterns: ["intel", "intellabs", "habana"], emailDomains: ["intel.com", "habana.ai"],
-                    loginSuffixes: ["-intel"], brandTile: ("intel", "0068B5"))
+                    loginSuffixes: ["-intel"], loginPrefixes: ["intel-"], brandTile: ("intel", "0068B5"))
         case .ibm:
             Profile(displayName: "IBM", shortLabel: "IB", filterNames: ["ibm"], githubOrgs: ["IBM", "IBMResearch"],
                     companyPatterns: ["ibm", "ibmresearch"], emailDomains: ["ibm.com"], loginSuffixes: ["-ibm"],
@@ -124,7 +130,7 @@ enum Org: String, CaseIterable, Codable, Sendable, Identifiable {
                     emailDomains: ["microsoft.com"], loginSuffixes: ["-msft"], logoAsset: "org-microsoft")
         case .alibaba:
             Profile(displayName: "Alibaba", shortLabel: "Al", filterNames: ["alibaba", "qwen"],
-                    githubOrgs: ["alibaba", "QwenLM"], companyPatterns: ["alibaba", "aliyun", "qwen"],
+                    githubOrgs: ["alibaba", "QwenLM"], companyPatterns: ["alibaba", "aliyun", "qwen", "baba"],
                     emailDomains: ["alibaba-inc.com", "alibaba.com", "aliyun.com"], logoAsset: "org-alibaba")
         case .antgroup:
             Profile(displayName: "Ant Group", shortLabel: "An", filterNames: ["ant", "antgroup"],
@@ -143,7 +149,7 @@ enum Org: String, CaseIterable, Codable, Sendable, Identifiable {
                     companyPatterns: ["arm"], emailDomains: ["arm.com"], brandTile: ("arm", "0091BD"))
         case .samsung:
             Profile(displayName: "Samsung", shortLabel: "Sa", filterNames: ["samsung"],
-                    githubOrgs: ["Samsung", "SamsungLabs"], companyPatterns: ["samsung"], emailDomains: ["samsung.com"],
+                    githubOrgs: ["Samsung", "SamsungLabs"], companyPatterns: ["samsung", "samsungds"], emailDomains: ["samsung.com"],
                     brandTile: ("S", "1428A0"))
         case .embeddedllm:
             Profile(displayName: "EmbeddedLLM", shortLabel: "EL", filterNames: ["embeddedllm"],
@@ -153,6 +159,28 @@ enum Org: String, CaseIterable, Codable, Sendable, Identifiable {
             Profile(displayName: "Cohere", shortLabel: "Co", filterNames: ["cohere"],
                     githubOrgs: ["cohere-ai", "Cohere-Labs"], companyPatterns: ["cohere"],
                     emailDomains: ["cohere.com", "cohere.ai"], loginSuffixes: ["-cohere"], logoAsset: "org-cohere")
+        case .amazon:
+            Profile(displayName: "Amazon", shortLabel: "Am", filterNames: ["amazon", "aws"],
+                    githubOrgs: ["aws", "awslabs", "amzn", "amazon-science", "aws-neuron", "aws-samples"],
+                    companyPatterns: ["amazon", "aws", "annapurna labs"],
+                    emailDomains: ["amazon.com", "amazon.co.uk", "amazon.de", "amazon.co.jp", "amazon.cn"],
+                    loginSuffixes: ["-aws", "-amzn", "-amazon"], loginPrefixes: ["aws-", "amzn-"], logoAsset: "org-amazon")
+        case .baseten:
+            Profile(displayName: "Baseten", shortLabel: "Ba", filterNames: ["baseten"], githubOrgs: ["basetenlabs"],
+                    companyPatterns: ["baseten", "basetenlabs"], emailDomains: ["baseten.co"],
+                    loginSuffixes: ["-baseten"], logoAsset: "org-baseten")
+        case .digitalocean:
+            Profile(displayName: "DigitalOcean", shortLabel: "DO", filterNames: ["digitalocean", "do"],
+                    githubOrgs: ["digitalocean"], companyPatterns: ["digitalocean", "digital ocean"],
+                    emailDomains: ["digitalocean.com"], loginSuffixes: ["-digitalocean"], logoAsset: "org-digitalocean")
+        case .tencent:
+            Profile(displayName: "Tencent", shortLabel: "Te", filterNames: ["tencent"],
+                    githubOrgs: ["Tencent", "TencentCloud", "Tencent-Hunyuan"], companyPatterns: ["tencent"],
+                    emailDomains: ["tencent.com"], loginSuffixes: ["-tencent"], logoAsset: "org-tencent")
+        case .coreweave:
+            Profile(displayName: "CoreWeave", shortLabel: "CW", filterNames: ["coreweave"], githubOrgs: ["coreweave"],
+                    companyPatterns: ["coreweave"], emailDomains: ["coreweave.com"], loginSuffixes: ["-coreweave"],
+                    logoAsset: "org-coreweave")
         case .llmd:
             Profile(displayName: "llm-d", shortLabel: "ld", filterNames: ["llm-d", "llmd"],
                     githubOrgs: ["llm-d", "llm-d-incubation"], companyPatterns: ["llm d"], logoAsset: "org-llmd")

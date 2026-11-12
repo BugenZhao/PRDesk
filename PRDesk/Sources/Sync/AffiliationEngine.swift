@@ -21,6 +21,7 @@ actor AffiliationEngine {
     private static let mergedPerRound = 20
     private static let userBatchSize = 40
     private static let emailBatchSize = 10
+    private static let profileEmailBatchSize = 100
 
     private let client: GitHubClient
     private let db: AppDatabase
@@ -80,7 +81,15 @@ actor AffiliationEngine {
             try await refreshUsers(stale, known: known)
         }
 
-        let current = try await db.userInfos()
+        var current = try await db.userInfos()
+        // Profiles fetched before public emails were read; one cheap query per 100 people.
+        let missingEmails = people.filter { current[$0] != nil && current[$0]?.profileEmailDomain == nil }
+        if !missingEmails.isEmpty {
+            for batch in missingEmails.chunked(Self.profileEmailBatchSize) {
+                try await db.saveProfileEmailDomains(fetchProfileEmailDomains(batch))
+            }
+            current = try await db.userInfos()
+        }
         let now = Date()
         // Missing counts first, then the oldest; the rest wait for later rounds.
         let mergedStale = authors.map { $0.lowercased() }
@@ -112,6 +121,7 @@ actor AffiliationEngine {
             let employers = Org.allCases.filter { !$0.isProject }
             let unknown = users.values.filter { user in
                 user.company == nil && !user.orgs.contains { org in employers.contains { $0.githubOrgs.contains { sameLogin($0, org) } } }
+                    && !employers.contains { org in user.profileEmailDomain.map(org.matches(emailDomain:)) == true }
             }
             for emailBatch in unknown.map(\.login).chunked(Self.emailBatchSize) {
                 for (login, domains) in try await fetchEmailDomains(emailBatch) {
@@ -347,7 +357,36 @@ actor AffiliationEngine {
 
         let login: String
         let company: String?
+        let email: String?
         let organizations: Orgs
+    }
+
+    /// The domain of a public profile email, lowercased; empty for none.
+    private static func domain(of email: String?) -> String {
+        guard let email, let at = email.lastIndex(of: "@") else { return "" }
+        return email[email.index(after: at)...].trimmingCharacters(in: .whitespaces).lowercased()
+    }
+
+    /// An organization login comes back as an empty object.
+    private struct EmailNode: Decodable, Sendable {
+        let login: String?
+        let email: String?
+    }
+
+    /// Public profile email domains, for profiles stored before they were read. Logins that
+    /// aren't users (bots, deleted accounts) come back null, and get an empty domain.
+    private func fetchProfileEmailDomains(_ logins: [String]) async throws -> [String: String] {
+        let safe = logins.filter(Self.isSafeLogin)
+        guard !safe.isEmpty else { return [:] }
+        let fields = safe.enumerated().map { index, login in
+            "u\(index): repositoryOwner(login: \"\(login)\") { ... on User { login email } }"
+        }
+        let response = try await client.query("query { \(fields.joined(separator: "\n")) }", variables: [String: String](), as: [String: EmailNode?].self)
+        var result = Dictionary(uniqueKeysWithValues: safe.map { ($0, "") })
+        for case let node? in response.values {
+            if let login = node.login { result[login.lowercased()] = Self.domain(of: node.email) }
+        }
+        return result
     }
 
     /// Logins are `[A-Za-z0-9-]`, so they can be inlined in aliased fields safely.
@@ -359,14 +398,14 @@ actor AffiliationEngine {
         let safe = logins.filter(Self.isSafeLogin)
         guard !safe.isEmpty else { return [:] }
         let fields = safe.enumerated().map { index, login in
-            "u\(index): user(login: \"\(login)\") { login company organizations(first: 30) { nodes { login } } }"
+            "u\(index): user(login: \"\(login)\") { login company email organizations(first: 30) { nodes { login } } }"
         }
         let response = try await client.query("query { \(fields.joined(separator: "\n")) }", variables: [String: String](), as: [String: UserNode?].self)
         let now = Date()
         var result: [String: UserInfo] = [:]
         // Users that no longer exist still get a row, so they aren't re-fetched every time.
         for login in safe {
-            result[login] = UserInfo(login: login, company: nil, orgs: [], emailDomains: [], fetchedAt: now)
+            result[login] = UserInfo(login: login, company: nil, orgs: [], emailDomains: [], profileEmailDomain: "", fetchedAt: now)
         }
         for case let node? in response.values {
             let key = node.login.lowercased()
@@ -376,6 +415,7 @@ actor AffiliationEngine {
                 company: company?.isEmpty == false ? company : nil,
                 orgs: node.organizations.nodes?.compactMap { $0?.login } ?? [],
                 emailDomains: [],
+                profileEmailDomain: Self.domain(of: node.email),
                 fetchedAt: now
             )
         }
