@@ -1,14 +1,13 @@
 import Foundation
 
-/// Affiliations shown as badges next to author names: vLLM itself, then the companies whose people
-/// do most of the work in the repository (picked from the top contributors over half a year,
-/// overall and in the Rust frontend), in roughly that order, then llm-d, a project several of
-/// those companies work on, after the employer it doesn't replace.
+/// Affiliations shown as badges next to author names, projects before employers: vLLM itself and
+/// llm-d, then the companies whose people do most of the work in the repository (picked from the
+/// top contributors over half a year, overall and in the Rust frontend), in roughly that order.
 enum Org: String, CaseIterable, Codable, Sendable, Identifiable {
-    case vllm, inferact, redhat, nvidia
+    case vllm, llmd
+    case inferact, redhat, nvidia
     case amd, intel, ibm, huggingface, mistral, meta, google, daocloud, huawei, microsoft
     case alibaba, antgroup, bytedance, moonshot, arm, samsung, embeddedllm
-    case llmd
 
     var id: String { rawValue }
 

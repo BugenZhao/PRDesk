@@ -403,7 +403,8 @@ contributing most in the last six months (picked from the top contributors overa
 frontend): **AMD**, **Intel**, **IBM**, **Hugging Face**, **Mistral AI**, **Meta**, **Google**,
 **DaoCloud**, **Huawei**, **Microsoft**, **Alibaba**, **Ant Group**, **ByteDance**, **Moonshot AI**,
 **Arm**, **Samsung**, **EmbeddedLLM**; and **llm-d**, a project several of those companies run
-together, so its badge sits after the employer's rather than standing in for it. The icons are bundled in the app, never fetched, and are
+together, which doesn't stand in for anyone's employer. Projects come before companies: vLLM, then
+llm-d, then the employer (e.g. llm-d then Red Hat). The icons are bundled in the app, never fetched, and are
 transparent graphic marks without text where possible: vLLM, Inferact, NVIDIA, AMD (the arrow),
 Meta, Huawei, Mistral AI, DaoCloud, Alibaba (the Alibaba Cloud mark), Ant Group and Moonshot AI
 mostly come from Simple Icons (AMD and Moonshot white in dark mode); the GitHub org avatars of Red
