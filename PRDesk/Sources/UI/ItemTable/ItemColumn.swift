@@ -133,7 +133,6 @@ enum ItemColumn: String, CaseIterable {
             return titleRuns(row, now: now, abbreviatesTags: abbreviatesTags)
 
         case .author, .avatar:
-            let vote: [CellRun] = row.authorVote.map { [.symbol($0.symbol, color: $0.nsColor)] } ?? []
             let orgBadges = item.author.map(badges) ?? []
             let contribution = item.author.flatMap(contribution)
             // An org badge already says the author is established.
@@ -145,11 +144,10 @@ enum ItemColumn: String, CaseIterable {
             let avatar: CellRun = .avatar(item.author.flatMap(AvatarCache.shared.image(for:)))
             // Marks of trust sit at the right edge, so they line up down the column.
             if self == .avatar {
-                // Room for two marks, the vote first; the tooltip names the rest. At the right edge,
-                // as in Author.
-                return [avatar, .spring] + (vote + seal + orgBadges.map(\.cellRun)).prefix(2)
+                // Room for two marks; the tooltip names the rest. At the right edge, as in Author.
+                return [avatar, .spring] + (seal + orgBadges.map(\.cellRun)).prefix(2)
             }
-            return [avatar, name] + vote + [.spring] + seal + orgBadges.map(\.cellRun)
+            return [avatar, name, .spring] + seal + orgBadges.map(\.cellRun)
 
         case .link:
             guard let paired = row.paired else { return [] }
@@ -347,21 +345,6 @@ extension NSColor {
     }
 }
 
-extension Vote {
-    var symbol: String {
-        switch self {
-        case .up: "hand.thumbsup.fill"
-        case .down: "hand.thumbsdown.fill"
-        }
-    }
-
-    var nsColor: NSColor {
-        switch self {
-        case .up: .systemGreen
-        case .down: .systemRed
-        }
-    }
-}
 
 extension Badge {
     @MainActor

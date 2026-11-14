@@ -4,7 +4,6 @@ import Foundation
 @MainActor
 protocol TimelinePeople {
     var viewer: String? { get }
-    func vote(for login: String?) -> Vote?
     func badges(for login: String) -> [Badge]
     func contribution(for login: String?) -> Contribution?
 }
@@ -297,7 +296,7 @@ struct TimelineDocument {
             return #"<img class="\#(cls)" src="\#(AvatarSchemeHandler.url(for: login).htmlEscaped)" data-login="\#(login.htmlEscaped)" alt="">"#
         }
 
-        /// The login with the viewer's vote and affiliation badges, as `LoginText` and `BadgeIcons`.
+        /// The login with affiliation badges, as `LoginText` and `BadgeIcons`.
         private func person(_ login: String?) -> String {
             guard let login else { return #"<span class="person"><span class="login">ghost</span></span>"# }
             let escaped = login.htmlEscaped
@@ -309,10 +308,6 @@ struct TimelineDocument {
             let facts = personFacts(contribution: contribution, badges: badges)
             let title = facts.isEmpty ? "" : #" title="\#(facts.joined(separator: "\n").htmlEscaped)""#
             var html = #"<span class="person"><span class="\#(cls)"\#(title) data-login="\#(escaped)">\#(escaped)</span>"#
-            if let vote = people.vote(for: login) {
-                let title = vote == .up ? "Upvoted" : "Downvoted: sinks to the bottom of Triage"
-                html += symbol(vote.symbol, cls: vote == .up ? "vote c-green" : "vote c-red", title: title)
-            }
             // An org badge already says the author is established.
             if let contribution, contribution.isRegular, badges.isEmpty {
                 html += symbol("checkmark.seal", cls: "c-green", title: contribution.summary)

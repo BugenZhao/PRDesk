@@ -9,9 +9,6 @@ struct SettingsView: View {
             Tab("Affiliations", systemImage: "person.2") {
                 AffiliationSettingsView()
             }
-            Tab("Votes", systemImage: "hand.thumbsup") {
-                VoteSettingsView()
-            }
             Tab("Grok Bot", systemImage: "paperplane") {
                 GrokBotSettingsView()
             }
@@ -277,44 +274,3 @@ private struct AffiliationSettingsView: View {
     }
 }
 
-private struct VoteSettingsView: View {
-    @Environment(AppModel.self) private var model
-    @State private var selection: String?
-
-    private struct Row: Identifiable {
-        var login: String
-        var vote: Vote
-        var id: String { login }
-    }
-
-    var body: some View {
-        let rows = model.votes.map { Row(login: $0.key, vote: $0.value) }
-            .sorted { ($0.vote.rawValue, $1.login) > ($1.vote.rawValue, $0.login) }
-        Form {
-            Section {
-                Table(rows, selection: $selection) {
-                    TableColumn("User", value: \.login)
-                    TableColumn("Vote") { row in
-                        Label(row.vote == .up ? "Upvoted" : "Downvoted", systemImage: row.vote.symbol)
-                            .foregroundStyle(Color(nsColor: row.vote.nsColor))
-                    }
-                }
-                .frame(height: 220)
-                HStack {
-                    Spacer()
-                    Button("Clear Vote", systemImage: "minus") {
-                        if let selection { model.setVote(nil, for: selection) }
-                    }
-                    .labelStyle(.iconOnly)
-                    .disabled(selection == nil)
-                }
-            } header: {
-                Text("People")
-            } footer: {
-                Text("Vote with + / - on selected rows, or right-click a name. Downvoted authors' items sink to the bottom of Triage.")
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .settingsPage()
-    }
-}

@@ -349,8 +349,6 @@ struct ItemTableView: NSViewRepresentable {
                 case "p": .togglePin
                 case "n": .toggleRead
                 case "a": .addToDesk
-                case "+", "=": .voteAuthor(.up)
-                case "-": .voteAuthor(.down)
                 case "o", "\r": .openInBrowser
                 case "u": .openAuthorProfile
                 case "e": .sendToBot(.investigate)
@@ -521,8 +519,6 @@ struct ItemTableView: NSViewRepresentable {
             MenuAction(title: "Clear Priority", action: .priority(nil), symbol: "xmark", key: "0"),
             MenuAction(title: "Pin / Unpin", action: .togglePin, symbol: "pin", key: "p"),
             MenuAction(title: "Mark as Read / Unread", action: .toggleRead, symbol: "envelope.open", key: "n"),
-            MenuAction(title: "Upvote Author", action: .voteAuthor(.up), symbol: "hand.thumbsup", key: "+"),
-            MenuAction(title: "Downvote Author", action: .voteAuthor(.down), symbol: "hand.thumbsdown", key: "-"),
             MenuAction(title: "👀 Investigate", action: .sendToBot(.investigate), key: "e"),
             MenuAction(title: "👀 Investigate…", action: .sendToBot(.investigate, withNote: true), key: "e", isAlternate: true),
             MenuAction(title: "🔥 Track", action: .sendToBot(.track), key: "f"),
@@ -531,7 +527,7 @@ struct ItemTableView: NSViewRepresentable {
             MenuAction(title: "Open Agent Session", action: .openSession, symbol: "terminal", key: "t"),
         ]
         /// Indices of `menuActions` after which a separator goes.
-        private static let menuSeparatorsAfter: Set = [1, 5, 9, 11, 13]
+        private static let menuSeparatorsAfter: Set = [1, 5, 9, 11]
         /// Index of `menuActions` after which the author's affiliation submenu goes.
         private static let affiliationAfter = 13
         /// Its submenu is made when the menu opens, for the authors right-clicked.
@@ -594,7 +590,6 @@ struct ItemTableView: NSViewRepresentable {
                 item.state = switch Self.menuActions[item.tag].action {
                 case let .triage(status): state { $0.listedTriage == status }
                 case let .priority(priority?): state { $0.priority == priority }
-                case let .voteAuthor(vote): state { $0.authorVote == vote }
                 case let .sendToBot(request, _): state { $0.state.sentAt(request) != nil }
                 default: .off
                 }

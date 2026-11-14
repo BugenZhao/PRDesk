@@ -73,7 +73,7 @@ const PRDesk = (() => {
     }
   }
 
-  // Right-clicking a person offers the app's vote menu instead of WebKit's.
+  // Right-clicking a person offers the app's menu for them instead of WebKit's.
   addEventListener("contextmenu", (event) => {
     const login = event.target.closest("[data-login]");
     if (login) {

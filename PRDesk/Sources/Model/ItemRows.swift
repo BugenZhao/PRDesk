@@ -7,8 +7,6 @@ struct ItemRow: Hashable, Sendable {
     var insight: ItemInsight
     /// The notification that brought the item to the Inbox.
     var note: InboxNote?
-    /// The viewer's vote on the item's author.
-    var authorVote: Vote?
     /// The item's entry on the triage board, if it is on it.
     var board: BoardEntry?
     /// In the Parity tab, the other end of the item's pipeline: the upstream PR promoted from a
@@ -79,7 +77,7 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
         case .good:
             "Status Working (or Good) and approved: waiting to be merged. A PR you approve (here or on the web) goes on the board as Good if it isn't on it yet. Your own items go first; PRs Merger is merging (Status Merging, a purple icon) go last."
         case .triage:
-            "No Status yet: not on the board, on it without a Status, or Done but open again. Also Skipped items someone asked you about since, with the reason. Your own items count as Working instead. Downvoted authors go last."
+            "No Status yet: not on the board, on it without a Status, or Done but open again. Also Skipped items someone asked you about since, with the reason. Your own items count as Working instead."
         case .backlog:
             "Status Backlog: worth caring about, but later. Your own items go first. The subscription is left alone."
         case .closed:

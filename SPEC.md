@@ -294,8 +294,7 @@ Top to bottom:
   what waits for 🚀 comes first. A Merging PR draws its open icon purple (the merge color), unless
   it is a draft or has conflicts, which keep their own icon
 - **Working**: the same, without approval; mine first
-- **Triage**: untriaged open items opened by others, plus woken Skipped items; items by downvoted
-  authors sink to the bottom
+- **Triage**: untriaged open items opened by others, plus woken Skipped items
 - **Backlog**: open items with Status = Backlog, collapsed by default; mine first
 - **Recently closed**: items merged / closed in the last 14 days, collapsed by default
 - **Skipped**, **Muted**: open items with that Status, collapsed by default
@@ -341,7 +340,7 @@ well
 | (marker) | The first, narrow column: `•` for unread activity from others (since I last viewed). When the item is in a stack, this column draws the stack's lines (see §4.1), with this dot as the node: the accent color when unread, otherwise gray (the icon before the title shows state), hollow for drafts; a forked child turns from its parent onto its own line to the right; official stacks are joined by solid lines, branch- and commit-joined ones by dashed lines. Two lines fit, with narrower spacing for more. Hovering shows the stack number and position, the base branch, the PR whose commits it starts with (for a commit-joined one), and which members are in other groups. Priority has no column of its own, only the row's background (§4.3) |
 | # | Number; small icons tell PRs and issues apart |
 | Title | State icon + title (leading `[..]` / `xx:` tags faded), a reason tag on woken items; the matching emoji on items sent to Grok Bots, and a `terminal` icon on items with a board Session (§3.3); then the board Comment, if any; a gray summary of the latest event (e.g. `@xx commented 2h`, `you reviewed 2d`) always right-aligned; truncated text (title, comment, summary) shows in full in a tooltip on hover |
-| Author | Avatar + login (italic for first-time contributors) + vote icon; trust marks (seal, org badges, see §5, §5.2) right-aligned |
+| Author | Avatar + login (italic for first-time contributors); trust marks (seal, org badges, see §5, §5.1) right-aligned |
 | Review | A bare ✓ + total approvals (including mine): on others' PRs, green when I've approved, gray when only others have; on my own PRs (which I can't approve), green when reviewDecision = APPROVED (approvals meet the merge requirement, the same condition as the Good group), gray otherwise; a red ✗ follows when I've requested changes. Built like the CI column: a small mark + a number, in fixed positions |
 | Turn | `review` (my review requested and not done) / `me` / `them` / empty (closed) |
 | CI | A colored dot: green passed / red failed / yellow running / gray cancelled; solid with the `ready` label, hollow without; failed / running counts in the tooltip |
@@ -366,7 +365,7 @@ well
   goes back to the list); free text matches title, number and author
 - Tokens: `is:pr` `is:issue` `is:draft` `is:open` `is:unread` `is:pinned` `is:first` `is:regular`
   `status:triage|working|backlog|skipped|muted` `turn:me` `author:x` `label:x` `ci:fail` `p:h`
-  `org:redhat` `vote:down` `merged:>=10`; a leading `-` negates
+  `org:redhat` `merged:>=10`; a leading `-` negates
 
 ### 4.5 Keyboard shortcuts
 
@@ -377,14 +376,13 @@ well
 | `⌘` / `⇧` click | Multiple selection; the shortcuts below and the context menu act on every selected item (right-clicking a row outside the selection acts on that row only). Toggles act on the whole selection: cleared if all are already set, otherwise set on all |
 | `/` | Focus the filter field |
 | `w` / `b` / `s` / `m` | Set Status to Working / Backlog / Skipped / Muted; pressing the same key again clears Status (back to untriaged); `s` on a woken Skipped item skips it again instead of clearing |
-| `⌘Z` / `⇧⌘Z` | With the list focused, undo / redo list actions: Status, Priority, Pin, author votes (Mark as read and Close can't be undone); board writes for one item go out in order, so an undo never reaches GitHub before the original; in text fields it's still text undo |
+| `⌘Z` / `⇧⌘Z` | With the list focused, undo / redo list actions: Status, Priority, Pin (Mark as read and Close can't be undone); board writes for one item go out in order, so an undo never reaches GitHub before the original; in text fields it's still text undo |
 | `1` / `2` / `3` / `0` | Set Priority to H / M / L / clear |
 | `p` | Pin / unpin |
 | `n` | Mark read; on a read item, mark unread (unread from the latest activity by others; items with no activity from others, e.g. only mine and bots', become unread as a whole until opened again or `n` is pressed; local only, GitHub notifications unchanged) |
 | `o` / `↩`, `⌘O` | Open in the browser (`⌘O` works with any focus, on the current selection) |
 | `u`, `⇧⌘O` | Open the author's GitHub profile (also in the row's context menu; `⇧⌘O` works with any focus) |
 | `⇧⌘C`, `⌘C` | Copy GitHub links, one per line (`⇧⌘C` works with any focus: all selected items when the list is focused, otherwise the item in the detail; `⌘C` only in the list). Rows can also be dragged out sideways, as links with titles |
-| `+` / `-` | Upvote / downvote the author |
 | `e` / `f` / `r` | Send to a Grok Bot: 👀 Investigate / 🔥 Track / 🚀 Merge (§3.3; 🚀 and re-sends open the send panel first); with `⌥`, open the panel first to write a note |
 | `t` | Open the agent session (the board's Session field, the newest one; in the desktop app when there is one; §3.3) |
 | `c` | Focus the comment box |
@@ -477,18 +475,7 @@ daily.
 Filtering: `org:vllm` matches both tiers, `org:committer` only committers, `org:member` only the
 gray tier.
 
-## 5.1 Voting on people
-
-- Each person can be upvoted / default / downvoted, stored only locally
-- A small 👍 / 👎 icon follows the author's name (list, detail header, timeline)
-- Downvoted authors: their items sink to the bottom of Triage; other groups are unaffected; Status
-  never changes automatically
-- Upvotes only show the icon for now, with no other effect
-- Actions: `+` / `-` on selected rows (again to clear), the context menu of a row or a name, and
-  Settings → Votes
-- Filtering: `vote:up` / `vote:down` / `vote:none`
-
-## 5.2 Contributor marks
+## 5.1 Contributor marks
 
 - Counts each author's merged PRs in vllm (GitHub search, 40 people per batch, refreshed weekly;
   daily for those at 0)
@@ -539,7 +526,7 @@ gray tier.
   - The list's summary, Turn and unread ignore these accounts' actions (the list doesn't fetch
     comment bodies, so command comments still count as taking part there)
   - Clicking a name or avatar opens their GitHub profile (the author name in the detail header
-    too); right-clicking a name offers votes, opening the profile and copying the login
+    too); right-clicking a name offers affiliations, opening the profile and copying the login
   - Everything can be expanded / collapsed at once; comments and reviews without a body (mostly
     approvals with no text) show just a header line and can't expand
   - Reactions show under the description, comments, reviews and inline comments (hover to see

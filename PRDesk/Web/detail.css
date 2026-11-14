@@ -40,7 +40,6 @@ a:hover { text-decoration: underline; }
 .person { display: inline-flex; align-items: center; gap: 3px; flex: none; min-width: 0; }
 .login { font-weight: 500; }
 .card .head .login { font-weight: 600; }
-.vote { font-size: 9px; }
 .badge { width: 13px; height: 13px; border-radius: 3px; flex: none; }
 .login.unvouched { font-style: italic; }
 /* Names and avatars open the person's GitHub profile. */

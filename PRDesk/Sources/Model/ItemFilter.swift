@@ -4,7 +4,7 @@ import Foundation
 ///
 /// Supported tokens: `is:pr|issue|draft|open|closed|merged|unread|pinned|first|regular`,
 /// `status:triage|working|backlog|skipped|muted`, `turn:me|them`, `author:x`, `label:x`,
-/// `ci:fail|pending|pass`, `p:h|m|l`, `org:x`, `vote:up|down|none`, and `merged:N` / `merged:>=N`
+/// `ci:fail|pending|pass`, `p:h|m|l`, `org:x`, and `merged:N` / `merged:>=N`
 /// (also `>`, `<`, `<=`) on the author's merged PR count.
 /// A leading `-` negates a token.
 struct ItemFilter: Equatable {
@@ -14,7 +14,7 @@ struct ItemFilter: Equatable {
         var negated: Bool
     }
 
-    private static let keys: Set = ["is", "status", "turn", "author", "label", "ci", "p", "org", "vote", "merged"]
+    private static let keys: Set = ["is", "status", "turn", "author", "label", "ci", "p", "org", "merged"]
 
     var text: [String] = []
     var tokens: [Token] = []
@@ -88,13 +88,6 @@ struct ItemFilter: Equatable {
             }
         case "p":
             return row.priority?.letter.lowercased() == value
-        case "vote":
-            return switch value {
-            case "up": row.authorVote == .up
-            case "down": row.authorVote == .down
-            case "none": row.authorVote == nil
-            default: false
-            }
         case "merged":
             guard let merged = authorContribution?.merged else { return false }
             return Self.compare(merged, value)

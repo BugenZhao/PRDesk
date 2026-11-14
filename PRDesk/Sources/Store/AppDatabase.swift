@@ -291,6 +291,10 @@ final class AppDatabase: Sendable {
                 t.add(column: "bio", .text)
             }
         }
+        migrator.registerMigration("v25") { db in
+            // Votes on people are gone.
+            try db.drop(table: "authorVote")
+        }
         return migrator
     }
 }
@@ -505,8 +509,6 @@ struct Snapshot: Equatable, Sendable {
     var states: [Item.ID: ItemState] = [:]
     /// Unread before this moment is ignored, so a first sync doesn't mark everything unread.
     var baseline: Date?
-    /// Votes by lowercased login.
-    var votes: [String: Vote] = [:]
     /// The triage board, by item number.
     var board: [Int: BoardEntry] = [:]
 }
@@ -524,7 +526,6 @@ extension AppDatabase {
                     items: Item.order(Item.Columns.updatedAt.desc).fetchAll(db),
                     states: Dictionary(uniqueKeysWithValues: ItemState.fetchAll(db).map { ($0.itemID, $0) }),
                     baseline: baseline,
-                    votes: Dictionary(uniqueKeysWithValues: AuthorVote.fetchAll(db).map { ($0.login, $0.vote) }),
                     board: Dictionary(uniqueKeysWithValues: BoardEntry.fetchAll(db).map { ($0.number, $0) })
                 )
             }

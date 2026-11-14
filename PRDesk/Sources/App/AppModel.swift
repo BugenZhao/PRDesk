@@ -17,8 +17,6 @@ enum ItemAction {
     case openAuthorProfile
     /// Copies the items' GitHub links, one per line.
     case copyLink
-    /// Vote on the item's author; voting the same way again clears the vote.
-    case voteAuthor(Vote)
     /// Brings an item opened from a link onto the desk.
     case addToDesk
     /// Sends the items to a Grok Bot with the request's emoji; `withNote` (⌥) opens the send sheet
@@ -318,24 +316,6 @@ final class AppModel {
     /// reload its detail (e.g. a rename, which leaves `updatedAt` until the next fetch).
     private var selectedItemRevision = 0
 
-    /// Votes on people, by lowercased login.
-    private(set) var votes: [String: Vote] = [:]
-
-    func vote(for login: String?) -> Vote? {
-        login.flatMap { votes[$0.lowercased()] }
-    }
-
-    /// Sets or (with nil) clears the vote on `login`.
-    func setVote(_ vote: Vote?, for login: String) {
-        Task {
-            do {
-                try await db.setVote(vote, for: login)
-            } catch {
-                logger.error("Failed to vote on \(login): \(error)")
-            }
-        }
-    }
-
     func state(for item: Item) -> ItemState {
         snapshot.states[item.id] ?? ItemState(itemID: item.id)
     }
@@ -374,7 +354,6 @@ final class AppModel {
         return ItemRow(
             item: item, state: state,
             insight: insight,
-            authorVote: vote(for: item.author),
             board: board
         )
     }
@@ -420,7 +399,6 @@ final class AppModel {
                     for item in snapshot.items {
                         if let author = item.author, let url = item.authorAvatarURL { AvatarCache.remember(url, for: author) }
                     }
-                    if votes != snapshot.votes { votes = snapshot.votes }
                     if board != snapshot.board {
                         board = snapshot.board
                         updateDockBadge()
@@ -913,7 +891,7 @@ final class AppModel {
     }
 
     /// Applies `action` to several items at once. Toggles work on the group: if every item already
-    /// has the status, priority, pin or vote, it is cleared from all; otherwise all get it.
+    /// has the status, priority or pin, it is cleared from all; otherwise all get it.
     func perform(_ action: ItemAction, on itemIDs: [Item.ID]) {
         var items = itemIDs.compactMap { itemsByID[$0] }
         guard !items.isEmpty else { return }
@@ -992,10 +970,6 @@ final class AppModel {
             pasteboard.setString(items.map(\.url).joined(separator: "\n"), forType: .string)
             // A single link also goes as a URL, so apps that take one (Mail, Notes) make it a link.
             if items.count == 1 { pasteboard.setString(items[0].url, forType: .URL) }
-        case let .voteAuthor(vote):
-            let authors = Array(Set(items.compactMap(\.author)))
-            let clear = authors.allSatisfy { self.vote(for: $0) == vote }
-            setVotes(authors.map { ($0, clear ? nil : vote) })
         case .addToDesk:
             break
         case let .sendToBot(request, withNote):
@@ -1060,7 +1034,7 @@ final class AppModel {
     /// Runs a board write, reporting failure in `writeError`.
     // MARK: Undo
 
-    /// Undo for list actions: Status, Priority, pins and author votes. The table answers ⌘Z with
+    /// Undo for list actions: Status, Priority and pins. The table answers ⌘Z with
     /// it while it has focus; text fields keep their own. Each step records what it replaced, so
     /// undoing it registers the redo.
     @ObservationIgnored let undoManager = UndoManager()
@@ -1142,15 +1116,6 @@ final class AppModel {
                 self?.yabPinsNote = note
             } while self?.yabPinsAgain == true
             self?.yabPinsTask = nil
-        }
-    }
-
-    private func setVotes(_ changes: [(author: String, vote: Vote?)]) {
-        guard !changes.isEmpty else { return }
-        let previous = changes.map { (author: $0.author, vote: vote(for: $0.author)) }
-        registerUndo("Vote") { $0.setVotes(previous) }
-        for change in changes {
-            setVote(change.vote, for: change.author)
         }
     }
 
@@ -1500,9 +1465,6 @@ final class AppModel {
         // What waits for 🚀 comes before what Merger is already merging.
         let good = members[.good] ?? []
         members[.good] = good.filter { !$0.isMerging } + good.filter(\.isMerging)
-        // Downvoted authors still get triaged, just last.
-        let triage = members[.triage] ?? []
-        members[.triage] = triage.filter { $0.authorVote != .down } + triage.filter { $0.authorVote == .down }
         // Stacks stay together, where their base sorts; Recently viewed keeps its order (by when
         // each item was opened). Pinned sorts like the rest, so its stacks group too.
         // Members in other sections (or filtered out) show as stubs on the rail.

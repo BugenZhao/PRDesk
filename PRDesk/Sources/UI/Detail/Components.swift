@@ -20,8 +20,8 @@ struct AvatarView: View {
     }
 }
 
-/// A login followed by the viewer's vote on that person, in italics for a first-timer nothing
-/// vouches for. Click to open their GitHub profile; right-click to vote or set their affiliation.
+/// A login, in italics for a first-timer nothing vouches for. Click to open their GitHub profile;
+/// right-click to set their affiliation.
 struct LoginText: View {
     @Environment(AppModel.self) private var model
     let login: String?
@@ -29,7 +29,6 @@ struct LoginText: View {
     @State private var isHovered = false
 
     var body: some View {
-        let isMe = sameLogin(login, model.viewer)
         let contribution = model.contribution(for: login)
         let badges = login.map(model.affiliations.badges(for:)) ?? []
         let unvouched = contribution?.isUnvouched(badges: badges) ?? false
@@ -48,19 +47,9 @@ struct LoginText: View {
             .onHover { isHovered = $0 }
             .help((personFacts(contribution: contribution, badges: badges) + (login.map { ["Open \($0)'s profile on GitHub"] } ?? []))
                 .joined(separator: "\n"))
-            if let vote = model.vote(for: login) {
-                Image(systemName: vote.symbol)
-                    .font(.caption2)
-                    .foregroundStyle(Color(nsColor: vote.nsColor))
-                    .help(vote == .up ? "Upvoted" : "Downvoted: sinks to the bottom of Triage")
-            }
         }
         .contextMenu {
             if let login {
-                if !isMe {
-                    VoteMenu(login: login)
-                    Divider()
-                }
                 AffiliationSubmenu(login: login)
                 Divider()
                 Button("Open Profile on GitHub") { AppModel.openProfile(login) }
@@ -70,22 +59,6 @@ struct LoginText: View {
                 }
             }
         }
-    }
-}
-
-/// Upvote / clear / downvote choices for a person.
-struct VoteMenu: View {
-    @Environment(AppModel.self) private var model
-    let login: String
-
-    var body: some View {
-        let current = model.vote(for: login)
-        Button("Upvote \(login)", systemImage: "hand.thumbsup") { model.setVote(.up, for: login) }
-            .disabled(current == .up)
-        Button("Downvote \(login)", systemImage: "hand.thumbsdown") { model.setVote(.down, for: login) }
-            .disabled(current == .down)
-        Button("Clear Vote", systemImage: "hand.raised.slash") { model.setVote(nil, for: login) }
-            .disabled(current == nil)
     }
 }
 
