@@ -22,9 +22,6 @@ struct ItemState: Codable, Hashable, Sendable {
     var investigateNote: String?
     var trackNote: String?
     var mergeNote: String?
-    /// The tab PR Desk made for the pin in Yab's sidebar (`YabPins`). It stays when the user closes
-    /// that tab, so the pin doesn't bring it back, and goes with the pin.
-    var yabTabID: String?
 
     init(itemID: Item.ID) {
         self.itemID = itemID

@@ -233,25 +233,6 @@ other grokbot copies (`grokbot login`). At build time `scripts/embed-grokbot.sh`
 grokbot-cli at the commit pinned in the script (cached per commit), signs it and puts it in
 `Contents/Helpers/`. In tests, dry-run only logs instead of sending.
 
-## 3.4 Syncing pins to Yab
-
-With Settings → General → Yab turned on (off by default), the app syncs Pinned one way into Yab's
-sidebar: a folder named `PR Desk` in the pinned area of a chosen space (Inferact by default),
-through Yab's `yab exec`, with no confirmation prompts.
-
-- **Pin**: adds a sleeping tab, creating the folder if it doesn't exist. If the PR is already open
-  in one of today's tabs, that tab moves into the folder; if I've kept it somewhere else, it's left
-  alone and added once it's gone.
-- **Unpin**: closes the tab the app added. A tab I'm looking at is closed once I leave it; one moved
-  out of the folder counts as mine and isn't closed.
-- **Closing the tab in Yab**: the pin stays, and the tab isn't added back; unpinning and pinning
-  again adds it again. Changes in Yab don't flow back.
-- **When**: it reconciles once when pins change and after each sync. Yab can only read and write
-  the space on screen, so while Yab isn't open or the target space isn't on screen nothing happens
-  until a later round; Settings shows what it's waiting for.
-- In tests, dry-run only logs and leaves Yab alone; test copies have their own preferences and
-  don't sync by default.
-
 ## 4. Main window
 
 ```
@@ -577,7 +558,7 @@ gray tier.
 - `items`: PR / issue snapshot fields + the raw JSON, with the repository (numbers are only unique
   within one)
 - `item_state`: pinned, viewed_at, seen_at, the last send time and note of each kind of Grok Bot
-  request, and the Yab tab id of a pin (local only, keyed by the item's node id)
+  request (local only, keyed by the item's node id)
 - `board_item`: the cache of board items (item id, Status and when it was set, Priority, Comment,
   Session)
 - `users`: login, avatar, company, orgs, email domains, committer areas, sources, fetched_at

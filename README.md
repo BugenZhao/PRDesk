@@ -17,7 +17,7 @@ A native macOS dashboard for the pull requests and issues I work on in
 - A detail pane with the conversation, checks and files diff, where I can comment, review and approve
 - An inbox of GitHub notifications for the repository
 - Badges for contributors' affiliations, and stacked PRs drawn as trees
-- Sending items to Grok Bots, and mirroring pinned items into Yab's sidebar
+- Sending items to Grok Bots
 
 [`SPEC.md`](SPEC.md) is the full spec, and [`AGENTS.md`](AGENTS.md) holds notes for
 coding agents.

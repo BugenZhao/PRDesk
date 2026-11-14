@@ -15,7 +15,7 @@ running copy first) — that is the copy for daily use. Keep the build free of w
 
 Debug builds accept `-PRDeskAppearance dark|light` to force an appearance, and
 `-PRDeskDryRunWrites YES` to log writes to GitHub (comments, reviews, marking notifications read,
-board fields, subscriptions, files marked viewed, messages to Grok Bots, tabs in Yab) instead of sending them — use it whenever a test could trigger a write. Both flags are
+board fields, subscriptions, files marked viewed, messages to Grok Bots) instead of sending them — use it whenever a test could trigger a write. Both flags are
 compiled out of Release builds: a Release test copy writes to GitHub for real, so only measure with
 one (benchmarks, profiling) and never press keys, click rows or select items in it.
 Local data lives in `~/Library/Application Support/PR Desk/` (SQLite via GRDB, avatar cache).
@@ -55,8 +55,8 @@ xcodebuild -workspace PRDesk.xcworkspace -scheme PRDesk -derivedDataPath "$DD" \
   filter parsing, sections and sorting
 - `PRDesk/Sources/Bots` — `GrokBot`: sends items to Grok Bots through the bundled grokbot CLI
   (SPEC §3.3), built by `scripts/embed-grokbot.sh` at a pinned commit (needs `~/.cargo`)
-- `PRDesk/Sources/Yab` — `YabPins`: mirrors pins into a folder of Yab's sidebar through `yab exec`
-  (SPEC §3.4)
+- `PRDesk/Sources/Yab` — `YabFrontTab`: reads Yab's tab in front through `yab exec`, for ⌃⌥⌘D
+  (SPEC §6)
 - `PRDesk/Sources/App` — `AppModel` (the `@Observable` main-actor state) and the app entry point
 - `PRDesk/Sources/UI` — SwiftUI shell; the list is an `NSTableView` with drawn cells (`ItemTable/`);
   the conversation and the files diff are each one long-lived `WKWebView` page (`Detail/WebDocument`)
@@ -110,8 +110,7 @@ are used off the main actor); no glass on content (cards, chips, rows).
   sent in the shared database; clear the `*SentAt` columns of `itemState`
   afterwards.
 - Yab's `native_context` and `tabs` only see the space on screen, `native_context` gives tab URLs
-  as origins only (join with `tabs` by the first 8 characters of the id), and `lay_out_tabs` dedupes
-  by the exact current URL. `yab exec` is documented to open a hidden Yab if none is running. Stay on
+  as origins only (join with `tabs` by the first 8 characters of the id). `yab exec` is documented to open a hidden Yab if none is running. Stay on
   `yab exec` rather than AppleScript: PR Desk is ad-hoc signed, so the Automation prompt would likely
   come back after each install.
 - `scripts/embed-grokbot.sh` runs cargo with `env -i`: under Xcode's environment proc-macro

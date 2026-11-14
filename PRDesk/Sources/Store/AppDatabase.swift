@@ -295,6 +295,12 @@ final class AppDatabase: Sendable {
             // Votes on people are gone.
             try db.drop(table: "authorVote")
         }
+        migrator.registerMigration("v26") { db in
+            // Pins are no longer mirrored into Yab.
+            try db.alter(table: "itemState") { t in
+                t.drop(column: "yabTabID")
+            }
+        }
         return migrator
     }
 }
@@ -425,26 +431,6 @@ extension AppDatabase {
             var state = try ItemState.fetchOne(db, key: itemID) ?? ItemState(itemID: itemID)
             change(&state)
             try state.save(db)
-        }
-    }
-
-    /// Pins with no tab in Yab yet, and tabs in Yab whose pin is gone.
-    func yabPinWork() async throws -> YabPins.Work {
-        try await writer.read { db in
-            let pinnedAt = Column("pinnedAt")
-            let tab = Column("yabTabID")
-            let unsynced = try ItemState.filter(pinnedAt != nil && tab == nil).order(pinnedAt).fetchAll(db)
-            let items = try Item.fetchAll(db, keys: unsynced.map(\.itemID))
-            let byID = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
-            let unpinned = try ItemState.filter(pinnedAt == nil && tab != nil).fetchAll(db)
-            return YabPins.Work(
-                add: unsynced.compactMap { state in
-                    byID[state.itemID].map { YabPins.Work.Add(item: $0.id, url: $0.url, title: $0.title) }
-                },
-                close: unpinned.compactMap { state in
-                    state.yabTabID.map { YabPins.Work.Close(item: state.itemID, tab: $0) }
-                }
-            )
         }
     }
 }
