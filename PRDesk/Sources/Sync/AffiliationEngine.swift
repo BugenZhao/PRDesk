@@ -21,7 +21,7 @@ actor AffiliationEngine {
     private static let mergedPerRound = 20
     private static let userBatchSize = 40
     private static let emailBatchSize = 10
-    private static let profileEmailBatchSize = 100
+    private static let profileExtrasBatchSize = 100
 
     private let client: GitHubClient
     private let db: AppDatabase
@@ -82,11 +82,13 @@ actor AffiliationEngine {
         }
 
         var current = try await db.userInfos()
-        // Profiles fetched before public emails were read; one cheap query per 100 people.
-        let missingEmails = people.filter { current[$0] != nil && current[$0]?.profileEmailDomain == nil }
-        if !missingEmails.isEmpty {
-            for batch in missingEmails.chunked(Self.profileEmailBatchSize) {
-                try await db.saveProfileEmailDomains(fetchProfileEmailDomains(batch))
+        // Profiles fetched before public emails and bios were read; one cheap query per 100 people.
+        let missingExtras = people.filter { login in
+            current[login].map { $0.profileEmailDomain == nil || $0.bio == nil } ?? false
+        }
+        if !missingExtras.isEmpty {
+            for batch in missingExtras.chunked(Self.profileExtrasBatchSize) {
+                try await db.saveProfileExtras(fetchProfileExtras(batch))
             }
             current = try await db.userInfos()
         }
@@ -122,6 +124,7 @@ actor AffiliationEngine {
             let unknown = users.values.filter { user in
                 user.company == nil && !user.orgs.contains { org in employers.contains { $0.githubOrgs.contains { sameLogin($0, org) } } }
                     && !employers.contains { org in user.profileEmailDomain.map(org.matches(emailDomain:)) == true }
+                    && !employers.contains { org in user.bioHandle.map(org.matches(handle:)) == true }
             }
             for emailBatch in unknown.map(\.login).chunked(Self.emailBatchSize) {
                 for (login, domains) in try await fetchEmailDomains(emailBatch) {
@@ -355,10 +358,12 @@ actor AffiliationEngine {
             let nodes: [Node?]?
         }
 
-        let login: String
+        /// Nil for an organization, which comes back as an empty object.
+        let login: String?
         let company: String?
         let email: String?
-        let organizations: Orgs
+        let bio: String?
+        let organizations: Orgs?
     }
 
     /// The domain of a public profile email, lowercased; empty for none.
@@ -368,25 +373,32 @@ actor AffiliationEngine {
     }
 
     /// An organization login comes back as an empty object.
-    private struct EmailNode: Decodable, Sendable {
+    private struct ExtrasNode: Decodable, Sendable {
         let login: String?
         let email: String?
+        let bio: String?
     }
 
-    /// Public profile email domains, for profiles stored before they were read. Logins that
-    /// aren't users (bots, deleted accounts) come back null, and get an empty domain.
-    private func fetchProfileEmailDomains(_ logins: [String]) async throws -> [String: String] {
+    /// Public profile email domains and bios, for profiles stored before they were read. Logins
+    /// that aren't users (bots, deleted accounts) come back null, and get empty strings.
+    private func fetchProfileExtras(_ logins: [String]) async throws -> [String: (emailDomain: String, bio: String)] {
         let safe = logins.filter(Self.isSafeLogin)
         guard !safe.isEmpty else { return [:] }
         let fields = safe.enumerated().map { index, login in
-            "u\(index): repositoryOwner(login: \"\(login)\") { ... on User { login email } }"
+            "u\(index): repositoryOwner(login: \"\(login)\") { ... on User { login email bio } }"
         }
-        let response = try await client.query("query { \(fields.joined(separator: "\n")) }", variables: [String: String](), as: [String: EmailNode?].self)
-        var result = Dictionary(uniqueKeysWithValues: safe.map { ($0, "") })
+        let response = try await client.query("query { \(fields.joined(separator: "\n")) }", variables: [String: String](), as: [String: ExtrasNode?].self)
+        var result = Dictionary(uniqueKeysWithValues: safe.map { ($0, (emailDomain: "", bio: "")) })
         for case let node? in response.values {
-            if let login = node.login { result[login.lowercased()] = Self.domain(of: node.email) }
+            if let login = node.login {
+                result[login.lowercased()] = (Self.domain(of: node.email), Self.trimmed(node.bio))
+            }
         }
         return result
+    }
+
+    private static func trimmed(_ bio: String?) -> String {
+        bio?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 
     /// Logins are `[A-Za-z0-9-]`, so they can be inlined in aliased fields safely.
@@ -398,24 +410,27 @@ actor AffiliationEngine {
         let safe = logins.filter(Self.isSafeLogin)
         guard !safe.isEmpty else { return [:] }
         let fields = safe.enumerated().map { index, login in
-            "u\(index): user(login: \"\(login)\") { login company email organizations(first: 30) { nodes { login } } }"
+            // `email` through `user(login:)` needs the user:email scope; through
+            // `repositoryOwner` it doesn't.
+            "u\(index): repositoryOwner(login: \"\(login)\") { ... on User { login company email bio organizations(first: 30) { nodes { login } } } }"
         }
         let response = try await client.query("query { \(fields.joined(separator: "\n")) }", variables: [String: String](), as: [String: UserNode?].self)
         let now = Date()
         var result: [String: UserInfo] = [:]
         // Users that no longer exist still get a row, so they aren't re-fetched every time.
         for login in safe {
-            result[login] = UserInfo(login: login, company: nil, orgs: [], emailDomains: [], profileEmailDomain: "", fetchedAt: now)
+            result[login] = UserInfo(login: login, company: nil, orgs: [], emailDomains: [], profileEmailDomain: "", bio: "", fetchedAt: now)
         }
         for case let node? in response.values {
-            let key = node.login.lowercased()
+            guard let key = node.login?.lowercased() else { continue }
             let company = node.company?.trimmingCharacters(in: .whitespacesAndNewlines)
             result[key] = UserInfo(
                 login: key,
                 company: company?.isEmpty == false ? company : nil,
-                orgs: node.organizations.nodes?.compactMap { $0?.login } ?? [],
+                orgs: node.organizations?.nodes?.compactMap { $0?.login } ?? [],
                 emailDomains: [],
                 profileEmailDomain: Self.domain(of: node.email),
+                bio: Self.trimmed(node.bio),
                 fetchedAt: now
             )
         }

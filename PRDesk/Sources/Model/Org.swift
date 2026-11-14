@@ -194,6 +194,12 @@ enum Org: String, CaseIterable, Codable, Sendable, Identifiable {
         return companyPatterns.contains { words.contains(" \($0) ") }
     }
 
+    /// Whether a handle mentioned in a bio (`@mistralai`, `@AMD`) names the org: one of its
+    /// GitHub orgs, or a company pattern.
+    func matches(handle: String) -> Bool {
+        githubOrgs.contains { $0.caseInsensitiveCompare(handle) == .orderedSame } || matches(company: handle)
+    }
+
     /// Whether a commit email domain is one of the org's, or a subdomain of one (`us.ibm.com`).
     func matches(emailDomain domain: String) -> Bool {
         emailDomains.contains { domain == $0 || domain.hasSuffix(".\($0)") }

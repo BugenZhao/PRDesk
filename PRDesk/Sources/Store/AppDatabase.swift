@@ -286,6 +286,11 @@ final class AppDatabase: Sendable {
                 t.add(column: "profileEmailDomain", .text)
             }
         }
+        migrator.registerMigration("v24") { db in
+            try db.alter(table: "userInfo") { t in
+                t.add(column: "bio", .text)
+            }
+        }
         return migrator
     }
 }

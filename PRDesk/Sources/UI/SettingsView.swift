@@ -257,7 +257,7 @@ private struct AffiliationSettingsView: View {
             } header: {
                 Text("Inferred from public data")
             } footer: {
-                Text("Also matched: profile company, the public profile email, commit email domains, and username suffixes or prefixes such as -redhat or amd-. Code owners in CODEOWNERS get the full vLLM badge like committers; vLLM members and collaborators (triage access or more) who are neither get a gray one; filter with org:committer, org:member, or org:vllm for both. llm-d's badge comes from its MAINTAINERS.md, OWNERS and CODEOWNERS files and its org members; filter with org:llm-d.")
+                Text("Also matched: profile company, the first org mentioned in the bio (@mistralai), the public profile email, commit email domains, and username suffixes or prefixes such as -redhat or amd-. Code owners in CODEOWNERS get the full vLLM badge like committers; vLLM members and collaborators (triage access or more) who are neither get a gray one; filter with org:committer, org:member, or org:vllm for both. llm-d's badge comes from its MAINTAINERS.md, OWNERS and CODEOWNERS files and its org members; filter with org:llm-d.")
                     .foregroundStyle(.secondary)
             }
 

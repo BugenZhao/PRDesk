@@ -456,12 +456,16 @@ matched:
    orgs are checked
 4. The profile's company field, matched as whole words (`intel` matches `@intel` and
    `Intel Corporation`, not `Intelligence`), e.g. `@Inferact`, `Red Hat`, `AMD`, `@ROCm`
-5. The domain of the public email on the profile, e.g. `@intel.com`, unless the company field names
-   another org (a public email can be left over from a past job); profiles stored before this was
-   read get it in one cheap query per 100 people
-6. The email domain of the commit authors on the user's PRs (subdomains included, e.g.
+5. The first `@` mention in the bio other than `@vllm-project`, e.g. "Software Engineer @mistralai",
+   when it is one of the org's GitHub orgs or matches its company patterns (`@AMD`, `@llm-d`); later
+   mentions tend to be projects contributed to or past jobs ("Contributor to @vllm-project, @llm-d",
+   "prev @Huawei")
+6. The domain of the public email on the profile, e.g. `@intel.com`, unless the company field names
+   another org (a public email can be left over from a past job); profiles stored before bios and
+   public emails were read get both in one cheap query per 100 people
+7. The email domain of the commit authors on the user's PRs (subdomains included, e.g.
    `us.ibm.com`): `redhat.com`, `nvidia.com`, `amd.com`, `intel.com` and so on
-7. Login suffixes, e.g. `-redhat`, `-nv`, `-amd`, `-intel`, `-ibm`, `-cohere`, `-aws`, then prefixes
+8. Login suffixes, e.g. `-redhat`, `-nv`, `-amd`, `-intel`, `-ibm`, `-cohere`, `-aws`, then prefixes
    for work accounts: `amd-`, `nv-` / `nvidia-`, `intel-`, `aws-` / `amzn-`
 
 `ai-dynamo` stays under NVIDIA rather than getting a badge of its own: nearly everyone working on

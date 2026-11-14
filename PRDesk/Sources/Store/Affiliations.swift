@@ -12,6 +12,8 @@ struct UserInfo: Codable, Hashable, Sendable {
     var emailDomains: [String]
     /// Domain of the public email on the profile; empty when there is none, nil until fetched.
     var profileEmailDomain: String?
+    /// The profile bio; empty when there is none, nil until fetched.
+    var bio: String?
     var fetchedAt: Date
     /// PRs merged in the repository, refreshed on its own schedule.
     var mergedCount: Int?
@@ -20,6 +22,17 @@ struct UserInfo: Codable, Hashable, Sendable {
 
 extension UserInfo: FetchableRecord, PersistableRecord {
     static let databaseTableName = "userInfo"
+}
+
+extension UserInfo {
+    /// The first handle mentioned in the bio other than vllm-project, e.g. `mistralai` in
+    /// "Software Engineer @mistralai": the employer, when there is one. Later mentions tend to be
+    /// projects contributed to or past jobs ("Contributor to @vllm-project, @llm-d", "prev @Huawei").
+    var bioHandle: String? {
+        guard let bio, !bio.isEmpty else { return nil }
+        return bio.matches(of: /@([A-Za-z0-9][A-Za-z0-9-]*)/).lazy.map { String($0.output.1) }
+            .first { !sameLogin($0, "vllm-project") }
+    }
 }
 
 /// A manual affiliation: `include` adds the badge, otherwise it is suppressed.
@@ -196,6 +209,9 @@ struct Affiliations: Equatable, Sendable {
             if let company = user.company, org.matches(company: company) {
                 return "profile company: \(company)"
             }
+            if let handle = user.bioHandle, org.matches(handle: handle) {
+                return "profile bio: @\(handle)"
+            }
             // A public email can be left over from a past job: it counts only when the company
             // field doesn't name another org.
             if let domain = user.profileEmailDomain, org.matches(emailDomain: domain),
@@ -220,10 +236,14 @@ struct Affiliations: Equatable, Sendable {
 // MARK: - Database
 
 extension AppDatabase {
-    func saveProfileEmailDomains(_ domains: [String: String]) async throws {
+    /// Public profile email domains and bios, keyed by login; empty strings for none.
+    func saveProfileExtras(_ extras: [String: (emailDomain: String, bio: String)]) async throws {
         try await writer.write { db in
-            for (login, domain) in domains {
-                try db.execute(sql: "UPDATE userInfo SET profileEmailDomain = ? WHERE login = ?", arguments: [domain, login])
+            for (login, extra) in extras {
+                try db.execute(
+                    sql: "UPDATE userInfo SET profileEmailDomain = ?, bio = ? WHERE login = ?",
+                    arguments: [extra.emailDomain, extra.bio, login]
+                )
             }
         }
     }
