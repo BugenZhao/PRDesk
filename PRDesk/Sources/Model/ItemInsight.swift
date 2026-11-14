@@ -79,9 +79,9 @@ struct ItemInsight: Hashable, Sendable {
         othersActivityAt = othersActivity.map(\.at).max()
 
         // The baseline only stands in until the item is first seen, so marking an older item
-        // unread (seenAt before the baseline) works.
-        let seen = state?.seenAt ?? baseline ?? .distantPast
-        // Or marked unread with nothing by others to go back to, until seen again.
+        // unread (seenAt before the baseline) works. Reading its notification elsewhere sees it too.
+        let seen = max(state?.seenAt ?? baseline ?? .distantPast, state?.notificationReadAt ?? .distantPast)
+        // Or marked unread (`n`), until seen again.
         isUnread = (othersActivityAt ?? .distantPast) > seen || (state?.markedUnreadAt).map { $0 > seen } ?? false
 
         isReviewRequestedFromMe = viewer.map(item.isReviewRequested(from:)) ?? false

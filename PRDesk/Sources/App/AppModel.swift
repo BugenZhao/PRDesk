@@ -477,11 +477,30 @@ final class AppModel {
             for note in missing.prefix(10) {
                 _ = try? await engine.fetchItem(repo: note.repo, number: note.number)
             }
+            await followNotificationReads()
             inbox = notes.sorted { $0.updatedAt > $1.updatedAt }
             rebuild()
             restoreSelection()
         } catch {
             logger.error("Inbox sync failed: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    /// Reading a notification anywhere (the web, GitHub's apps, here) counts as seeing its item:
+    /// records when each recent thread was last read.
+    private func followNotificationReads() async {
+        do {
+            let threads = try await engine.fetchRecentThreads()
+            let ids = Dictionary(snapshot.items.map { ($0.repoNumber, $0.id) }, uniquingKeysWith: { a, _ in a })
+            var readAt: [Item.ID: Date] = [:]
+            for thread in threads {
+                guard let id = ids[thread.repoNumber], let at = thread.lastReadAt else { continue }
+                readAt[id] = max(readAt[id] ?? at, at)
+            }
+            let changed = readAt.filter { snapshot.states[$0.key]?.notificationReadAt != $0.value }
+            if !changed.isEmpty { try await db.setNotificationReadTimes(changed) }
+        } catch {
+            logger.error("Reading notification read times failed: \(String(describing: error), privacy: .public)")
         }
     }
 
@@ -933,14 +952,14 @@ final class AppModel {
                     markNotificationRead(item)
                 }
             } else {
-                // GitHub times are whole seconds: a second before the latest activity by others
-                // leaves just that unread. With none (say, only the viewer and bots so far), the
-                // item is marked unread until seen again.
+                // Unread until seen again, even where GitHub says its notification was read. GitHub
+                // times are whole seconds: a second before the latest activity by others makes
+                // just that new when the item is next opened.
                 for (item, insight) in rows {
-                    if let latest = insight.othersActivityAt {
-                        updateState(item) { $0.seenAt = latest.addingTimeInterval(-1) }
-                    } else {
-                        updateState(item) { $0.markedUnreadAt = now }
+                    let seenAt = insight.othersActivityAt?.addingTimeInterval(-1)
+                    updateState(item) { state in
+                        state.markedUnreadAt = now
+                        if let seenAt { state.seenAt = seenAt }
                     }
                 }
             }

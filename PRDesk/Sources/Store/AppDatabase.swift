@@ -314,6 +314,11 @@ final class AppDatabase: Sendable {
                 t.drop(column: "pinnedAt")
             }
         }
+        migrator.registerMigration("v28") { db in
+            try db.alter(table: "itemState") { t in
+                t.add(column: "notificationReadAt", .datetime)
+            }
+        }
         return migrator
     }
 }
@@ -436,6 +441,17 @@ extension AppDatabase {
 extension AppDatabase {
     func state(_ itemID: Item.ID) async throws -> ItemState? {
         try await reader.read { db in try ItemState.fetchOne(db, key: itemID) }
+    }
+
+    /// Records when items' notifications were last read on GitHub.
+    func setNotificationReadTimes(_ times: [Item.ID: Date]) async throws {
+        try await writer.write { db in
+            for (itemID, at) in times {
+                var state = try ItemState.fetchOne(db, key: itemID) ?? ItemState(itemID: itemID)
+                state.notificationReadAt = at
+                try state.save(db)
+            }
+        }
     }
 
     /// Loads (or creates) the state for `itemID`, applies `change`, and saves it.

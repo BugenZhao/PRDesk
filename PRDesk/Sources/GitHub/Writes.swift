@@ -31,8 +31,11 @@ struct InboxNote: Hashable, Sendable {
     /// GitHub's reason, e.g. `mention`, `review_requested`, `comment`, `author`.
     var reason: String
     var updatedAt: Date
-    /// Read in this session; stays listed (without the unread dot) until the next inbox sync.
+    /// Read on GitHub, or in this session (then it stays listed, without the unread dot, until the
+    /// next inbox sync).
     var isRead = false
+    /// When the viewer last read the thread, wherever: here, on the web or in GitHub's apps.
+    var lastReadAt: Date?
 
     /// As `Item.repoNumber`.
     var repoNumber: String { "\(repo.lowercased())#\(number)" }
@@ -173,7 +176,9 @@ extension SyncEngine {
 
         let id: String
         let reason: String
+        let unread: Bool
         let updated_at: Date
+        let last_read_at: Date?
         let subject: Subject
     }
 
@@ -181,28 +186,45 @@ extension SyncEngine {
     func fetchInbox() async throws -> [InboxNote] {
         var notes: [InboxNote] = []
         for repo in [Self.repo, Parity.repo] {
-            notes += try await fetchInbox(repo: repo)
+            notes += try await fetchThreads(repo: repo, since: nil)
         }
         return notes
     }
 
-    private func fetchInbox(repo: String) async throws -> [InboxNote] {
+    /// Those notifications updated in the last `readWindow`, read ones too: for when each was last
+    /// read, which counts as seeing the item (`ItemState.notificationReadAt`).
+    func fetchRecentThreads() async throws -> [InboxNote] {
+        let since = Date().addingTimeInterval(-Self.readWindow)
+        var notes: [InboxNote] = []
+        for repo in [Self.repo, Parity.repo] {
+            notes += try await fetchThreads(repo: repo, since: since)
+        }
+        return notes
+    }
+
+    private static let readWindow: TimeInterval = 14 * 24 * 3600
+
+    /// Unread threads, or with `since`, all threads updated since then.
+    private func fetchThreads(repo: String, since: Date?) async throws -> [InboxNote] {
         var notes: [InboxNote] = []
         for page in 1 ... 5 {
-            let batch = try await client.rest(
-                "GET", "/repos/\(repo)/notifications",
-                query: [
-                    URLQueryItem(name: "participating", value: "true"),
-                    URLQueryItem(name: "per_page", value: "50"),
-                    URLQueryItem(name: "page", value: String(page)),
-                ],
-                as: [NotificationDTO].self
-            )
+            var query = [
+                URLQueryItem(name: "participating", value: "true"),
+                URLQueryItem(name: "per_page", value: "50"),
+                URLQueryItem(name: "page", value: String(page)),
+            ]
+            if let since {
+                query += [URLQueryItem(name: "all", value: "true"), URLQueryItem(name: "since", value: since.formatted(.iso8601))]
+            }
+            let batch = try await client.rest("GET", "/repos/\(repo)/notifications", query: query, as: [NotificationDTO].self)
             notes += batch.compactMap { note in
                 guard ["PullRequest", "Issue"].contains(note.subject.type),
                       let number = note.subject.url?.split(separator: "/").last.flatMap({ Int($0) })
                 else { return nil }
-                return InboxNote(threadID: note.id, repo: repo, number: number, reason: note.reason, updatedAt: note.updated_at)
+                return InboxNote(
+                    threadID: note.id, repo: repo, number: number, reason: note.reason, updatedAt: note.updated_at,
+                    isRead: !note.unread, lastReadAt: note.last_read_at
+                )
             }
             if batch.count < 50 { break }
         }

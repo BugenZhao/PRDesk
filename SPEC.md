@@ -322,7 +322,7 @@ well
 | Column | Content |
 |---|---|
 | (row) | Closed items are faded as a whole row; so are draft PRs (keeping only the unread dot), setting them apart from PRs waiting for review at a glance |
-| (marker) | The first, narrow column: `•` for unread activity from others (since I last viewed). When the item is in a stack, this column draws the stack's lines (see §4.1), with this dot as the node: the accent color when unread, otherwise gray (the icon before the title shows state), hollow for drafts; a forked child turns from its parent onto its own line to the right; official stacks are joined by solid lines, branch- and commit-joined ones by dashed lines. Two lines fit, with narrower spacing for more. Hovering shows the stack number and position, the base branch, the PR whose commits it starts with (for a commit-joined one), and which members are in other groups. Priority has no column of its own, only the row's background (§4.3) |
+| (marker) | The first, narrow column: `•` for unread activity from others since I last saw the item: opened it here, or read its notification anywhere (on the web, in GitHub's apps), going by when GitHub says each notification updated in the last 14 days was last read. When the item is in a stack, this column draws the stack's lines (see §4.1), with this dot as the node: the accent color when unread, otherwise gray (the icon before the title shows state), hollow for drafts; a forked child turns from its parent onto its own line to the right; official stacks are joined by solid lines, branch- and commit-joined ones by dashed lines. Two lines fit, with narrower spacing for more. Hovering shows the stack number and position, the base branch, the PR whose commits it starts with (for a commit-joined one), and which members are in other groups. Priority has no column of its own, only the row's background (§4.3) |
 | # | Number; small icons tell PRs and issues apart |
 | Title | State icon + title (leading `[..]` / `xx:` tags faded), a reason tag on woken items; the matching emoji on items sent to Grok Bots, and a `terminal` icon on items with a board Session (§3.3); then the board Comment, if any; a gray summary of the latest event (e.g. `@xx commented 2h`, `you reviewed 2d`) always right-aligned; truncated text (title, comment, summary) shows in full in a tooltip on hover |
 | Author | Avatar + login (italic for first-time contributors); trust marks (seal, org badges, see §5, §5.1) right-aligned |
@@ -364,7 +364,7 @@ well
 | `⌘Z` / `⇧⌘Z` | With the list focused, undo / redo list actions: Status, Priority, Pin (Mark as read and Close can't be undone); board writes for one item go out in order, so an undo never reaches GitHub before the original; in text fields it's still text undo |
 | `1` / `2` / `3` / `0` | Set Priority to H / M / L / clear |
 | `p` | Pin / unpin |
-| `n` | Mark read; on a read item, mark unread (unread from the latest activity by others; items with no activity from others, e.g. only mine and bots', become unread as a whole until opened again or `n` is pressed; local only, GitHub notifications unchanged) |
+| `n` | Mark read; on a read item, mark unread until opened again or `n` is pressed, even if its notification was read (local only, GitHub notifications unchanged); opening it then shows the latest activity by others as new |
 | `o` / `↩`, `⌘O` | Open in the browser (`⌘O` works with any focus, on the current selection) |
 | `u`, `⇧⌘O` | Open the author's GitHub profile (also in the row's context menu; `⇧⌘O` works with any focus) |
 | `⇧⌘C`, `⌘C` | Copy GitHub links, one per line (`⇧⌘C` works with any focus: all selected items when the list is focused, otherwise the item in the detail; `⌘C` only in the list). Rows can also be dragged out sideways, as links with titles |
@@ -561,8 +561,8 @@ gray tier.
 
 - `items`: PR / issue snapshot fields + the raw JSON, with the repository (numbers are only unique
   within one)
-- `item_state`: viewed_at, seen_at, the last send time and note of each kind of Grok Bot request
-  (local only, keyed by the item's node id)
+- `item_state`: viewed_at, seen_at, marked_unread_at, when its notification was last read on
+  GitHub, the last send time and note of each kind of Grok Bot request (keyed by the item's node id)
 - `board_item`: the cache of board items (item id, Status and when it was set, Priority, Comment,
   Session, Pinned)
 - `users`: login, avatar, company, orgs, email domains, committer areas, sources, fetched_at
