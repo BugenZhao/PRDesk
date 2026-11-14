@@ -16,7 +16,7 @@ struct DetailView: View {
         return Group {
             if let item = model.selectedItem {
                 VStack(spacing: 0) {
-                    DetailHeader(item: item, state: model.state(for: item), tab: $model.detailTab)
+                    DetailHeader(item: item, tab: $model.detailTab)
                         .padding(12)
                     Divider()
                     content(item)
@@ -125,7 +125,6 @@ struct DelayedProgressView: View {
 private struct DetailHeader: View {
     @Environment(AppModel.self) private var model
     let item: Item
-    let state: ItemState
     @Binding var tab: DetailView.DetailTab
     @State private var isParking = false
     /// The title being edited in place, and the item it belongs to (kept, so a rename committed
@@ -350,10 +349,11 @@ private struct DetailHeader: View {
                 Button("Add to Desk", systemImage: "plus") { model.perform(.addToDesk, on: item.id) }
                     .help("Keep this item on the desk, in Triage (a)")
             }
-            iconButton(state.isPinned ? "Unpin" : "Pin", symbol: state.isPinned ? "pin.slash" : "pin") {
+            let isPinned = board?.isPinned == true
+            iconButton(isPinned ? "Unpin" : "Pin", symbol: isPinned ? "pin.slash" : "pin") {
                 model.perform(.togglePin, on: item.id)
             }
-            .help(state.isPinned ? "Unpin (p)" : "Pin (p)")
+            .help(isPinned ? "Unpin (p)" : "Pin (p)")
         }
     }
 

@@ -2,7 +2,8 @@ import Foundation
 import os
 
 /// The triage board: a GitHub Project whose Status, Priority and Comment fields are the source of
-/// truth for triage (SPEC §3.1). Its Session field holds links the assistant bot writes (SPEC §3.3).
+/// truth for triage (SPEC §3.1), and its Pinned field holds the viewer's pins. Its Session field
+/// holds links the assistant bot writes (SPEC §3.3).
 enum BoardQuery {
     static let owner = "vllm-project"
     static let number = 56
@@ -38,6 +39,9 @@ enum BoardQuery {
               }
               session: fieldValueByName(name: "Session") {
                 ... on ProjectV2ItemFieldTextValue { text }
+              }
+              pinned: fieldValueByName(name: "Pinned") {
+                ... on ProjectV2ItemFieldSingleSelectValue { name }
               }
             }
           }
@@ -90,6 +94,7 @@ enum BoardQuery {
             let priority: SelectValue?
             let comment: TextValue?
             let session: TextValue?
+            let pinned: SelectValue?
 
             var entry: BoardEntry? {
                 guard let content, let contentID = content.id, let number = content.number,
@@ -99,7 +104,7 @@ enum BoardQuery {
                     number: number, itemID: id, contentID: contentID,
                     status: status?.name, statusAt: status?.updatedAt,
                     priority: priority?.name, comment: comment?.text, session: session?.text,
-                    isArchived: isArchived
+                    pinned: pinned?.name != nil, isArchived: isArchived
                 )
             }
         }
@@ -124,6 +129,7 @@ enum BoardQuery {
         var projectID: String
         var status: SelectField?
         var priority: SelectField?
+        var pinned: SelectField?
 
         init(_ project: Project) {
             projectID = project.id
@@ -137,6 +143,7 @@ enum BoardQuery {
             }
             status = select("Status")
             priority = select("Priority")
+            pinned = select("Pinned")
         }
     }
 }
@@ -441,6 +448,20 @@ extension SyncEngine {
                 return (field.id, nil)
             }
             let (id, option) = try Self.option(schema.priority, named: priority.optionName, in: "Priority")
+            return (id, FieldValue(singleSelectOptionId: option))
+        }
+    }
+
+    /// Pins or unpins the item: the Pinned field's one option, or no value.
+    func setPinned(_ pinned: Bool, number: Int, contentID: String) async throws {
+        try await writeBoard(number: number, contentID: contentID) { entry in
+            entry.pinned = pinned
+        } field: { schema, _ in
+            guard pinned else {
+                guard let field = schema.pinned else { throw BoardError.missingField("Pinned") }
+                return (field.id, nil)
+            }
+            let (id, option) = try Self.option(schema.pinned, named: "Pinned", in: "Pinned")
             return (id, FieldValue(singleSelectOptionId: option))
         }
     }

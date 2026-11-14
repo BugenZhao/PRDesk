@@ -792,7 +792,7 @@ final class AppModel {
         let row = row(for: item)
         if row.board?.isForeign == true { return false }
         let cutoff = Date().addingTimeInterval(-ListSection.closedRetention)
-        return item.isOpen || (item.closedAt ?? item.updatedAt) >= cutoff || row.state.isPinned
+        return item.isOpen || (item.closedAt ?? item.updatedAt) >= cutoff || row.isPinned
     }
 
     // MARK: History
@@ -898,8 +898,9 @@ final class AppModel {
             items = items.filter { $0.isUpstream && board(for: $0)?.isForeign != true }
             addToDesk(items)
         case .togglePin:
-            // Pinned is a dashboard section, which staging PRs stay out of.
-            items = items.filter { $0.isUpstream && !$0.isParity }
+            // Pins are on the board, so as for Status; Pinned is a dashboard section, which
+            // staging PRs stay out of.
+            items = items.filter { $0.isUpstream && !$0.isParity && board(for: $0)?.isForeign != true }
             addToDesk(items)
         case .addToDesk:
             addToDesk(items.filter(canAddToDesk))
@@ -922,8 +923,8 @@ final class AppModel {
             guard !changes.isEmpty else { return }
             setPriority(changes.map { ($0, next) })
         case .togglePin:
-            let pin = !items.allSatisfy { state(for: $0).isPinned }
-            setPins(items.map { ($0, pin ? state(for: $0).pinnedAt ?? now : nil) })
+            let pin = !items.allSatisfy { board(for: $0)?.isPinned == true }
+            setPins(items.filter { board(for: $0)?.isPinned != pin }.map { ($0, pin) })
         case .toggleRead:
             let rows = items.map { ($0, insight(for: $0, state: state(for: $0))) }
             if rows.contains(where: { $0.1.isUnread }) {
@@ -1080,13 +1081,17 @@ final class AppModel {
         }
     }
 
-    private func setPins(_ changes: [(item: Item, pinnedAt: Date?)]) {
+    private func setPins(_ changes: [(item: Item, pinned: Bool)]) {
         guard !changes.isEmpty else { return }
-        let previous = changes.map { (item: $0.item, pinnedAt: state(for: $0.item).pinnedAt) }
-        registerUndo(changes.contains { $0.pinnedAt != nil } ? "Pin" : "Unpin") { $0.setPins(previous) }
-        for change in changes {
-            let pinnedAt = change.pinnedAt
-            updateState(change.item) { $0.pinnedAt = pinnedAt }
+        let previous = changes.map { (item: $0.item, pinned: board(for: $0.item)?.isPinned == true) }
+        let pins = changes.contains(where: \.pinned)
+        registerUndo(pins ? "Pin" : "Unpin") { $0.setPins(previous) }
+        let what = changes.count == 1 ? "#\(changes[0].item.number)" : "\(changes.count) items"
+        let verb = Set(changes.map(\.pinned)).count > 1 ? "pin / unpin" : pins ? "pin" : "unpin"
+        writeBoard("\(verb) \(what)", activity: "\(verb.capitalized) \(what)", numbers: changes.map(\.item.number)) { engine in
+            for change in changes {
+                try await engine.setPinned(change.pinned, number: change.item.number, contentID: change.item.id)
+            }
         }
     }
 
@@ -1234,7 +1239,7 @@ final class AppModel {
             if row.board?.isForeign == true { return false }
             if item.isParity, item.isOpen, !item.isDraft { return true }
             if let section = ListSection.triageSection(of: row), [.working, .good, .triage].contains(section) { return true }
-            return row.state.isPinned || inboxItems.contains(item.repoNumber) || recent.contains(item.id)
+            return row.isPinned || inboxItems.contains(item.repoNumber) || recent.contains(item.id)
         }
         prefetchTask = Task { [weak self, db, engine, logger] in
             defer { self?.prefetchTask = nil }
@@ -1360,7 +1365,7 @@ final class AppModel {
             let row = row(for: item)
             // Items of the other tracker sharing the board are none of the app's business.
             if row.board?.isForeign == true { return nil }
-            if !item.isOpen, (item.closedAt ?? item.updatedAt) < cutoff, !row.state.isPinned { return nil }
+            if !item.isOpen, (item.closedAt ?? item.updatedAt) < cutoff, !row.isPinned { return nil }
             return row
         }
         // Staging PRs and the upstream PRs promoted from them show in the Parity tab, not the dashboard.
@@ -1426,7 +1431,7 @@ final class AppModel {
             .filter { $0.state.viewedAt != nil }
             .sorted { $0.state.viewedAt! > $1.state.viewedAt! }
             .prefix(ListSection.recentLimit))
-        members[.pinned] = ordered.filter(\.state.isPinned)
+        members[.pinned] = ordered.filter(\.isPinned)
         for row in ordered {
             if let section = ListSection.triageSection(of: row) { members[section, default: []].append(row) }
         }

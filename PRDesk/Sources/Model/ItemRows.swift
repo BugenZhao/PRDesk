@@ -19,6 +19,8 @@ struct ItemRow: Hashable, Sendable {
     /// Merger is merging the PR (Status Merging on the board).
     var isMerging: Bool { item.isOpen && triage == .merging }
     var priority: Priority? { board?.priorityValue }
+    /// Pinned on the board (its Pinned field).
+    var isPinned: Bool { board?.isPinned == true }
     var comment: String? { board?.isArchived == false ? board?.comment : nil }
 
     /// Why a Skipped item is back in Triage: someone asked the viewer directly after it was skipped.

@@ -301,6 +301,19 @@ final class AppDatabase: Sendable {
                 t.drop(column: "yabTabID")
             }
         }
+        migrator.registerMigration("v27") { db in
+            // Pins live on the board's Pinned field now; local ones carry over until it is read.
+            try db.alter(table: "boardItem") { t in
+                t.add(column: "pinned", .boolean).notNull().defaults(to: false)
+            }
+            try db.execute(sql: """
+                UPDATE boardItem SET pinned = 1
+                WHERE contentID IN (SELECT itemID FROM itemState WHERE pinnedAt IS NOT NULL)
+                """)
+            try db.alter(table: "itemState") { t in
+                t.drop(column: "pinnedAt")
+            }
+        }
         return migrator
     }
 }

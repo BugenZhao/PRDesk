@@ -116,8 +116,8 @@ are used off the main actor); no glass on content (cards, chips, rows).
 - `scripts/embed-grokbot.sh` runs cargo with `env -i`: under Xcode's environment proc-macro
   crates fail to build ("can't find crate for `serde_derive`"), and the half-built target dir
   keeps failing until it is deleted (`~/Library/Caches/com.bugenzhao.PRDesk.build/grokbot`).
-- The triage board (GitHub Project `vllm-project` #56) is the source of truth for Status, Priority
-  and Comment (SPEC §3.1). The app writes them only on an explicit user action, never from a rule (an off-board PR the user approves is added as Good, standing in for the board's own approval workflow, and 🚀 sets Merging once the board's automation has had its say);
+- The triage board (GitHub Project `vllm-project` #56) is the source of truth for Status, Priority,
+  Comment and pins (its Pinned field) (SPEC §3.1). The app writes them only on an explicit user action, never from a rule (an off-board PR the user approves is added as Good, standing in for the board's own approval workflow, and 🚀 sets Merging once the board's automation has had its say);
   it also shares the board with another tracker (`Python Parity Backlog`), whose items it must
   leave alone.
 - Menu commands live in `AppCommands`, apart from the scenes, and read only observed flags that

@@ -61,7 +61,7 @@ struct ItemFilter: Equatable {
             case "closed": item.state == .closed
             case "merged": item.state == .merged
             case "unread": row.insight.isUnread
-            case "pinned": row.state.isPinned
+            case "pinned": row.isPinned
             case "first": authorContribution?.isFirstTime ?? false
             case "regular": authorContribution?.isRegular ?? false
             default: false

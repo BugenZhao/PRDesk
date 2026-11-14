@@ -93,6 +93,8 @@ struct BoardEntry: Codable, Hashable, Sendable {
     /// Links to the agent sessions opened for the item, oldest first, separated by spaces: written
     /// by the assistant bot after 👀 or 🔥 (SPEC §3.3), only read here.
     var session: String?
+    /// Pinned by the viewer (the Pinned field has a value).
+    var pinned = false
     var isArchived: Bool
 
     /// Another tracker shares the board; its items are left alone entirely.
@@ -119,6 +121,8 @@ struct BoardEntry: Codable, Hashable, Sendable {
         guard !isArchived, let session else { return [] }
         return session.split(whereSeparator: \.isWhitespace).compactMap { URL(string: String($0)) }.filter { $0.scheme != nil }
     }
+
+    var isPinned: Bool { !isArchived && pinned }
 
     var priorityValue: Priority? {
         guard !isArchived else { return nil }

@@ -1,10 +1,10 @@
 import Foundation
 import GRDB
 
-/// Local-only state for an item, keyed by its node id. Triage decisions live on the board instead.
+/// Local-only state for an item, keyed by its node id. Triage decisions and pins live on the board
+/// instead.
 struct ItemState: Codable, Hashable, Sendable {
     var itemID: Item.ID
-    var pinnedAt: Date?
     /// Last time the item was opened in the detail pane (for Recently viewed).
     var viewedAt: Date?
     /// Activity by others after this is unread. Opening an item or `n` moves it forward;
@@ -26,8 +26,6 @@ struct ItemState: Codable, Hashable, Sendable {
     init(itemID: Item.ID) {
         self.itemID = itemID
     }
-
-    var isPinned: Bool { pinnedAt != nil }
 
     func sentAt(_ request: BotRequest) -> Date? {
         switch request {

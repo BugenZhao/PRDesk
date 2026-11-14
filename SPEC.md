@@ -9,7 +9,7 @@ implementation that doesn't consult the source of any existing tool.
   appear only in the Parity tab (§3.2)
 - Items: PRs and issues
 - User: the user signed in to `gh` (BugenZhao); every "me / you" means them
-- Source of truth for triage: the GitHub Project **Bugen's Board** (`vllm-project` #56), see §3.1
+- Source of truth for triage and pins: the GitHub Project **Bugen's Board** (`vllm-project` #56), see §3.1
 - Out of scope: Claude / terminal panels, task items, collections, notes, IDE / worktree integration
 - Grok Bot: the app only hands items to bots (§3.3); it doesn't run agents or read bot
   conversations or state
@@ -98,6 +98,10 @@ Status on its own, with the single exception of approvals below.
 - **Priority**: a single-select field on the board: High / Medium / Low
 - **Comment**: a text field on the board, the item's note (usually the next step); read-only in the
   app, shown after the title in the list
+- **Pinned**: a single-select field on the board with one option, `Pinned`: my pins (`p`), kept on
+  the board rather than locally so they're the same wherever the board is read. Pinning an item that
+  isn't on the board adds it without a Status (so it shows in Triage unless it's mine; the board's
+  automation may still give an approved PR Good). Items of the other tracker can't be pinned
 - **Other Statuses**: `Python Parity Backlog` belongs to another tracker; the app ignores those
   items completely (doesn't show or change them). The old `Good` and `Pending` count as Working,
   `Stale` as Backlog; Done on an open item (e.g. reopened) counts as untriaged
@@ -269,7 +273,7 @@ Top to bottom:
   selecting the neighbor when a row leaves the list, or restoring the selection at launch).
   Selecting inside Recently viewed only marks read and doesn't reorder it, so `j` doesn't bounce
   between the top two rows
-- **Pinned**: items pinned with `p` (local)
+- **Pinned**: items pinned with `p` (the board's Pinned field, §3.1)
 - **Good**: open items with Status = Working (or Merging), plus open items I opened that have no
   Status, that are approved PRs; mine first, then PRs Merger is merging (Status = Merging) last, so
   what waits for 🚀 comes first. A Merging PR draws its open icon purple (the merge color), unless
@@ -557,10 +561,10 @@ gray tier.
 
 - `items`: PR / issue snapshot fields + the raw JSON, with the repository (numbers are only unique
   within one)
-- `item_state`: pinned, viewed_at, seen_at, the last send time and note of each kind of Grok Bot
-  request (local only, keyed by the item's node id)
+- `item_state`: viewed_at, seen_at, the last send time and note of each kind of Grok Bot request
+  (local only, keyed by the item's node id)
 - `board_item`: the cache of board items (item id, Status and when it was set, Priority, Comment,
-  Session)
+  Session, Pinned)
 - `users`: login, avatar, company, orgs, email domains, committer areas, sources, fetched_at
 - `org_overrides`: the manual mappings
 - `timeline_cache`: the detail cache (with the item's updated time, which prefetching uses to judge
