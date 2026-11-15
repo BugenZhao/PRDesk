@@ -30,6 +30,10 @@ enum DeviceRole: Sendable {
     /// members, profiles, merged counts).
     var computesAffiliations: Bool { self == .primary }
 
+    /// Fetches details ahead of opening (Working, Good, Triage, the inbox, pins): hundreds of
+    /// queries after a first sync. The companion fetches a detail when it is opened.
+    var prefetchesDetails: Bool { self == .primary }
+
     /// How far back the first sync looks.
     var initialLookback: TimeInterval {
         switch self {

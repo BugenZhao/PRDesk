@@ -101,27 +101,7 @@ struct MainView: View {
                 .help("Show or hide the detail pane (⌘B)")
             }
         }
-        .alert(
-            "GitHub not updated",
-            isPresented: Binding(get: { model.writeError != nil }, set: { if !$0 { model.writeError = nil } }),
-            actions: { Button("OK") {} },
-            message: { Text(model.writeError ?? "") }
-        )
-        .alert(
-            "Grok Bot not reached",
-            isPresented: Binding(get: { model.botError != nil }, set: { if !$0 { model.botError = nil } }),
-            actions: { Button("OK") {} },
-            message: { Text(model.botError ?? "") }
-        )
-        .alert(
-            "Not opened",
-            isPresented: Binding(get: { model.linkError != nil }, set: { if !$0 { model.linkError = nil } }),
-            actions: { Button("OK") {} },
-            message: { Text(model.linkError ?? "") }
-        )
-        .sheet(item: Binding(get: { model.pendingBotSend }, set: { model.pendingBotSend = $0 })) { pending in
-            BotSendSheet(pending: pending)
-        }
+        .modifier(ModelAlerts())
         .task {
             #if DEBUG
                 // `-PRDeskAppearance dark|light` forces an appearance, for checking both without

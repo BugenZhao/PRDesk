@@ -15,13 +15,23 @@ enum WebResources {
     static func page(_ kind: WebDocument.Kind) -> String {
         """
         <!doctype html>
-        <html data-page="\(kind.rawValue)" data-repos="\(SyncEngine.repo) \(Parity.repo)"><head><meta charset="utf-8"><meta name="color-scheme" content="light dark">
+        <html data-page="\(kind.rawValue)" data-repos="\(SyncEngine.repo) \(Parity.repo)"\(platformAttributes)><head><meta charset="utf-8"><meta name="color-scheme" content="light dark">\(viewport)
         <style>\(markdownCSS)
         \(detailCSS)
         \(WebSymbols.css)</style></head>
         <body><main id="root"></main></body></html>
         """
     }
+
+    /// The phone lays the page out at its own width, and sizes text itself rather than letting
+    /// WebKit inflate some paragraphs (see `detail.css`).
+    #if os(macOS)
+        private static let platformAttributes = ""
+        private static let viewport = ""
+    #else
+        private static let platformAttributes = #" data-platform="phone""#
+        private static let viewport = #"<meta name="viewport" content="width=device-width, initial-scale=1">"#
+    #endif
 
     private static func text(_ name: String, _ ext: String) -> String {
         guard let url = Bundle.main.url(forResource: name, withExtension: ext),

@@ -1218,7 +1218,7 @@ final class AppModel {
     /// the item, so opening one shows its cache at once. A round still running skips the next; the
     /// sync after picks it up.
     private func prefetchDetails() {
-        guard prefetchTask == nil else { return }
+        guard DeviceRole.current.prefetchesDetails, prefetchTask == nil else { return }
         let inboxItems = Set(inbox.filter { !isMuted($0) }.map(\.repoNumber))
         let recent = Set(snapshot.items
             .filter { state(for: $0).viewedAt != nil }

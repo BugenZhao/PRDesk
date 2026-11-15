@@ -14,6 +14,9 @@
 html { overflow-anchor: auto; }
 html, body { margin: 0; padding: 0; background: transparent; }
 body { font: 13px -apple-system, system-ui, sans-serif; color: var(--label); -webkit-font-smoothing: auto; }
+/* The phone: no text autosizing (it enlarges paragraphs but not one-line events), everything a
+   size up instead. */
+html[data-platform="phone"] { -webkit-text-size-adjust: 100%; zoom: 1.2; }
 #root { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
 #root:empty { display: none; }
 a { color: var(--accent); text-decoration: none; }

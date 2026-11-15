@@ -34,6 +34,14 @@ struct ComposerView: View {
     }
     private var isAuthor: Bool { sameLogin(item.author, model.viewer) }
 
+    private var placeholder: String {
+        #if os(macOS)
+            item.kind == .pullRequest ? "Comment or review (Markdown, ⌘↩ to comment)" : "Comment (Markdown, ⌘↩ to send)"
+        #else
+            item.kind == .pullRequest ? "Comment or review (Markdown)" : "Comment (Markdown)"
+        #endif
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             if isPreviewing {
@@ -59,7 +67,7 @@ struct ComposerView: View {
                     .background(Color.textBackground, in: RoundedRectangle(cornerRadius: 6))
                     .overlay(alignment: .topLeading) {
                         if text.isEmpty {
-                            Text(item.kind == .pullRequest ? "Comment or review (Markdown, ⌘↩ to comment)" : "Comment (Markdown, ⌘↩ to send)")
+                            Text(placeholder)
                                 .foregroundStyle(.tertiary)
                                 .padding(.horizontal, 9)
                                 .padding(.vertical, 4)
@@ -70,8 +78,13 @@ struct ComposerView: View {
             }
 
             HStack(spacing: 8) {
-                Toggle("Preview", isOn: $isPreviewing)
+                Toggle("Preview", systemImage: "eye", isOn: $isPreviewing)
                     .toggleStyle(.button)
+                    #if os(iOS)
+                        .labelStyle(.iconOnly)
+                    #else
+                        .labelStyle(.titleOnly)
+                    #endif
                     .disabled(trimmed.isEmpty)
                 if let error {
                     Text(error)
@@ -83,13 +96,30 @@ struct ComposerView: View {
                 if isBusy {
                     ProgressView().controlSize(.small)
                 }
-                if item.isOpen {
-                    closeButton
-                }
+                #if os(iOS)
+                    // Too narrow for every button: the rarer actions go in a menu.
+                    if item.isOpen {
+                        Menu("More", systemImage: "ellipsis") {
+                            if item.kind == .pullRequest, !isAuthor {
+                                Button("Request changes") { send(.requestChanges) }
+                                    .disabled(trimmed.isEmpty || isBusy)
+                            }
+                            closeButton
+                        }
+                        .labelStyle(.iconOnly)
+                        .disabled(isBusy)
+                    }
+                #else
+                    if item.isOpen {
+                        closeButton
+                    }
+                    if item.kind == .pullRequest, item.isOpen, !isAuthor {
+                        Button("Request changes") { send(.requestChanges) }
+                            .disabled(trimmed.isEmpty || isBusy)
+                            .help("Submit a review requesting changes; needs a comment")
+                    }
+                #endif
                 if item.kind == .pullRequest, item.isOpen, !isAuthor {
-                    Button("Request changes") { send(.requestChanges) }
-                        .disabled(trimmed.isEmpty || isBusy)
-                        .help("Submit a review requesting changes; needs a comment")
                     Button("Approve") { send(.approve) }
                         .disabled(isBusy)
                         .help("Submit an approving review, with the text as its comment")

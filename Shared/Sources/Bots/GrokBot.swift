@@ -30,6 +30,11 @@ enum BotRequest: String, CaseIterable, Codable, Sendable {
         self != .merge || item.kind == .pullRequest && item.isOpen && item.isUpstream && item.reviewDecision == "APPROVED"
     }
 
+    /// The bot's name to show: a bot set by id (as the phone's are) goes by the request's usual bot.
+    var botName: String {
+        UUID(uuidString: bot) == nil ? bot : (self == .merge ? GrokBot.defaultMergeBot : GrokBot.defaultAssistantBot)
+    }
+
     /// The bot it goes to, by name (or a unique prefix of one), set in Settings.
     var bot: String {
         let key = self == .merge ? GrokBot.mergeBotKey : GrokBot.assistantBotKey

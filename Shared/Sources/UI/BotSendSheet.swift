@@ -33,7 +33,7 @@ struct BotSendSheet: View {
                 .background(.background, in: .rect(cornerRadius: 6))
                 .overlay(alignment: .topLeading) {
                     if note.isEmpty {
-                        Text("Note for \(pending.request.bot) (optional)")
+                        Text("Note for \(pending.request.botName) (optional)")
                             .foregroundStyle(.tertiary)
                             .padding(.horizontal, 9)
                             .padding(.vertical, 4)
@@ -45,7 +45,7 @@ struct BotSendSheet: View {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
-                Button("Send") {
+                Button(sendTitle) {
                     model.sendToBot(pending.request, items: pending.items, note: note)
                     dismiss()
                 }
@@ -55,13 +55,27 @@ struct BotSendSheet: View {
             }
         }
         .padding(20)
-        .frame(width: 440)
+        #if os(macOS)
+            .frame(width: 440)
+        #else
+            .frame(maxHeight: .infinity, alignment: .top)
+            .presentationDetents([.medium])
+        #endif
         .onAppear { noteFocused = true }
+    }
+
+    /// The phone hands the message to Grok Bot as a draft, sent from there.
+    private var sendTitle: String {
+        #if os(macOS)
+            "Send"
+        #else
+            "Open in Grok Bot"
+        #endif
     }
 
     private var title: String {
         let what = pending.items.count == 1 ? "#\(pending.items[0].number)" : "\(pending.items.count) items"
         let again = pending.resends == 0 ? "" : pending.resends == pending.items.count ? " again" : " (\(pending.resends) again)"
-        return "Send \(what) to \(pending.request.bot) \(pending.request.emoji)\(again)"
+        return "Send \(what) to \(pending.request.botName) \(pending.request.emoji)\(again)"
     }
 }
