@@ -448,7 +448,7 @@ final class AvatarSchemeHandler: NSObject, WKURLSchemeHandler {
         let name = url.lastPathComponent
         let appearance = webView.effectiveAppearance
         Task {
-            let data = if url.host == "badge" { await Self.badgeData(name, appearance: appearance) } else { await AvatarCache.data(for: name) }
+            let data = if url.host == "badge" { await Self.badgeData(name, appearance: appearance) } else { await AvatarStore.data(for: name) }
             guard running.remove(id) != nil else { return }
             guard let data else {
                 task.didFailWithError(URLError(.fileDoesNotExist))

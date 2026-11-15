@@ -14,8 +14,8 @@ let project = Project(
             deploymentTargets: .macOS("26.0"),
             // Not Tuist's default plist, which names a Main storyboard this app doesn't have.
             infoPlist: .file(path: "PRDesk/Info.plist"),
-            sources: ["PRDesk/Sources/**"],
-            resources: ["PRDesk/AppIcon.icon", "PRDesk/Assets.xcassets", "PRDesk/Web/**"],
+            sources: ["PRDesk/Sources/**", "Shared/Sources/**"],
+            resources: ["Shared/Resources/AppIcon.icon", "Shared/Resources/Assets.xcassets", "Shared/Resources/Web/**"],
             scripts: [
                 // The grokbot CLI, for sending items to Grok Bots. Its build is cached by commit.
                 .post(
@@ -32,7 +32,7 @@ let project = Project(
             settings: .settings(
                 base: [
                     "SWIFT_VERSION": "6.0",
-                    // Icon Composer icon (PRDesk/AppIcon.icon), compiled by actool.
+                    // Icon Composer icon (Shared/Resources/AppIcon.icon), compiled by actool.
                     "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
                     // No asset-catalog accent color; the app follows the system accent.
                     "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": "",
@@ -42,6 +42,35 @@ let project = Project(
                     "CODE_SIGN_IDENTITY": "-",
                     "CODE_SIGN_STYLE": "Manual",
                     "ENABLE_HARDENED_RUNTIME": "NO",
+                ]
+            )
+        ),
+        // The iPhone and iPad companion: GitHub (the board, notifications) is its only source of
+        // truth, and it never runs the Mac's rules (subscriptions, approvals). See Shared/.
+        .target(
+            name: "PRDeskMobile",
+            destinations: [.iPhone, .iPad],
+            product: .app,
+            bundleId: "com.bugenzhao.PRDesk.mobile",
+            deploymentTargets: .iOS("26.0"),
+            infoPlist: .extendingDefault(with: [
+                "CFBundleDisplayName": "PR Desk",
+                "UILaunchScreen": [:],
+                // Sends to Grok Bots open its app with a draft.
+                "LSApplicationQueriesSchemes": ["grokbot"],
+            ]),
+            sources: ["PRDeskMobile/Sources/**", "Shared/Sources/**"],
+            resources: ["Shared/Resources/AppIcon.icon", "Shared/Resources/Assets.xcassets", "Shared/Resources/Web/**"],
+            dependencies: [
+                .package(product: "GRDB"),
+            ],
+            settings: .settings(
+                base: [
+                    "SWIFT_VERSION": "6.0",
+                    "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
+                    "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": "",
+                    "MARKETING_VERSION": "0.1",
+                    "CURRENT_PROJECT_VERSION": "1",
                 ]
             )
         ),

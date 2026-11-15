@@ -17,36 +17,48 @@ enum GitHubAuth {
         throw GitHubAuthError.noToken
     }
 
-    /// Runs `gh auth token`. GUI apps don't inherit the shell PATH, so try the
-    /// usual install locations before falling back to a login shell.
-    @concurrent
-    static func ghToken() async -> String? {
-        let fm = FileManager.default
-        let candidates = ["/opt/homebrew/bin/gh", "/usr/local/bin/gh"]
-        if let gh = candidates.first(where: fm.isExecutableFile(atPath:)) {
-            return run(gh, ["auth", "token"])
+    #if os(macOS)
+        /// Runs `gh auth token`. GUI apps don't inherit the shell PATH, so try the
+        /// usual install locations before falling back to a login shell.
+        @concurrent
+        static func ghToken() async -> String? {
+            let fm = FileManager.default
+            let candidates = ["/opt/homebrew/bin/gh", "/usr/local/bin/gh"]
+            if let gh = candidates.first(where: fm.isExecutableFile(atPath:)) {
+                return run(gh, ["auth", "token"])
+            }
+            return run("/bin/zsh", ["-lc", "gh auth token"])
         }
-        return run("/bin/zsh", ["-lc", "gh auth token"])
-    }
 
-    private static func run(_ executable: String, _ arguments: [String]) -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = arguments
-        let stdout = Pipe()
-        process.standardOutput = stdout
-        process.standardError = FileHandle.nullDevice
-        do {
-            try process.run()
-        } catch {
-            return nil
+        private static func run(_ executable: String, _ arguments: [String]) -> String? {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: executable)
+            process.arguments = arguments
+            let stdout = Pipe()
+            process.standardOutput = stdout
+            process.standardError = FileHandle.nullDevice
+            do {
+                try process.run()
+            } catch {
+                return nil
+            }
+            let data = stdout.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else { return nil }
+            let token = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+            return token.isEmpty ? nil : token
         }
-        let data = stdout.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else { return nil }
-        let token = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-        return token.isEmpty ? nil : token
-    }
+    #else
+        /// The phone has no `gh`: debug builds may take a token from the environment (as a
+        /// simulator launch passes it); otherwise it is the one saved in Settings.
+        static func ghToken() async -> String? {
+            #if DEBUG
+                ProcessInfo.processInfo.environment["PRDESK_GITHUB_TOKEN"].flatMap { $0.isEmpty ? nil : $0 }
+            #else
+                nil
+            #endif
+        }
+    #endif
 }
 
 /// Stores a personal access token as a generic password item.

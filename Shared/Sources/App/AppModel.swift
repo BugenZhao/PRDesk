@@ -1,4 +1,3 @@
-import AppKit
 import Foundation
 import Observation
 import os
@@ -113,7 +112,7 @@ final class AppModel {
     @ObservationIgnored private var restoredSelection: TableSelection? = Defaults.get(.selection)
     /// Unread notifications for issues and PRs in the repository, newest first.
     private(set) var inbox: [InboxNote] = [] {
-        didSet { updateDockBadge() }
+        didSet { updateBadge() }
     }
 
     /// Muted items' notifications don't count; GitHub can't always be stopped from sending them.
@@ -131,8 +130,8 @@ final class AppModel {
     /// The upstream PR promoted from each parity staging PR that has one, by the staging PR's id.
     @ObservationIgnored private var stagingUpstream: [Item.ID: Item] = [:]
 
-    private func updateDockBadge() {
-        NSApp.dockTile.badgeLabel = unreadInboxCount == 0 ? nil : String(unreadInboxCount)
+    private func updateBadge() {
+        Platform.setBadgeCount(unreadInboxCount)
     }
     /// Working and Good items regardless of the filter, the viewer's move first (for the menu bar).
     private(set) var workingItems: [ItemRow] = []
@@ -278,7 +277,7 @@ final class AppModel {
     @ObservationIgnored private var detailTask: Task<Void, Never>?
     /// Cached details older than this are refreshed when shown, even if the item looks unchanged.
     private static let detailMaxAge: TimeInterval = 120
-    @ObservationIgnored private let logger = Logger(subsystem: "com.bugenzhao.PRDesk", category: "App")
+    @ObservationIgnored let logger = Logger(subsystem: "com.bugenzhao.PRDesk", category: "App")
 
     init(db: AppDatabase) {
         self.db = db
@@ -377,15 +376,9 @@ final class AppModel {
 
     func start() {
         guard tasks.isEmpty else { return }
-        // A mouse's back and forward buttons move through the history like ⌘[ and ⌘].
-        mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: .otherMouseDown) { [weak self] event in
-            let button = event.buttonNumber
-            guard button == 3 || button == 4 else { return event }
-            MainActor.assumeIsolated {
-                if button == 3 { self?.goBack() } else { self?.goForward() }
-            }
-            return nil
-        }
+        #if os(macOS)
+            installMouseMonitor()
+        #endif
         tasks.append(Task { [weak self, db] in
             do {
                 for try await snapshot in db.observeSnapshot() {
@@ -393,11 +386,11 @@ final class AppModel {
                     self.snapshot = snapshot
                     migrateDrafts()
                     for item in snapshot.items {
-                        if let author = item.author, let url = item.authorAvatarURL { AvatarCache.remember(url, for: author) }
+                        if let author = item.author, let url = item.authorAvatarURL { AvatarStore.remember(url, for: author) }
                     }
                     if board != snapshot.board {
                         board = snapshot.board
-                        updateDockBadge()
+                        updateBadge()
                     }
                     rebuild()
                     restoreSelection()
@@ -751,27 +744,6 @@ final class AppModel {
     /// Brings up the window, set by the views that can open it.
     @ObservationIgnored var showWindow: (() -> Void)?
 
-    /// Shows the issue or PR on the tab in front in Yab, bringing the window up.
-    func showBrowserTab() {
-        Task {
-            do {
-                guard let tab = try await YabFrontTab.read() else {
-                    linkError = "Yab has no tab in front."
-                    return
-                }
-                guard let link = ItemLink(tab.url) ?? ItemLink(pageTitle: tab.title) else {
-                    linkError = "The tab in front in Yab isn't an issue or PR of \(SyncEngine.repo):\n\(tab.url)"
-                    return
-                }
-                showWindow?()
-                open(link)
-            } catch {
-                logger.error("Reading Yab's tab failed: \(error.localizedDescription, privacy: .public)")
-                linkError = "Couldn't read Yab's tab in front: \(error.localizedDescription)"
-            }
-        }
-    }
-
     private func showOpened(_ item: Item) {
         openedItems.removeAll { $0.id == item.id }
         openedItems.insert(item, at: 0)
@@ -827,7 +799,9 @@ final class AppModel {
     private(set) var canGoBack = false
     private(set) var canGoForward = false
     @ObservationIgnored private var isMovingInHistory = false
-    @ObservationIgnored private var mouseMonitor: Any?
+    #if os(macOS)
+        @ObservationIgnored var mouseMonitor: Any?
+    #endif
     private static let historyLimit = 100
 
     func goBack() {
@@ -966,7 +940,7 @@ final class AppModel {
         case .openInBrowser:
             // Opening dozens of tabs is never what a stray keypress meant.
             for item in items.prefix(Self.maxTabsAtOnce) {
-                if let url = URL(string: item.url) { NSWorkspace.shared.open(url) }
+                if let url = URL(string: item.url) { Platform.open(url) }
             }
         case .openSession:
             let links = items.compactMap { board(for: $0)?.sessionLinks.last }
@@ -980,11 +954,8 @@ final class AppModel {
                 Self.openProfile(author)
             }
         case .copyLink:
-            let pasteboard = NSPasteboard.general
-            pasteboard.clearContents()
-            pasteboard.setString(items.map(\.url).joined(separator: "\n"), forType: .string)
             // A single link also goes as a URL, so apps that take one (Mail, Notes) make it a link.
-            if items.count == 1 { pasteboard.setString(items[0].url, forType: .URL) }
+            Platform.copy(items.map(\.url).joined(separator: "\n"), url: items.count == 1 ? items[0].url : nil)
         case .addToDesk:
             break
         case let .sendToBot(request, withNote):
@@ -1043,7 +1014,7 @@ final class AppModel {
 
     /// Opens a person's GitHub profile in the browser.
     static func openProfile(_ login: String) {
-        if let url = profileURL(for: login) { NSWorkspace.shared.open(url) }
+        if let url = profileURL(for: login) { Platform.open(url) }
     }
 
     /// Runs a board write, reporting failure in `writeError`.
