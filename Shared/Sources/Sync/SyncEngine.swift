@@ -20,14 +20,13 @@ enum SyncError: LocalizedError {
 
 /// Pulls tracked PRs and issues from GitHub into the local database.
 ///
-/// The first sync looks back `initialLookback`; later syncs only ask for items
+/// The first sync looks back the device's `initialLookback`; later syncs only ask for items
 /// updated since the previous sync started (minus some slack for search index lag).
 /// Items on the triage board are tracked too; those no search finds are refreshed by id.
 actor SyncEngine {
     static let owner = "vllm-project"
     static let name = "vllm"
     static let repo = "\(owner)/\(name)"
-    static let initialLookback: TimeInterval = 90 * 24 * 3600
     private static let indexSlack: TimeInterval = 5 * 60
     /// Open board items are probed this often (see `probe(ids:)`), and fully refetched hourly.
     private static let boardRefreshInterval: TimeInterval = 5 * 60
@@ -73,7 +72,7 @@ actor SyncEngine {
         let since: Date = if let last = try await db.meta(Self.lastSyncKey).flatMap(Self.parse) {
             last.addingTimeInterval(-Self.indexSlack)
         } else {
-            startedAt.addingTimeInterval(-Self.initialLookback)
+            startedAt.addingTimeInterval(-DeviceRole.current.initialLookback)
         }
 
         // One advanced search for everything tracked; `involves:` covers author, assignee, mentions
@@ -98,7 +97,7 @@ actor SyncEngine {
         if let contentIDs = try await board {
             fetched += try await refreshBoardItems(contentIDs)
             boardSyncedAt = startedAt
-            await followApprovals(viewer: viewer, readAt: startedAt)
+            if DeviceRole.current.runsRules { await followApprovals(viewer: viewer, readAt: startedAt) }
         }
 
         await fetchStackCommits()

@@ -556,7 +556,7 @@ final class AppModel {
             try await engine.submit(submission, body: body, subjectID: detail.id)
         }
         setDraft("", for: item.id)
-        if submission == .approve, item.kind == .pullRequest, item.isUpstream, item.isOpen,
+        if DeviceRole.current.runsRules, submission == .approve, item.kind == .pullRequest, item.isUpstream, item.isOpen,
            board(for: item).map({ $0.isArchived && !$0.isForeign }) ?? true {
             writeBoard("add #\(item.number) to the board as Good", activity: "#\(item.number) → Good", numbers: [item.number]) { engine in
                 try await engine.addApproved(number: item.number, contentID: item.id)
@@ -995,7 +995,7 @@ final class AppModel {
             }
             for item in items { botSends[item.id]?[request]?.isSent = true }
             rebuild()
-            if request == .merge { setMerging(items) }
+            if request == .merge, DeviceRole.current.sendsToBotsDirectly { setMerging(items) }
             for item in items {
                 do {
                     try await db.updateState(item.id) { $0.setSent(at: now, note: note, for: request) }
@@ -1110,6 +1110,7 @@ final class AppModel {
 
     /// Updates affiliation data for everyone who appears in the list.
     func refreshAffiliations(force: Bool = false) async {
+        guard DeviceRole.current.computesAffiliations else { return }
         let authors = Set(snapshot.items.compactMap(\.author))
         let logins = authors.union(snapshot.items.flatMap { $0.events.compactMap(\.actor) })
         do {

@@ -189,8 +189,8 @@ extension SyncEngine {
         // Writes made while the board was being read would be undone by what it read.
         let recent = Set(boardWrites.filter { $0.value > startedAt.addingTimeInterval(-Self.boardWriteGrace) }.keys)
         let previous = try await db.replaceBoard(entries, keeping: recent)
-        // The first read has nothing to compare with.
-        if !previous.isEmpty {
+        // The first read has nothing to compare with; only the primary device follows changes.
+        if !previous.isEmpty, DeviceRole.current.runsRules {
             await followStatusChanges(entries.filter { !recent.contains($0.number) }, previous: previous)
         }
         return entries.filter { !$0.isForeign && !$0.isArchived }.map(\.contentID)
@@ -379,6 +379,8 @@ extension SyncEngine {
             let (id, option) = try Self.option(schema.status, named: status.rawValue, in: "Status")
             return (id, FieldValue(singleSelectOptionId: option))
         }
+        // A companion leaves the subscription to the primary device, which follows the change.
+        guard DeviceRole.current.runsRules else { return }
         do {
             try await followSubscription(from: previous, to: status, contentID: contentID)
         } catch {
