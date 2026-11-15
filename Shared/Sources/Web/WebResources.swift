@@ -1,4 +1,4 @@
-import AppKit
+import Foundation
 
 /// The pages' HTML, styles and scripts, from the app bundle.
 @MainActor
@@ -38,7 +38,7 @@ enum WebResources {
 @MainActor
 enum WebSymbols {
     static let names = [
-        "arrow.up.right", "chevron.right", "checkmark.seal", "hand.thumbsup.fill", "hand.thumbsdown.fill",
+        "arrow.up.right", "chevron.right", "checkmark.seal",
         "doc.text", "arrow.up.circle", "arrow.triangle.2.circlepath", "arrow.triangle.merge", "xmark.circle",
         "arrow.uturn.left.circle", "eye", "pencil.circle", "person.badge.plus", "xmark.seal", "tag", "link",
         "person.crop.circle.badge.checkmark", "pencil", "eye.circle", "circle",
@@ -52,26 +52,9 @@ enum WebSymbols {
 
     static let css: String = names.compactMap { rule($0) }.joined(separator: "\n")
 
-    /// Draws the symbol centered in a square at twice its size, for a sharp mask.
+    /// The symbol as a mask, drawn by the platform (`WebImages.symbolPNG`).
     private static func rule(_ name: String) -> String? {
-        guard let symbol = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
-            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 26, weight: .regular))
-        else { return nil }
-        let side = ceil(max(symbol.size.width, symbol.size.height))
-        guard let bitmap = NSBitmapImageRep(
-            bitmapDataPlanes: nil, pixelsWide: Int(side * 2), pixelsHigh: Int(side * 2),
-            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
-        ) else { return nil }
-        bitmap.size = NSSize(width: side, height: side)
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
-        symbol.draw(in: NSRect(
-            x: (side - symbol.size.width) / 2, y: (side - symbol.size.height) / 2,
-            width: symbol.size.width, height: symbol.size.height
-        ))
-        NSGraphicsContext.restoreGraphicsState()
-        guard let png = bitmap.representation(using: .png, properties: [:]) else { return nil }
+        guard let png = WebImages.symbolPNG(name) else { return nil }
         return ".\(className(name)) { --sym: url(data:image/png;base64,\(png.base64EncodedString())); }"
     }
 }
