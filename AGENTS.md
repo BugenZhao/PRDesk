@@ -1,6 +1,7 @@
 # PR Desk
 
-Native macOS (26+) dashboard for PRs and issues in `vllm-project/vllm`. Product spec: `SPEC.md`.
+Native macOS (26+) dashboard for PRs and issues in `vllm-project/vllm`, with an iPhone and iPad
+companion (`PRDeskMobile`, iOS 26+). Product spec: `SPEC.md`.
 
 ## Build and run
 
@@ -40,28 +41,62 @@ xcodebuild -workspace PRDesk.xcworkspace -scheme PRDesk -derivedDataPath "$DD" \
 - It shares the real database: selecting an item marks it viewed and read, and adding or pinning
   stores it. Pick items already in Recently viewed, and don't add, pin or set fields unless that is
   what's being tested. Quit the copy when done.
-- Web pages (`PRDesk/Web/`) can also be checked headless: load `WebResources.page(_:)` into an
+- Web pages (`Shared/Resources/Web/`) can also be checked headless: load `WebResources.page(_:)` into an
   offscreen `WKWebView` with the scripts, render a payload built from `detailCache` rows, and
   `takeSnapshot`. Offscreen views don't animate or tick timers at full rate, so judge timing and
   transitions in the app instead.
 
+### The iOS companion
+
+Build for a simulator and launch it with `simctl`, so debug flags and a token reach it (the phone
+has no `gh`; debug builds read `PRDESK_GITHUB_TOKEN` from the environment):
+
+```sh
+DD=<your scratch dir>/DerivedDataMobile
+xcodebuild -workspace PRDesk.xcworkspace -scheme PRDeskMobile -derivedDataPath "$DD" \
+  -destination 'platform=iOS Simulator,id=<udid>' CODE_SIGNING_ALLOWED=NO build
+xcrun simctl install <udid> "$DD/Build/Products/Debug-iphonesimulator/PRDeskMobile.app"
+SIMCTL_CHILD_PRDESK_GITHUB_TOKEN="$(gh auth token)" xcrun simctl launch --terminate-running-process \
+  <udid> com.bugenzhao.PRDesk.mobile -PRDeskDryRunWrites YES
+```
+
+- Quote the `-destination`: split by the shell, it quietly builds for a generic device instead and
+  the simulator keeps the old app.
+- The companion has its own database in the simulator's app container. Its syncs spend the same
+  GraphQL quota as the Mac's (5,000 points an hour, per user): a first sync is about a thousand
+  items; don't relaunch it over and over with an empty database.
+
 ## Layout
 
-- `PRDesk/Sources/GitHub` — `GitHubClient` (GraphQL + REST, retries), queries and mutations
-- `PRDesk/Sources/Sync` — `SyncEngine` (tracked items, details, inbox, the triage board),
+Both apps compile `Shared/`; each adds its own views and platform parts. Put new logic in
+`Shared/` and keep platform code to the thin files around it, so the apps don't drift.
+
+- `Shared/Sources/GitHub` — `GitHubClient` (GraphQL + REST, retries), queries and mutations
+- `Shared/Sources/Sync` — `SyncEngine` (tracked items, details, inbox, the triage board),
   `AffiliationEngine` (badges)
-- `PRDesk/Sources/Store` — GRDB records and migrations (`AppDatabase`); migrations are append-only
-- `PRDesk/Sources/Model` — pure logic: `ItemInsight` (Turn, unread, review-request classification),
-  filter parsing, sections and sorting
-- `PRDesk/Sources/Bots` — `GrokBot`: sends items to Grok Bots through the bundled grokbot CLI
-  (SPEC §3.3), built by `scripts/embed-grokbot.sh` at a pinned commit (needs `~/.cargo`)
-- `PRDesk/Sources/Yab` — `YabFrontTab`: reads Yab's tab in front through `yab exec`, for ⌃⌥⌘D
+- `Shared/Sources/Store` — GRDB records and migrations (`AppDatabase`); migrations are append-only
+- `Shared/Sources/Model` — pure logic: `ItemInsight` (Turn, unread, review-request classification),
+  filter parsing, sections and sorting, state icons
+- `Shared/Sources/App` — `AppModel` (the `@Observable` main-actor state both apps drive)
+- `Shared/Sources/Support` — `Platform` (opening links, the pasteboard, the badge count),
+  `DeviceRole` (only the Mac, the primary, follows the board with rules and prefetches details),
+  `AvatarStore`
+- `Shared/Sources/Bots` — `GrokBot` messages (SPEC §3.3); each app sends them its way
+- `Shared/Sources/Web` — the detail pages: `WebDocument` (one long-lived `WKWebView` that Swift
+  fills with JSON from `TimelineDocument` / `FilesDocument` and `detail.js` patches in place by
+  block id), `WebResources`, `AvatarSchemeHandler`
+- `Shared/Sources/UI` — SwiftUI views both apps use: the composer, checks, header components, the
+  bot send sheet, alerts
+- `Shared/Resources` — the web pages' styles and scripts (`Web/`, with highlight.js), the asset
+  catalog, the app icon
+- `PRDesk/Sources` — the Mac: the app entry, `AppModel+Mac` (mouse buttons, Yab), the list (an
+  `NSTableView` with drawn cells, `UI/ItemTable/`), the detail pane, `WebDocument+Mac` (find bar,
+  menus), `WebImages+Mac`, the grokbot CLI sender (`Bots/GrokBot+CLI`, built by
+  `scripts/embed-grokbot.sh` at a pinned commit, needs `~/.cargo`), `Yab/YabFrontTab` for ⌃⌥⌘D
   (SPEC §6)
-- `PRDesk/Sources/App` — `AppModel` (the `@Observable` main-actor state) and the app entry point
-- `PRDesk/Sources/UI` — SwiftUI shell; the list is an `NSTableView` with drawn cells (`ItemTable/`);
-  the conversation and the files diff are each one long-lived `WKWebView` page (`Detail/WebDocument`)
-  that Swift fills with JSON (`TimelineDocument`, `FilesDocument`) and `PRDesk/Web/detail.js` patches
-  in place by block id; styles, scripts and highlight.js live in `PRDesk/Web/`
+- `PRDeskMobile/Sources` — the phone: tabs, list and detail screens, settings, its `WebImages`,
+  `AvatarCache` and web view host, and a Grok sender that opens Grok Bot with the message as a
+  draft (`grokbot://app/v1/prompt`)
 
 ## Apple's coding-assistant docs
 
@@ -132,11 +167,11 @@ are used off the main actor); no glass on content (cards, chips, rows).
 - Only user-initiated selection counts as opening an item (viewed, unread cleared, notification
   marked read). Selections the table makes itself go through `AppModel.autoSelect`; otherwise a
   row leaving the list selects its neighbor, which gets read and leaves too, in a chain.
-- PR state icons in `PRDesk/Assets.xcassets` (`pr-open`, `pr-draft`, `pr-conflict`, `pr-merged`,
-  `pr-closed`) are GitHub Octicons at 16 px (MIT, `PRDesk/octicons.LICENSE`). Octicons has no
+- PR state icons in `Shared/Resources/Assets.xcassets` (`pr-open`, `pr-draft`, `pr-conflict`, `pr-merged`,
+  `pr-closed`) are GitHub Octicons at 16 px (MIT, `Shared/Resources/octicons.LICENSE`). Octicons has no
   conflict glyph: `pr-conflict` is `git-pull-request` with its top-left node swapped for the ✕ and
   stem of `git-pull-request-closed`. The repo is public: don't add assets taken from other apps.
-- The app icon is an Icon Composer bundle (`PRDesk/AppIcon.icon`: `icon.json` + SVG layers on a
+- The app icon is an Icon Composer bundle (`Shared/Resources/AppIcon.icon`: `icon.json` + SVG layers on a
   1024 canvas). Layers must be filled shapes — strokes render as solid fills. Keep same-colored
   parts in one layer and make pieces overlap rather than abut, or the glass rendering shows
   hairline seams. The `.icns` that `actool` emits is a flat iOS 26-style fallback; judge the

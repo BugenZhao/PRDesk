@@ -38,6 +38,6 @@ open .build/DerivedData/Build/Products/Debug/PRDesk.app
 ## Third-party
 
 - [GRDB.swift](https://github.com/groue/GRDB.swift) (MIT)
-- [highlight.js](https://highlightjs.org) (BSD-3-Clause, `PRDesk/Web/highlight.LICENSE`)
-- [Octicons](https://primer.style/octicons) for the PR state icons (MIT, `PRDesk/octicons.LICENSE`)
-- [Lobe Icons](https://github.com/lobehub/lobe-icons) for the Cohere and Tencent badges (MIT, `PRDesk/lobe-icons.LICENSE`)
+- [highlight.js](https://highlightjs.org) (BSD-3-Clause, `Shared/Resources/Web/highlight.LICENSE`)
+- [Octicons](https://primer.style/octicons) for the PR state icons (MIT, `Shared/Resources/octicons.LICENSE`)
+- [Lobe Icons](https://github.com/lobehub/lobe-icons) for the Cohere and Tencent badges (MIT, `Shared/Resources/lobe-icons.LICENSE`)
