@@ -10,7 +10,7 @@ struct AvatarView: View {
         _ = cache.version
         return Group {
             if let login, let image = cache.image(for: login) {
-                Image(nsImage: image).resizable()
+                Image(platformImage: image).resizable()
             } else {
                 Circle().fill(.quaternary)
             }
@@ -43,20 +43,21 @@ struct LoginText: View {
             }
             .buttonStyle(.plain)
             .disabled(login == nil)
-            .pointerStyle(login == nil ? nil : .link)
+            #if os(macOS)
+                .pointerStyle(login == nil ? nil : .link)
+            #endif
             .onHover { isHovered = $0 }
             .help((personFacts(contribution: contribution, badges: badges) + (login.map { ["Open \($0)'s profile on GitHub"] } ?? []))
                 .joined(separator: "\n"))
         }
         .contextMenu {
             if let login {
-                AffiliationSubmenu(login: login)
-                Divider()
+                #if os(macOS)
+                    AffiliationSubmenu(login: login)
+                    Divider()
+                #endif
                 Button("Open Profile on GitHub") { AppModel.openProfile(login) }
-                Button("Copy Username") {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(login, forType: .string)
-                }
+                Button("Copy Username") { Platform.copy(login) }
             }
         }
     }
@@ -84,9 +85,9 @@ struct BadgeIcons: View {
             ForEach(badges, id: \.org) { badge in
                 Group {
                     if let image = badge.image {
-                        Image(nsImage: image).resizable().scaledToFit()
+                        Image(platformImage: image).resizable().scaledToFit()
                     } else {
-                        BadgeTile(text: badge.org.shortLabel, color: Color(nsColor: .tertiaryLabelColor), size: size)
+                        BadgeTile(text: badge.org.shortLabel, color: Color.tertiaryLabel, size: size)
                     }
                 }
                 .frame(width: size, height: size)

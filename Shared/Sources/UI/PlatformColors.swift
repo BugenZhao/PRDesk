@@ -11,6 +11,14 @@ extension Color {
         #endif
     }
 
+    static var tertiaryLabel: Color {
+        #if os(macOS)
+            Color(nsColor: .tertiaryLabelColor)
+        #else
+            Color(uiColor: .tertiaryLabel)
+        #endif
+    }
+
     static var separator: Color {
         #if os(macOS)
             Color(nsColor: .separatorColor)
