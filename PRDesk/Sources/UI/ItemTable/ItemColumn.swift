@@ -372,59 +372,22 @@ extension Priority {
     }
 }
 
-/// The icon for an item's kind and state.
-enum StateIcon: Hashable {
-    /// A template image in the asset catalog: the PR state glyphs (GitHub Octicons).
-    case asset(String)
-    case symbol(String)
+extension StateTint {
+    var nsColor: NSColor {
+        switch self {
+        case .green: .systemGreen
+        case .gray: .secondaryLabelColor
+        case .yellow: .systemYellow
+        case .purple: .systemPurple
+        case .red: .systemRed
+        }
+    }
 }
 
 extension Item {
-    var hasConflicts: Bool { isOpen && mergeable == "CONFLICTING" }
-
-    /// Each PR state has its own glyph; draft wins over conflicts. Issues use SF Symbols.
-    var stateIcon: StateIcon {
-        switch (kind, state) {
-        case (.pullRequest, .open): .asset(isDraft ? "pr-draft" : hasConflicts ? "pr-conflict" : "pr-open")
-        case (.pullRequest, .merged): .asset("pr-merged")
-        case (.pullRequest, .closed): .asset("pr-closed")
-        case (.issue, .open): .symbol("circle.circle")
-        case (.issue, _): .symbol("checkmark.circle")
-        }
-    }
-
-    var stateDescription: String {
-        switch (kind, state) {
-        case (.pullRequest, .open): isDraft ? "Draft" : hasConflicts ? "Open, merge conflicts" : "Open"
-        case (_, .merged): "Merged"
-        case (_, .closed): "Closed"
-        case (.issue, .open): "Open"
-        }
-    }
-
-    /// An open PR Merger is merging draws its open icon purple, the merge color, unless what the
-    /// icon shows matters more (a draft, conflicts).
-    private func showsMerging(_ isMerging: Bool) -> Bool {
-        isMerging && kind == .pullRequest && state == .open && !isDraft && !hasConflicts
-    }
-
     func stateColor(isMerging: Bool) -> NSColor {
-        showsMerging(isMerging) ? .systemPurple : stateColor
+        stateTint(isMerging: isMerging).nsColor
     }
 
-    func stateDescription(isMerging: Bool) -> String {
-        showsMerging(isMerging) ? "Open, being merged by Merger" : stateDescription
-    }
-
-    /// GitHub's state colors: open green, draft gray, merged/completed purple, closed PR red;
-    /// an open, ready PR with merge conflicts is yellow.
-    var stateColor: NSColor {
-        switch (kind, state) {
-        case (.pullRequest, .open): isDraft ? .secondaryLabelColor : hasConflicts ? .systemYellow : .systemGreen
-        case (.pullRequest, .merged): .systemPurple
-        case (.pullRequest, .closed): .systemRed
-        case (.issue, .open): .systemGreen
-        case (.issue, _): .systemPurple
-        }
-    }
+    var stateColor: NSColor { stateTint.nsColor }
 }

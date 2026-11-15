@@ -37,7 +37,7 @@ private struct CheckRow: View {
 
     var body: some View {
         Button {
-            if let url = check.url.flatMap(URL.init(string:)) { NSWorkspace.shared.open(url) }
+            if let url = check.url.flatMap(URL.init(string:)) { Platform.open(url) }
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: check.state.symbol)

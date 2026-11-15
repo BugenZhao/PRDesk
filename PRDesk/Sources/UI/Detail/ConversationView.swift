@@ -81,9 +81,3 @@ struct ConversationView: View {
         return menu
     }
 }
-
-extension AppModel: TimelinePeople {
-    func badges(for login: String) -> [Badge] {
-        affiliations.badges(for: login)
-    }
-}

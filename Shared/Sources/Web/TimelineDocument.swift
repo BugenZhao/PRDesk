@@ -8,6 +8,12 @@ protocol TimelinePeople {
     func contribution(for login: String?) -> Contribution?
 }
 
+extension AppModel: TimelinePeople {
+    func badges(for login: String) -> [Badge] {
+        affiliations.badges(for: login)
+    }
+}
+
 /// The conversation as the timeline page shows it: the description, comment and review cards,
 /// and one-line events, as HTML blocks keyed by id (see `detail.js`).
 @MainActor

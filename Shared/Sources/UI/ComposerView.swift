@@ -46,7 +46,7 @@ struct ComposerView: View {
                     }
                 }
                 .frame(height: 110)
-                .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+                .background(Color.textBackground, in: RoundedRectangle(cornerRadius: 6))
             } else {
                 TextEditor(text: $text)
                     .font(.body)
@@ -56,7 +56,7 @@ struct ComposerView: View {
                     // never feed into the window's minimum size.
                     .frame(height: editorHeight)
                     .padding(4)
-                    .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+                    .background(Color.textBackground, in: RoundedRectangle(cornerRadius: 6))
                     .overlay(alignment: .topLeading) {
                         if text.isEmpty {
                             Text(item.kind == .pullRequest ? "Comment or review (Markdown, ⌘↩ to comment)" : "Comment (Markdown, ⌘↩ to send)")
@@ -66,7 +66,7 @@ struct ComposerView: View {
                                 .allowsHitTesting(false)
                         }
                     }
-                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(focused ? Color.accentColor.opacity(0.6) : Color(nsColor: .separatorColor), lineWidth: 1))
+                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(focused ? Color.accentColor.opacity(0.6) : Color.separator, lineWidth: 1))
             }
 
             HStack(spacing: 8) {
