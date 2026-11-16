@@ -207,8 +207,8 @@ every stage is computed from state on GitHub.
   conflicts)
 - Columns: Author (the agent or me, but for adopted PRs) becomes **Link**, showing the state icon
   and number of the PR at the other end: upstream PRs in Upstream and Landed show their staging PR,
-  an adoption's staging PR the PR it adopts; hovering shows the repository and title (and an adopted
-  PR's author)
+  an adoption's staging PR the PR it adopts; an author other than the agent or me (an adopted PR's)
+  shows as an avatar at the right; hovering shows the repository and title (and that author)
 - Avatars of GitHub Apps (such as the agent) can't be fetched by login; use the avatar URL from
   the sync
 

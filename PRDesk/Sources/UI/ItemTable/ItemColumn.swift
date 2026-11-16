@@ -151,7 +151,10 @@ enum ItemColumn: String, CaseIterable {
 
         case .link:
             guard let paired = row.paired else { return [] }
-            return [.icon(paired.stateIcon, color: paired.stateColor), .text("#\(paired.number)", color: .secondaryLabelColor, font: CellFont.digits)]
+            let runs: [CellRun] = [.icon(paired.stateIcon, color: paired.stateColor), .text("#\(paired.number)", color: .secondaryLabelColor, font: CellFont.digits)]
+            // Link stands in for Author: someone other than the agent or the viewer is worth a face.
+            guard let author = Self.outsideAuthor(row, viewer: viewer) else { return runs }
+            return runs + [.spring, .avatar(AvatarCache.shared.image(for: author))]
 
         case .review:
             return reviewRuns(row)
@@ -189,6 +192,12 @@ enum ItemColumn: String, CaseIterable {
         case .updated:
             return [.text(item.updatedAt.compactAge(relativeTo: now), color: .secondaryLabelColor, font: CellFont.digits)]
         }
+    }
+
+    /// In the Parity tab, whose PR a row's pair is when it is neither the agent's nor the viewer's:
+    /// an adopted PR's author, on its row or its staging PR's.
+    static func outsideAuthor(_ row: ItemRow, viewer: String?) -> String? {
+        [row.item.author, row.paired?.author].compactMap(\.self).first { !Parity.isBot($0) && !sameLogin($0, viewer) }
     }
 
     /// Marks an upstream PR the parity agent is adopting (or adopted), so in Landed too it stands

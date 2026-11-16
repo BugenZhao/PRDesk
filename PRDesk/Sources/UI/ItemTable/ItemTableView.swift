@@ -184,8 +184,8 @@ struct ItemTableView: NSViewRepresentable {
                 updateTagMode()
             } else if parent.badgeVersion != badgeVersion {
                 badgeVersion = parent.badgeVersion
-                // Both columns that show the author's marks.
-                let columns = IndexSet([ItemColumn.author, .avatar].map { table.column(withIdentifier: $0.identifier) }.filter { $0 >= 0 })
+                // The columns that show authors: their avatars and marks, or (Link) an adopted PR's.
+                let columns = IndexSet([ItemColumn.author, .avatar, .link].map { table.column(withIdentifier: $0.identifier) }.filter { $0 >= 0 })
                 table.reloadData(forRowIndexes: IndexSet(integersIn: 0 ..< rows.count), columnIndexes: columns)
             }
 
@@ -734,7 +734,13 @@ struct ItemTableView: NSViewRepresentable {
                     let lines = [truncated].compactMap(\.self) + sessions + [adoption].compactMap(\.self)
                     return lines.isEmpty ? nil : lines.joined(separator: "\n")
                 case .author, .avatar: return authorTooltip(itemRow.item.author)
-                case .link: return itemRow.paired.map(Self.linkTooltip)
+                case .link:
+                    return itemRow.paired.map { paired in
+                        let line = Self.linkTooltip(paired)
+                        // An adopted PR's own row: Link stands in for its author.
+                        guard paired.isParityStaging, let author = ItemColumn.outsideAuthor(itemRow, viewer: viewer) else { return line }
+                        return "\(line)\nAdopted from @\(author)"
+                    }
                 case .stack: return Self.stackTooltip(itemRow)
                 case .review: return ItemColumn.reviewTooltip(itemRow.item)
                 case .ci: return ItemColumn.ciTooltip(itemRow.item)
