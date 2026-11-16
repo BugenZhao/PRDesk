@@ -100,7 +100,7 @@ actor SyncEngine {
             if DeviceRole.current.runsRules { await followApprovals(viewer: viewer, readAt: startedAt) }
         }
 
-        await fetchStackCommits()
+        await fetchCommits()
 
         try await db.setMeta(Self.lastSyncKey, Self.format(startedAt))
         if try await db.meta(AppDatabase.baselineKey) == nil {
@@ -110,22 +110,27 @@ actor SyncEngine {
         return await SyncResult(viewer: viewer, fetched: fetched, finishedAt: Date(), rateLimit: client.rateLimit)
     }
 
-    /// Fetches the commits of PRs that may be stacked by commits, where their heads moved; a
-    /// failure waits for the next round.
-    private func fetchStackCommits() async {
+    /// Fetches the commits of PRs that may be stacked by commits, and of PRs the parity agent
+    /// adopted, where their heads moved; a failure waits for the next round.
+    private func fetchCommits() async {
         do {
-            let ids = try await db.stackCommitsDue()
+            let ids = try await db.commitsDue()
             guard !ids.isEmpty else { return }
             let fetched = try await Self.concurrently(ids.chunked(ItemQuery.pageSize)) { chunk in
                 try await self.client.query(ItemQuery.commits, variables: ItemQuery.NodesVariables(ids: chunk), as: ItemQuery.CommitsResponse.self)
                     .nodes.compactMap(\.self)
             }.flatMap(\.self)
             try await db.setCommits(fetched.map { node in
-                (node.id, node.commits.nodes?.compactMap { $0?.commit.oid } ?? [], node.headRefOid)
+                let commits = node.commits.nodes?.compactMap { $0?.commit } ?? []
+                var authors: [String] = []
+                for login in commits.compactMap(\.author?.user?.login) where !authors.contains(login) {
+                    authors.append(login)
+                }
+                return (node.id, commits.map(\.oid), authors, node.headRefOid)
             })
-            logger.info("Fetched the commits of \(fetched.count) PRs that may be stacked")
+            logger.info("Fetched the commits of \(fetched.count) PRs")
         } catch {
-            logger.error("Failed to fetch stack commits: \(String(describing: error), privacy: .public)")
+            logger.error("Failed to fetch commits: \(String(describing: error), privacy: .public)")
         }
     }
 
@@ -177,6 +182,12 @@ actor SyncEngine {
         }
         if store { try await db.upsert([item]) }
         return item
+    }
+
+    /// The Markdown body of a pull request.
+    func fetchBody(repo: String, number: Int) async throws -> String {
+        struct Pull: Decodable, Sendable { let body: String? }
+        return try await client.rest("GET", "/repos/\(repo)/pulls/\(number)", as: Pull.self).body ?? ""
     }
 
     /// Re-fetches the given items by node id, a few small batches at a time.

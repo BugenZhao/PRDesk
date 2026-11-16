@@ -319,6 +319,11 @@ final class AppDatabase: Sendable {
                 t.add(column: "notificationReadAt", .datetime)
             }
         }
+        migrator.registerMigration("v29") { db in
+            try db.alter(table: "item") { t in
+                t.add(column: "commitAuthors", .text)
+            }
+        }
         return migrator
     }
 }
@@ -332,35 +337,41 @@ extension AppDatabase {
             for item in items {
                 // The commits a stack is worked out from are fetched apart; keep them.
                 _ = try item.upsertAndFetch(db) { _ in
-                    [Column("commitOids").noOverwrite, Column("commitsHead").noOverwrite]
+                    [Column("commitOids").noOverwrite, Column("commitsHead").noOverwrite, Column("commitAuthors").noOverwrite]
                 }
             }
         }
     }
 
-    /// PRs sharing their first commit (and repository and base branch) with another, whose
-    /// commits haven't been fetched at their current head: the candidates for a stack from a fork.
-    func stackCommitsDue() async throws -> [String] {
+    /// PRs whose commits haven't been fetched at their current head, among those sharing their
+    /// first commit (and repository and base branch) with another: the candidates for a stack from
+    /// a fork; and open upstream PRs a parity staging PR adopts (`richard/adopt-<n>-…`), whose
+    /// commits tell whether the adoption was promoted.
+    func commitsDue() async throws -> [String] {
         try await reader.read { db in
             try String.fetchAll(db, sql: """
                 SELECT id FROM item
                 WHERE kind = 'pr' AND headCommit IS NOT NULL AND commitsHead IS NOT headCommit
-                  AND (repo, IFNULL(baseRef, ''), firstCommit) IN (
+                  AND ((repo, IFNULL(baseRef, ''), firstCommit) IN (
                     SELECT repo, IFNULL(baseRef, ''), firstCommit FROM item
                     WHERE kind = 'pr' AND firstCommit IS NOT NULL
                     GROUP BY repo, IFNULL(baseRef, ''), firstCommit HAVING COUNT(*) > 1)
-                """)
+                  OR state = 'open' AND repo = ? COLLATE NOCASE AND number IN (
+                    SELECT CAST(substr(headRef, 15) AS INTEGER) FROM item
+                    WHERE kind = 'pr' AND repo = ? COLLATE NOCASE AND headRef LIKE 'richard/adopt-%'))
+                """, arguments: [SyncEngine.repo, Parity.repo])
         }
     }
 
-    func setCommits(_ commits: [(id: String, oids: [String], head: String)]) async throws {
+    func setCommits(_ commits: [(id: String, oids: [String], authors: [String], head: String)]) async throws {
         guard !commits.isEmpty else { return }
         try await writer.write { db in
             for commit in commits {
-                let json = String(decoding: try JSONEncoder().encode(commit.oids), as: UTF8.self)
+                let oids = String(decoding: try JSONEncoder().encode(commit.oids), as: UTF8.self)
+                let authors = String(decoding: try JSONEncoder().encode(commit.authors), as: UTF8.self)
                 try db.execute(
-                    sql: "UPDATE item SET commitOids = ?, commitsHead = ? WHERE id = ?",
-                    arguments: [json, commit.head, commit.id]
+                    sql: "UPDATE item SET commitOids = ?, commitAuthors = ?, commitsHead = ? WHERE id = ?",
+                    arguments: [oids, authors, commit.head, commit.id]
                 )
             }
         }

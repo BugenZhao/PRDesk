@@ -160,7 +160,8 @@ enum ItemColumn: String, CaseIterable {
             // The viewer's move stands out by weight alone; color is left to priority.
             // A pending review request is the most common reason it's the viewer's move; name it.
             // The parity agent requests review on every staging PR, parked ones too.
-            if item.isOpen, row.insight.isReviewRequestedFromMe, !item.isParityStaging || row.insight.turn == .me {
+            // On an adopted PR the viewer's commits are on, a request (CODEOWNERS') is beside the point.
+            if item.isOpen, row.insight.isReviewRequestedFromMe, !row.insight.isCoAuthor, !item.isParityStaging || row.insight.turn == .me {
                 return [.text("review", color: .labelColor, font: CellFont.smallBold)]
             }
             return switch row.insight.turn {

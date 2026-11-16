@@ -98,9 +98,12 @@ struct Item: Codable, Hashable, Identifiable, Sendable {
     var headCommit: String? = nil
     /// For a PR that shares its first commit with another, its commits (the first 100) as of the
     /// head `commitsHead`, which tell which of them it carries. Fetched apart from the list
-    /// (`SyncEngine.fetchStackCommits`), and kept when the list stores the item again.
+    /// (`SyncEngine.fetchCommits`), and kept when the list stores the item again.
     var commitOids: [String]? = nil
     var commitsHead: String? = nil
+    /// The authors' logins of the same commits, for a PR adopted by the parity agent, whose
+    /// promote pushes commits by the viewer onto it (`Parity.Adoption.isPromoted`).
+    var commitAuthors: [String]? = nil
     var kind: Kind
     var title: String
     var url: String

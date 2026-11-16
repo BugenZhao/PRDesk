@@ -129,6 +129,11 @@ final class AppModel {
     @ObservationIgnored private var paritySections: [Item.ID: ListSection] = [:]
     /// The upstream PR promoted from each parity staging PR that has one, by the staging PR's id.
     @ObservationIgnored private var stagingUpstream: [Item.ID: Item] = [:]
+    /// The parity agent's adoptions of other people's upstream PRs, as of the last rebuild.
+    @ObservationIgnored private var adoptions = Parity.Adoptions()
+
+    /// The adoption a staging PR makes, or an upstream PR is the subject of.
+    func adoption(of item: Item) -> Parity.Adoption? { adoptions.of(item) }
 
     private func updateBadge() {
         Platform.setBadgeCount(unreadInboxCount)
@@ -358,6 +363,7 @@ final class AppModel {
         var state: ItemState
         var viewer: String?
         var baseline: Date?
+        var adoptedSince: Date?
     }
 
     /// Insights by item, reused while what they are worked out from stays the same: every
@@ -365,9 +371,11 @@ final class AppModel {
     @ObservationIgnored private var insights: [Item.ID: (inputs: InsightInputs, insight: ItemInsight)] = [:]
 
     private func insight(for item: Item, state: ItemState) -> ItemInsight {
-        let inputs = InsightInputs(item: item, state: state, viewer: viewer, baseline: snapshot.baseline)
+        let adoption = adoptions.byUpstream[item.id]
+        let adoptedSince = adoption?.isPromoted == true ? adoption?.since : nil
+        let inputs = InsightInputs(item: item, state: state, viewer: viewer, baseline: snapshot.baseline, adoptedSince: adoptedSince)
         if let cached = insights[item.id], cached.inputs == inputs { return cached.insight }
-        let insight = ItemInsight(item: item, state: state, viewer: viewer, baseline: snapshot.baseline)
+        let insight = ItemInsight(item: item, state: state, viewer: viewer, baseline: snapshot.baseline, adoptedSince: adoptedSince)
         insights[item.id] = (inputs, insight)
         return insight
     }
@@ -642,6 +650,18 @@ final class AppModel {
     }
 
     func requestComposerFocus() { composerFocusRequest += 1 }
+
+    /// An adopted PR whose promote is done, before the viewer has posted the comment the agent drafted.
+    func awaitsDraftedComment(_ item: Item) -> Bool {
+        row(for: item).insight.awaitsDraftedComment
+    }
+
+    /// The comment the parity agent drafted, in an adoption's staging PR, for the viewer to post
+    /// on the adopted PR; nil if the body has none.
+    func draftedComment(for adoption: Parity.Adoption) async throws -> String? {
+        let body = try await engine.fetchBody(repo: adoption.staging.repo, number: adoption.staging.number)
+        return Parity.draftedComment(inBody: body)
+    }
 
     @ObservationIgnored private var filesCache: [Item.ID: (updatedAt: Date?, files: [PullFile])] = [:]
 
@@ -1352,6 +1372,7 @@ final class AppModel {
             affiliations.users[login.lowercased()]?.mergedCount.map { Contribution(merged: $0, threshold: threshold) }
         }
 
+        adoptions = Parity.adoptions(in: snapshot.items, viewer: viewer)
         let all: [ItemRow] = snapshot.items.compactMap { item in
             let row = row(for: item)
             // Items of the other tracker sharing the board are none of the app's business.
@@ -1359,15 +1380,16 @@ final class AppModel {
             if !item.isOpen, (item.closedAt ?? item.updatedAt) < cutoff, !row.isPinned { return nil }
             return row
         }
-        // Staging PRs and the upstream PRs promoted from them show in the Parity tab, not the dashboard.
+        // Staging PRs and the upstream PRs promoted from them show in the Parity tab, not the
+        // dashboard; adopted PRs show in both once promoted.
         let candidates = all.filter { $0.item.isUpstream && !$0.item.isParity }
-        let parity = Parity.sections(of: all)
+        let parity = Parity.sections(of: all, adoptions: adoptions)
         paritySections = [:]
         stagingUpstream = [:]
         for (section, rows) in parity {
             for row in rows {
                 paritySections[row.item.id] = section
-                if row.item.isParityUpstream, let staging = row.paired { stagingUpstream[staging.id] = row.item }
+                if row.item.isUpstream, let staging = row.paired { stagingUpstream[staging.id] = row.item }
             }
         }
         updateStackLadder()

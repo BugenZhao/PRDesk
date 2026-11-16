@@ -59,7 +59,7 @@ struct ItemRowView: View {
             }
             Spacer(minLength: 4)
             if let turn = row.insight.turn {
-                Text(row.insight.isReviewRequestedFromMe ? "review" : turn.rawValue)
+                Text(row.insight.isReviewRequestedFromMe && !row.insight.isCoAuthor ? "review" : turn.rawValue)
                     .fontWeight(turn == .me ? .semibold : .regular)
                     .foregroundStyle(turn == .me ? .primary : .tertiary)
             }

@@ -726,13 +726,21 @@ struct ItemTableView: NSViewRepresentable {
                     let lines = [truncated].compactMap(\.self) + sessions
                     return lines.isEmpty ? nil : lines.joined(separator: "\n")
                 case .author, .avatar: return authorTooltip(itemRow.item.author)
-                case .link: return itemRow.paired.map { "\($0.repo)#\($0.number) \($0.title)" }
+                case .link: return itemRow.paired.map(Self.linkTooltip)
                 case .stack: return Self.stackTooltip(itemRow)
                 case .review: return ItemColumn.reviewTooltip(itemRow.item)
                 case .ci: return ItemColumn.ciTooltip(itemRow.item)
                 default: return nil
                 }
             }
+        }
+
+        /// The PR at the other end of a parity row; an adopted PR names its author, who isn't the
+        /// agent or the viewer.
+        private static func linkTooltip(_ paired: Item) -> String {
+            let line = "\(paired.repo)#\(paired.number) \(paired.title)"
+            guard paired.isUpstream, !paired.isParityUpstream, let author = paired.author else { return line }
+            return "Adopts \(line)\nby @\(author)"
         }
 
         private static func stackTooltip(_ row: ItemRow) -> String? {

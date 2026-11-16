@@ -142,12 +142,36 @@ every stage is computed from state on GitHub.
   `bz/rust-parity-drop-incomplete-call`), so a staging PR with no upstream PR of the same name falls
   back to an upstream PR not claimed by another staging PR, opened after it, with the same title or
   a slug that is its slug cut at a `-` (same title first, then longest slug)
+- **Adoptions**: instead of waiting on someone else's small upstream PR in its scope, the agent
+  adopts it (the runbook's §8b): a staging PR on `richard/adopt-<n>-<slug>`, built from the author's
+  head and titled like it, with the agent's fixes on top; promoting pushes the fixes onto the
+  author's branch as my commits, so there is no `bz/` PR, and I post on the upstream PR myself, from
+  a comment the agent drafts in the staging PR's body
+  - Paired by the number in the branch name. The adopted PR stays where it is on the Dashboard
+    throughout: it is someone else's PR, with its own board Status
+  - Before the promote, the staging PR goes through Review / Discussing / Approved / Parked like any
+    other, its Link showing the adopted PR (the tooltip names its author)
+  - Promoted once the adopted PR carries a commit of mine (its commits are fetched apart from the
+    list, as for stacks, when its head moves) and isn't closed unmerged. From then on it is listed
+    in the Parity tab as its upstream PR, in Upstream and then Landed, as well as on the Dashboard
+  - Turn of a promoted adopted PR: `me` until I comment or review on it after approving the staging
+    PR (the drafted comment; once the recent events no longer reach back that far, it counts as
+    posted), then as if it were mine (changes requested since my last push, failed CI, conflicts,
+    others talking after me); a review request to me (CODEOWNERS) no longer shows as `review`
+  - The detail header notes the other end: `Adopts #63912 by @author` on the staging PR,
+    `Adopted by the parity agent in #160` on the adopted PR; clicking opens it. While the drafted
+    comment is unposted, the composer on the adopted PR has **Drafted Comment**, which fills the
+    editor with it (the fenced block, or else the blockquote, under the staging body's heading
+    naming a draft comment) to edit and post
+  - Closing an adoption's staging PR means not adopting it: the agent leaves the PR to its author,
+    and the confirmation says so
 - **My decisions** are actions on GitHub, which the agent reads on its next run:
   - Approve: ready to promote
   - Comment or Request changes: the agent replies or revises on its next run
   - Park (convert to draft): later; the agent parks the item as `backlog`. Resume (mark ready for
     review) undoes it
-  - Close: not wanted; the agent records it as `accepted-divergence`
+  - Close: not wanted; the agent records it as `accepted-divergence` (an adoption: leaves the PR to
+    its author)
 - Staging PRs aren't on the board and have no Status / Priority; `w` / `b` / `s` / `m` and the
   number keys do nothing on them; they don't go to the Dashboard either (nor Recently viewed or
   Pinned). Promoted upstream parity PRs, though mine, are also only in the Parity tab: the agent
@@ -173,9 +197,10 @@ every stage is computed from state on GitHub.
   - **Rejected**: staging PRs closed without merging in the last 14 days, collapsed by default
 - The tab sits between Dashboard and Inbox and shows how many wait on me (`Parity 3`): the Review
   group, plus the Upstream rows with Turn = me (upstream reviews, CI failures, conflicts)
-- Columns: Author (always the agent or me) becomes **Link**, showing the state icon and number of
-  the PR at the other end: upstream PRs in Upstream and Landed show their staging PR; hovering shows
-  the repository and title
+- Columns: Author (the agent or me, but for adopted PRs) becomes **Link**, showing the state icon
+  and number of the PR at the other end: upstream PRs in Upstream and Landed show their staging PR,
+  an adoption's staging PR the PR it adopts; hovering shows the repository and title (and an adopted
+  PR's author)
 - Avatars of GitHub Apps (such as the agent) can't be fetched by login; use the avatar URL from
   the sync
 

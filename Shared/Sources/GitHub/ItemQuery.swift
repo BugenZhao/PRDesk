@@ -36,9 +36,12 @@ enum ItemQuery {
     }
     """
 
+    /// How many recent timeline events an item keeps (`Item.events`).
+    static let eventLimit = 12
+
     /// Recent events used for Turn, unread state and the summary next to the title.
     private static let prEvents = """
-    timelineItems(last: 12, itemTypes: [ISSUE_COMMENT, PULL_REQUEST_REVIEW, PULL_REQUEST_COMMIT, HEAD_REF_FORCE_PUSHED_EVENT, MERGED_EVENT, CLOSED_EVENT, REOPENED_EVENT, READY_FOR_REVIEW_EVENT, REVIEW_REQUESTED_EVENT]) {
+    timelineItems(last: \(eventLimit), itemTypes: [ISSUE_COMMENT, PULL_REQUEST_REVIEW, PULL_REQUEST_COMMIT, HEAD_REF_FORCE_PUSHED_EVENT, MERGED_EVENT, CLOSED_EVENT, REOPENED_EVENT, READY_FOR_REVIEW_EVENT, REVIEW_REQUESTED_EVENT]) {
       nodes {
         __typename
         ... on IssueComment { author \(actor) createdAt }
@@ -131,11 +134,12 @@ enum ItemQuery {
     }
     """
 
-    /// The commits of PRs that may be stacked by commits (`Stacks.commitParents`).
+    /// The commits of PRs that may be stacked by commits (`Stacks.commitParents`), or that the
+    /// parity agent adopted (`Parity.Adoption.isPromoted`).
     static let commits = """
     query($ids: [ID!]!) {
       nodes(ids: $ids) {
-        ... on PullRequest { id headRefOid commits(first: 100) { nodes { commit { oid } } } }
+        ... on PullRequest { id headRefOid commits(first: 100) { nodes { commit { oid author { user { login } } } } } }
       }
     }
     """
@@ -306,7 +310,17 @@ enum ItemQuery {
     /// Some of a PR's commits.
     struct CommitList: Decodable, Sendable {
         struct Node: Decodable, Sendable {
-            struct Inner: Decodable, Sendable { let oid: String }
+            struct Inner: Decodable, Sendable {
+                struct Author: Decodable, Sendable {
+                    struct User: Decodable, Sendable { let login: String }
+                    let user: User?
+                }
+
+                let oid: String
+                /// Only in `ItemQuery.commits`.
+                let author: Author?
+            }
+
             let commit: Inner
         }
 

@@ -180,6 +180,8 @@ private struct DetailHeader: View {
             .font(.caption)
             .foregroundStyle(.secondary)
 
+            AdoptionNote(item: item)
+
             if let ladder = model.stackLadder, ladder.rungs.contains(where: { $0.entry.number == item.number }) {
                 StackPanel(item: item, ladder: ladder)
             }

@@ -15,6 +15,7 @@ struct ComposerView: View {
     /// The close waiting for confirmation; its reason is nil for a PR.
     @State private var pendingClose: PendingClose?
     @State private var error: String?
+    @State private var isLoadingDraftedComment = false
     /// The item whose draft `text` holds.
     @State private var draftItemID: Item.ID?
     @FocusState private var focused: Bool
@@ -24,7 +25,7 @@ struct ComposerView: View {
     }
 
     private var trimmed: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
-    private var isBusy: Bool { sending != nil || isClosing }
+    private var isBusy: Bool { sending != nil || isClosing || isLoadingDraftedComment }
     private var closeTitle: String { trimmed.isEmpty ? "Close" : "Close with comment" }
 
     /// Grows with the number of lines, from three to about nine.
@@ -86,6 +87,7 @@ struct ComposerView: View {
                         .labelStyle(.titleOnly)
                     #endif
                     .disabled(trimmed.isEmpty)
+                draftedCommentButton
                 if let error {
                     Text(error)
                         .foregroundStyle(.red)
@@ -160,6 +162,43 @@ struct ComposerView: View {
         }
     }
 
+    /// On a PR the parity agent adopted and promoted, fills in the comment it drafted for the viewer
+    /// to post (SPEC §3.2), until one is posted.
+    @ViewBuilder private var draftedCommentButton: some View {
+        if item.isOpen, let adoption = model.adoption(of: item), adoption.upstream?.id == item.id, adoption.isPromoted,
+           model.awaitsDraftedComment(item)
+        {
+            // The bar is full with the review buttons; the tooltip names it.
+            Button("Drafted Comment", systemImage: "text.quote") { loadDraftedComment(adoption) }
+                .labelStyle(.iconOnly)
+                .disabled(!trimmed.isEmpty || isBusy)
+                .help(trimmed.isEmpty
+                    ? "Fill in the comment the parity agent drafted in #\(adoption.staging.number)"
+                    : "Clear the text to fill in the comment the parity agent drafted")
+        }
+    }
+
+    private func loadDraftedComment(_ adoption: Parity.Adoption) {
+        isLoadingDraftedComment = true
+        error = nil
+        Task {
+            do {
+                if let comment = try await model.draftedComment(for: adoption) {
+                    if trimmed.isEmpty {
+                        text = comment
+                        isPreviewing = false
+                        focused = true
+                    }
+                } else {
+                    error = "#\(adoption.staging.number) has no drafted comment"
+                }
+            } catch {
+                self.error = error.localizedDescription
+            }
+            isLoadingDraftedComment = false
+        }
+    }
+
     /// PRs close outright; issues ask why, as on GitHub.
     @ViewBuilder private var closeButton: some View {
         if item.kind == .pullRequest {
@@ -184,8 +223,13 @@ struct ComposerView: View {
         case .notPlanned: "The issue will be closed as not planned"
         }
         let message = trimmed.isEmpty ? "\(what)." : "\(what), after posting your comment."
-        // The agent reads a closed staging PR as a no (SPEC §3.2).
-        return item.isParityStaging ? "\(message) The parity agent records the item as an accepted divergence." : message
+        // The agent reads a closed staging PR as a no (SPEC §3.2): for an adoption, as leaving the
+        // PR to its author.
+        guard item.isParityStaging else { return message }
+        if let number = Parity.adoptedNumber(item.headRef) {
+            return "\(message) The parity agent stops adopting #\(number) and leaves it to its author."
+        }
+        return "\(message) The parity agent records the item as an accepted divergence."
     }
 
     private func close(reason: CloseReason?) {

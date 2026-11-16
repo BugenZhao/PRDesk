@@ -60,8 +60,15 @@ struct ItemInsight: Hashable, Sendable {
     /// The viewer's latest opinionated review approves the PR.
     var isApprovedByMe: Bool
     var reviewMark: ReviewMark
+    /// Someone else's PR the parity agent adopted and promoted: the viewer's commits are on it, so
+    /// Turn is the author's (SPEC §3.2), and a review request is no longer the point.
+    var isCoAuthor: Bool
+    /// On such a PR, the viewer has yet to post the comment the agent drafted.
+    var awaitsDraftedComment: Bool
 
-    init(item: Item, state: ItemState?, viewer: String?, baseline: Date?) {
+    /// `adoptedSince`: for an upstream PR the parity agent adopted and promoted, the time from which
+    /// the viewer's comments count as posting the drafted one (`Parity.Adoption.since`).
+    init(item: Item, state: ItemState?, viewer: String?, baseline: Date?, adoptedSince: Date? = nil) {
         let isMe = { (login: String?) in sameLogin(login, viewer) }
         // On a staging PR the parity agent is the other side of the conversation, not noise.
         let human = item.events.filter { event in
@@ -101,12 +108,24 @@ struct ItemInsight: Hashable, Sendable {
         summary = latest.map { Self.describe($0, isMe: isMe($0.actor), isAuthor: isAuthor($0.actor)) }
         summaryAt = latest?.at
 
+        isCoAuthor = adoptedSince != nil
+        awaitsDraftedComment = adoptedSince.map { since in
+            let talk: Set<Item.Event.Kind> = [.comment, .approved, .changesRequested, .reviewed]
+            let posted = human.contains { isMe($0.actor) && talk.contains($0.kind) && $0.at > since }
+                || (myReview?.submittedAt).map { $0 > since } == true
+                // The events no longer reach back that far: whatever was posted then is out of sight.
+                || item.events.count >= ItemQuery.eventLimit && (item.events.first?.at ?? .distantPast) > since
+            return !posted
+        } ?? false
+
         turn = if !item.isOpen {
             nil
         } else if item.isParityStaging {
             Self.parityTurn(item: item, human: human, myLast: myLast, isMe: isMe, approved: isApprovedByMe)
+        } else if awaitsDraftedComment {
+            .me
         } else {
-            Self.turn(item: item, human: human, myLast: myLast, isMe: isMe, requested: isReviewRequestedFromMe)
+            Self.turn(item: item, human: human, myLast: myLast, isMe: isMe, requested: isReviewRequestedFromMe, isCoAuthor: isCoAuthor)
         }
     }
 
@@ -149,14 +168,14 @@ struct ItemInsight: Hashable, Sendable {
 
     private static func turn(
         item: Item, human: [Item.Event], myLast: Date?, isMe: (String?) -> Bool,
-        requested: Bool
+        requested: Bool, isCoAuthor: Bool
     ) -> Turn? {
         let mine = human.filter { isMe($0.actor) }
         /// Conversation by others (comments and reviews), ignoring pushes and bookkeeping.
         let othersTalk = human.filter { !isMe($0.actor) && [.comment, .approved, .changesRequested, .reviewed].contains($0.kind) }
         let othersTalkLast = othersTalk.map(\.at).max()
 
-        let isAuthor = isMe(item.author)
+        let isAuthor = isMe(item.author) || isCoAuthor
         switch item.kind {
         case .pullRequest where isAuthor:
             if item.isDraft { return .me }

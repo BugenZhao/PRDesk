@@ -97,6 +97,7 @@ private struct DetailHeader: View {
                 Spacer(minLength: 0)
             }
             .font(.caption)
+            AdoptionNote(item: item)
             if !item.labels.isEmpty {
                 FlowLayout(spacing: 4) {
                     ForEach(item.labels, id: \.name) { LabelChip(name: $0.name, hex: $0.color) }
