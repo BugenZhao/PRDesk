@@ -16,6 +16,8 @@ struct ComposerView: View {
     @State private var pendingClose: PendingClose?
     @State private var error: String?
     @State private var isLoadingDraftedComment = false
+    /// The height the text takes, wrapped at the editor's width.
+    @State private var textHeight: CGFloat = 0
     /// The item whose draft `text` holds.
     @State private var draftItemID: Item.ID?
     @FocusState private var focused: Bool
@@ -28,10 +30,17 @@ struct ComposerView: View {
     private var isBusy: Bool { sending != nil || isClosing || isLoadingDraftedComment }
     private var closeTitle: String { trimmed.isEmpty ? "Close" : "Close with comment" }
 
-    /// Grows with the number of lines, from three to about nine.
+    /// The text view's insets around the text: the line fragment padding on the sides, and the
+    /// container inset above and below (none on the Mac, 8 points on iOS).
+    #if os(macOS)
+        private static let textInsets = EdgeInsets(top: 0, leading: 5, bottom: 0, trailing: 5)
+    #else
+        private static let textInsets = EdgeInsets(top: 8, leading: 5, bottom: 8, trailing: 5)
+    #endif
+
+    /// Grows with the text as it wraps, from three lines to about twelve, then scrolls.
     private var editorHeight: CGFloat {
-        let lines = CGFloat(text.split(separator: "\n", omittingEmptySubsequences: false).count)
-        return min(160, max(54, lines * 17 + 10))
+        min(210, max(54, textHeight + Self.textInsets.top + Self.textInsets.bottom + 8))
     }
     private var isAuthor: Bool { sameLogin(item.author, model.viewer) }
 
@@ -62,7 +71,9 @@ struct ComposerView: View {
                     .scrollContentBackground(.hidden)
                     .focused($focused)
                     // An explicit height that follows the text, so the editor's own sizing can
-                    // never feed into the window's minimum size.
+                    // never feed into the window's minimum size. The text is measured by a hidden
+                    // copy behind it, which takes no part in the layout.
+                    .background(alignment: .topLeading) { textMeasure }
                     .frame(height: editorHeight)
                     .padding(4)
                     .background(Color.textBackground, in: RoundedRectangle(cornerRadius: 6))
@@ -160,6 +171,18 @@ struct ComposerView: View {
         } message: { pending in
             Text(closeMessage(pending.reason))
         }
+    }
+
+    /// The text as the editor wraps it; a trailing newline still takes a line, as in the editor.
+    private var textMeasure: some View {
+        Text(text.isEmpty || text.hasSuffix("\n") ? text + " " : text)
+            .font(.body)
+            .padding(.leading, Self.textInsets.leading)
+            .padding(.trailing, Self.textInsets.trailing)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .hidden()
+            .onGeometryChange(for: CGFloat.self, of: \.size.height) { textHeight = $0 }
     }
 
     /// On a PR the parity agent adopted and promoted, fills in the comment it drafted for the viewer
