@@ -35,10 +35,10 @@ extension Item {
         }
     }
 
-    /// An open PR Merger is merging draws its open icon purple, the merge color, unless what the
-    /// icon shows matters more (a draft, conflicts).
+    /// An open PR Merger is merging draws its icon purple, the merge color: the open glyph, or the
+    /// conflict one while Merger works through (mechanical) conflicts itself. A draft stays a draft.
     private func showsMerging(_ isMerging: Bool) -> Bool {
-        isMerging && kind == .pullRequest && state == .open && !isDraft && !hasConflicts
+        isMerging && kind == .pullRequest && state == .open && !isDraft
     }
 
     func stateTint(isMerging: Bool) -> StateTint {
@@ -46,7 +46,8 @@ extension Item {
     }
 
     func stateDescription(isMerging: Bool) -> String {
-        showsMerging(isMerging) ? "Open, being merged by Merger" : stateDescription
+        guard showsMerging(isMerging) else { return stateDescription }
+        return hasConflicts ? "Open, being merged by Merger (merge conflicts)" : "Open, being merged by Merger"
     }
 
     /// GitHub's state colors: open green, draft gray, merged/completed purple, closed PR red;

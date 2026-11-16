@@ -12,6 +12,8 @@ struct ItemRow: Hashable, Sendable {
     /// In the Parity tab, the other end of the item's pipeline: the upstream PR promoted from a
     /// staging PR, or the staging PR of an upstream one.
     var paired: Item?
+    /// Merger is merging `paired`, for its icon's color.
+    var pairedIsMerging = false
     /// For an upstream PR the parity agent is adopting (or adopted), the adoption.
     var adoption: Parity.Adoption?
     /// Its place on a stack's rail, when other members of its stack are in the same section.

@@ -36,7 +36,7 @@ struct AdoptionNote: View {
         Button(action: open) {
             HStack(spacing: 4) {
                 if let target {
-                    StateIconView(item: target, size: 12)
+                    StateIconView(item: target, size: 12, isMerging: model.isMerging(target))
                 }
                 Text(text)
             }

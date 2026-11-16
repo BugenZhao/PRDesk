@@ -80,9 +80,11 @@ struct StackPanel: View {
             model.openItem(repo: ladder.repo, number: entry.number)
         } label: {
             row {
-                // A staging PR landed upstream is closed on the fork; it shows as merged.
-                RailView(rail: rung.rail, color: rung.upstream?.state == .merged ? .purple : entry.stateColor, hollow: entry.state == .open && entry.isDraft)
-                    .help(entry.stateDescription)
+                // A staging PR landed upstream is closed on the fork; it shows as merged. One Merger
+                // is merging is purple too, as in the list.
+                let isMerging = entry.state == .open && !entry.isDraft && model.isMerging(repo: ladder.repo, number: entry.number)
+                RailView(rail: rung.rail, color: rung.upstream?.state == .merged || isMerging ? .purple : entry.stateColor, hollow: entry.state == .open && entry.isDraft)
+                    .help(isMerging ? "\(entry.stateDescription), being merged by Merger" : entry.stateDescription)
                 Text("#\(String(entry.number))")
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
@@ -131,13 +133,13 @@ struct StackPanel: View {
         let text = noteText(rung)
         if let upstream = rung.upstream {
             HStack(spacing: 3) {
-                StateIconView(item: upstream, size: Self.noteIconSize)
+                StateIconView(item: upstream, size: Self.noteIconSize, isMerging: model.isMerging(upstream))
                 Text(text ?? "")
                     .monospacedDigit()
             }
             .foregroundStyle(.secondary)
             .font(.caption)
-            .help("Promoted as \(upstream.repo)#\(upstream.number): \(upstream.stateDescription)")
+            .help("Promoted as \(upstream.repo)#\(upstream.number): \(upstream.stateDescription(isMerging: model.isMerging(upstream)))")
         } else if let text {
             Text(text)
                 .font(.caption)

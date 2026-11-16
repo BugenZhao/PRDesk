@@ -309,8 +309,10 @@ Top to bottom:
 - **Pinned**: items pinned with `p` (the board's Pinned field, §3.1)
 - **Good**: open items with Status = Working (or Merging), plus open items I opened that have no
   Status, that are approved PRs; mine first, then PRs Merger is merging (Status = Merging) last, so
-  what waits for 🚀 comes first. A Merging PR draws its open icon purple (the merge color), unless
-  it is a draft or has conflicts, which keep their own icon
+  what waits for 🚀 comes first. A Merging PR draws its icon purple (the merge color): the open
+  glyph, or the conflict glyph when it has conflicts, which Merger works through itself when they
+  are mechanical; a draft keeps its own gray icon. The same goes wherever a PR's state icon shows: the detail header, the
+  stack panel, Link and the adoption notes
 - **Working**: the same, without approval; mine first
 - **Triage**: untriaged open items opened by others, plus woken Skipped items
 - **Backlog**: open items with Status = Backlog, collapsed by default; mine first

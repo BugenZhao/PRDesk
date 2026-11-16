@@ -151,7 +151,7 @@ enum ItemColumn: String, CaseIterable {
 
         case .link:
             guard let paired = row.paired else { return [] }
-            let runs: [CellRun] = [.icon(paired.stateIcon, color: paired.stateColor), .text("#\(paired.number)", color: .secondaryLabelColor, font: CellFont.digits)]
+            let runs: [CellRun] = [.icon(paired.stateIcon, color: paired.stateColor(isMerging: row.pairedIsMerging)), .text("#\(paired.number)", color: .secondaryLabelColor, font: CellFont.digits)]
             // Link stands in for Author: someone other than the agent or the viewer is worth a face.
             guard let author = Self.outsideAuthor(row, viewer: viewer) else { return runs }
             return runs + [.spring, .avatar(AvatarCache.shared.image(for: author))]

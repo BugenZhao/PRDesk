@@ -344,6 +344,16 @@ final class AppModel {
         item.isUpstream ? board[item.number] : nil
     }
 
+    /// Merger is merging the PR (Status Merging on the board), for its icon's color.
+    func isMerging(_ item: Item) -> Bool {
+        item.isOpen && board(for: item)?.triage == .merging
+    }
+
+    /// The same for a PR known only by number, such as a stack's member.
+    func isMerging(repo: String, number: Int) -> Bool {
+        repo.caseInsensitiveCompare(SyncEngine.repo) == .orderedSame && board[number]?.triage == .merging
+    }
+
     /// The item's Status on the board as the list treats it: none for a Skipped item that was
     /// woken. What toggles act on, so the default Working of the viewer's own items is left out.
     func triage(for item: Item) -> TriageStatus? {
@@ -1404,7 +1414,14 @@ final class AppModel {
         // Staging PRs and the upstream PRs promoted from them show in the Parity tab, not the
         // dashboard; adopted PRs show in both once promoted.
         let candidates = all.filter { $0.item.isUpstream && !$0.item.isParity }
-        let parity = Parity.sections(of: all, adoptions: adoptions)
+        var parity = Parity.sections(of: all, adoptions: adoptions)
+        for (section, rows) in parity {
+            parity[section] = rows.map { row in
+                var row = row
+                row.pairedIsMerging = row.paired.map(isMerging) ?? false
+                return row
+            }
+        }
         paritySections = [:]
         stagingUpstream = [:]
         upstreamStaging = [:]
