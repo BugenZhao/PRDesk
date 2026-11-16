@@ -125,7 +125,7 @@ final class AppModel {
     }
 
     /// What waits on the viewer in the Parity tab, for the tab's count: staging PRs to review, and
-    /// upstream PRs whose Turn is the viewer's.
+    /// upstream PRs (the viewer's own or adopted) whose Turn is the viewer's.
     private(set) var parityWaitingCount = 0
     /// Where each item of the Parity tab is listed, as of the last rebuild.
     @ObservationIgnored private var paritySections: [Item.ID: ListSection] = [:]
@@ -1418,7 +1418,9 @@ final class AppModel {
             }
         }
         updateStackLadder()
-        let waiting = (parity[.parityReview]?.count ?? 0) + (parity[.parityUpstream] ?? []).count { $0.insight.turn == .me }
+        let waiting = (parity[.parityReview]?.count ?? 0)
+            + (parity[.parityUpstream] ?? []).count { $0.insight.turn == .me }
+            + (parity[.parityAdopted] ?? []).count { $0.insight.turn == .me }
         if parityWaitingCount != waiting { parityWaitingCount = waiting }
 
         workingItems = Self.mineFirst(candidates

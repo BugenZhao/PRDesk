@@ -149,14 +149,15 @@ every stage is computed from state on GitHub.
   a comment the agent drafts in the staging PR's body
   - Paired by the number in the branch name. The adopted PR stays where it is on the Dashboard
     throughout: it is someone else's PR, with its own board Status. While the adoption is under
-    way (the staging PR is open, or it was promoted), its row there carries a `link` mark after the
-    title, whose tooltip names the staging PR and where it stands (in review, approved, parked,
-    promoted)
+    way (the staging PR is open, or it was promoted), its row carries a `link` mark after the
+    title (on the Dashboard, and in the Parity tab's Adopted and Landed), whose tooltip names the
+    staging PR and where it stands (in review, approved, parked, promoted)
   - Before the promote, the staging PR goes through Review / Discussing / Approved / Parked like any
     other, its Link showing the adopted PR (the tooltip names its author)
   - Promoted once the adopted PR carries a commit of mine (its commits are fetched apart from the
     list, as for stacks, when its head moves) and isn't closed unmerged. From then on it is listed
-    in the Parity tab as its upstream PR, in Upstream and then Landed, as well as on the Dashboard
+    in the Parity tab as its upstream PR, in Adopted (apart from my own upstream PRs) and then
+    Landed, as well as on the Dashboard
   - Turn of a promoted adopted PR: `me` until I comment or review on it after approving the staging
     PR (the drafted comment; once the recent events no longer reach back that far, it counts as
     posted), then as if it were mine (changes requested since my last push, failed CI, conflicts,
@@ -194,12 +195,16 @@ every stage is computed from state on GitHub.
   - **Approved**: approved by me, with no upstream PR yet: waiting to be promoted
   - **Upstream**: the open upstream parity PRs themselves (`bz/rust-parity-*`), so the Review, CI
     and Turn columns are upstream's. Their staging PRs aren't listed separately
+  - **Adopted**: the same for promoted adoptions, other people's upstream PRs carrying the agent's
+    fixes as my commits
   - **Parked**: draft staging PRs, collapsed by default
-  - **Landed**: upstream parity PRs merged in the last 14 days (listed as upstream PRs like
-    Upstream; on merge the same row moves from Upstream to Landed), collapsed by default
+  - **Landed**: upstream parity PRs, mine or adopted, merged in the last 14 days (listed as
+    upstream PRs like Upstream; on merge the same row moves from Upstream or Adopted to Landed),
+    collapsed by default
   - **Rejected**: staging PRs closed without merging in the last 14 days, collapsed by default
 - The tab sits between Dashboard and Inbox and shows how many wait on me (`Parity 3`): the Review
-  group, plus the Upstream rows with Turn = me (upstream reviews, CI failures, conflicts)
+  group, plus the Upstream and Adopted rows with Turn = me (upstream reviews, CI failures,
+  conflicts)
 - Columns: Author (the agent or me, but for adopted PRs) becomes **Link**, showing the state icon
   and number of the PR at the other end: upstream PRs in Upstream and Landed show their staging PR,
   an adoption's staging PR the PR it adopts; hovering shows the repository and title (and an adopted

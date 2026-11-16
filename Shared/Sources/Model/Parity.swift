@@ -45,7 +45,9 @@ enum Parity {
     }
 
     /// The sections of the Parity tab, top to bottom.
-    static let sections: [ListSection] = [.parityReview, .parityDiscussing, .parityApproved, .parityUpstream, .parityParked, .parityLanded, .parityRejected]
+    static let sections: [ListSection] = [
+        .parityReview, .parityDiscussing, .parityApproved, .parityUpstream, .parityAdopted, .parityParked, .parityLanded, .parityRejected,
+    ]
 
     /// Groups staging PRs and the upstream PRs promoted from them into the Parity tab's sections,
     /// each row paired with its other end. Rows keep their order within a section.
@@ -73,9 +75,10 @@ enum Parity {
                     section = Self.stagingSection(of: row)
                 }
             } else if let adoption = adoptions.byUpstream[item.id], adoption.isPromoted {
-                // A promoted adoption is listed as its upstream PR, which stays on the dashboard too.
+                // A promoted adoption is listed as its upstream PR, which stays on the dashboard too,
+                // apart from the viewer's own until it lands.
                 row.paired = adoption.staging
-                section = item.isOpen ? .parityUpstream : .parityLanded
+                section = item.isOpen ? .parityAdopted : .parityLanded
             } else if upstreamIDs.contains(item.id), item.state != .closed {
                 row.paired = stagingOf[item.id]
                 section = item.isOpen ? .parityUpstream : .parityLanded

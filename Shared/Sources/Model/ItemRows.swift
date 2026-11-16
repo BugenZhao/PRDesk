@@ -42,7 +42,7 @@ struct ItemRow: Hashable, Sendable {
 
 enum ListSection: String, CaseIterable, Codable, Sendable {
     case opened, recent, pinned, working, good, triage, backlog, closed, skipped, muted, inbox
-    case parityReview, parityDiscussing, parityApproved, parityUpstream, parityParked, parityLanded, parityRejected
+    case parityReview, parityDiscussing, parityApproved, parityUpstream, parityAdopted, parityParked, parityLanded, parityRejected
 
     var title: String {
         switch self {
@@ -61,6 +61,7 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
         case .parityDiscussing: "Discussing"
         case .parityApproved: "Approved"
         case .parityUpstream: "Upstream"
+        case .parityAdopted: "Adopted"
         case .parityParked: "Parked"
         case .parityLanded: "Landed"
         case .parityRejected: "Rejected"
@@ -100,10 +101,12 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
             "Staging PRs you approved that have no upstream PR yet: ready for the agent's promote run."
         case .parityUpstream:
             "Open upstream PRs promoted from staging PRs (bz/rust-parity-*), listed here rather than on the dashboard; review, CI and Turn are upstream's, Link is the staging PR. Approved ones wait for the agent's merge run."
+        case .parityAdopted:
+            "Other people's open upstream PRs the agent adopted and promoted: its fixes are on them as your commits. They stay on the dashboard too; Link is the staging PR."
         case .parityParked:
             "Staging PRs marked draft: parked as backlog by the agent until you resume them."
         case .parityLanded:
-            "Upstream parity PRs merged in the last \(Int(Self.closedRetention / 86400)) days; Link is the staging PR they were promoted from."
+            "Upstream parity PRs, yours or adopted, merged in the last \(Int(Self.closedRetention / 86400)) days; Link is the staging PR they were promoted from."
         case .parityRejected:
             "Staging PRs closed without landing in the last \(Int(Self.closedRetention / 86400)) days: a no, which the agent records as an accepted divergence."
         }

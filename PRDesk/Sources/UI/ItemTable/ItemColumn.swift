@@ -191,10 +191,10 @@ enum ItemColumn: String, CaseIterable {
         }
     }
 
-    /// Marks an upstream PR the parity agent is adopting, outside the Parity tab (where the Link
-    /// column shows it).
+    /// Marks an upstream PR the parity agent is adopting (or adopted), so in Landed too it stands
+    /// apart from the viewer's own.
     static func showsAdoption(_ row: ItemRow) -> Bool {
-        row.adoption != nil && row.paired == nil
+        row.adoption != nil
     }
 
     @MainActor private func titleRuns(_ row: ItemRow, now: Date, abbreviatesTags: Bool) -> [CellRun] {
