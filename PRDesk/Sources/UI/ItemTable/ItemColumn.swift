@@ -191,6 +191,12 @@ enum ItemColumn: String, CaseIterable {
         }
     }
 
+    /// Marks an upstream PR the parity agent is adopting, outside the Parity tab (where the Link
+    /// column shows it).
+    static func showsAdoption(_ row: ItemRow) -> Bool {
+        row.adoption != nil && row.paired == nil
+    }
+
     @MainActor private func titleRuns(_ row: ItemRow, now: Date, abbreviatesTags: Bool) -> [CellRun] {
         let item = row.item
         var runs: [CellRun] = [
@@ -199,6 +205,9 @@ enum ItemColumn: String, CaseIterable {
         ]
         if row.board?.sessionLinks.isEmpty == false {
             runs.append(.symbol("terminal", color: .secondaryLabelColor, pointSize: 10))
+        }
+        if Self.showsAdoption(row) {
+            runs.append(.symbol("link", color: .secondaryLabelColor, pointSize: 10))
         }
         if let note = row.note {
             runs.append(.chip(note.reasonLabel, color: .controlAccentColor))

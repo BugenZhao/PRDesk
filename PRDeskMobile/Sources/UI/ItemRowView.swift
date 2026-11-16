@@ -54,6 +54,10 @@ struct ItemRowView: View {
             if row.isPinned {
                 Image(systemName: "pin.fill").foregroundStyle(.orange)
             }
+            // An upstream PR the parity agent is adopting; the Parity tab shows it in Link instead.
+            if row.adoption != nil, row.paired == nil {
+                Image(systemName: "link").foregroundStyle(.secondary)
+            }
             if let summary = row.insight.summary {
                 Text(summary).foregroundStyle(.tertiary).lineLimit(1)
             }

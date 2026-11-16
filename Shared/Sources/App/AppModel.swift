@@ -23,6 +23,8 @@ enum ItemAction {
     case sendToBot(BotRequest, withNote: Bool = false)
     /// Opens the latest agent session of each item, from the board's Session field.
     case openSession
+    /// Goes to the PR at the other end of the first item's parity pair (`AppModel.linkedPR`).
+    case openLinked
 }
 
 /// A send to a Grok Bot waiting in the send sheet: every merge, any request the items were
@@ -132,8 +134,22 @@ final class AppModel {
     /// The parity agent's adoptions of other people's upstream PRs, as of the last rebuild.
     @ObservationIgnored private var adoptions = Parity.Adoptions()
 
+    /// The staging PR of each upstream PR promoted from one, by the upstream PR's id.
+    @ObservationIgnored private var upstreamStaging: [Item.ID: Item] = [:]
+
     /// The adoption a staging PR makes, or an upstream PR is the subject of.
     func adoption(of item: Item) -> Parity.Adoption? { adoptions.of(item) }
+
+    /// The PR at the other end of an item's parity pair, as repository and number (it may not be
+    /// stored): an adoption's adopted PR or staging PR, a staging PR's promoted upstream PR, or an
+    /// upstream PR's staging PR.
+    func linkedPR(of item: Item) -> (repo: String, number: Int)? {
+        if let adoption = adoptions.of(item) {
+            if adoption.staging.id != item.id { return (adoption.staging.repo, adoption.staging.number) }
+            return Parity.adoptedNumber(item.headRef).map { (SyncEngine.repo, $0) }
+        }
+        return (stagingUpstream[item.id] ?? upstreamStaging[item.id]).map { ($0.repo, $0.number) }
+    }
 
     private func updateBadge() {
         Platform.setBadgeCount(unreadInboxCount)
@@ -354,7 +370,8 @@ final class AppModel {
         return ItemRow(
             item: item, state: state,
             insight: insight,
-            board: board
+            board: board,
+            adoption: adoptions.byUpstream[item.id].flatMap { $0.isActive ? $0 : nil }
         )
     }
 
@@ -962,6 +979,10 @@ final class AppModel {
             for item in items.prefix(Self.maxTabsAtOnce) {
                 if let url = URL(string: item.url) { Platform.open(url) }
             }
+        case .openLinked:
+            if let linked = items.lazy.compactMap(linkedPR).first {
+                openItem(repo: linked.repo, number: linked.number)
+            }
         case .openSession:
             let links = items.compactMap { board(for: $0)?.sessionLinks.last }
             for link in links.prefix(Self.maxTabsAtOnce) {
@@ -1386,10 +1407,14 @@ final class AppModel {
         let parity = Parity.sections(of: all, adoptions: adoptions)
         paritySections = [:]
         stagingUpstream = [:]
+        upstreamStaging = [:]
         for (section, rows) in parity {
             for row in rows {
                 paritySections[row.item.id] = section
-                if row.item.isUpstream, let staging = row.paired { stagingUpstream[staging.id] = row.item }
+                if row.item.isUpstream, let staging = row.paired {
+                    stagingUpstream[staging.id] = row.item
+                    upstreamStaging[row.item.id] = staging
+                }
             }
         }
         updateStackLadder()

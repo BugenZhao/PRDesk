@@ -156,9 +156,23 @@ enum Parity {
         /// The fixes are on the upstream PR: it carries a commit by the viewer (who never commits to
         /// someone else's PR otherwise) and isn't closed unmerged.
         var isPromoted: Bool
+        /// The viewer approved the staging PR (it waits to be promoted).
+        var isApproved: Bool
         /// The viewer's comments on the upstream PR from this on count as posting the comment the
         /// agent drafted: since the staging PR was opened, or the viewer approved it.
         var since: Date
+
+        /// Under way: the staging PR is open, or the fixes are already on the PR. A staging PR
+        /// closed before the promote leaves the PR to its author.
+        var isActive: Bool { isPromoted || staging.isOpen }
+
+        /// Where the adoption stands, for a tooltip.
+        var stage: String {
+            if isPromoted { return "promoted" }
+            if !staging.isOpen { return "closed" }
+            if staging.isDraft { return "parked" }
+            return isApproved ? "approved, waiting to be promoted" : "in review"
+        }
     }
 
     struct Adoptions: Sendable {
@@ -213,7 +227,10 @@ enum Parity {
                 upstream.state != .closed && (upstream.commitAuthors ?? []).contains { sameLogin($0, viewer) }
             } ?? false
             let approval = viewer.flatMap(staging.review(by:)).flatMap { $0.state == "APPROVED" ? $0.submittedAt : nil }
-            let adoption = Adoption(staging: staging, upstream: upstream, isPromoted: promoted, since: max(staging.createdAt, approval ?? .distantPast))
+            let adoption = Adoption(
+                staging: staging, upstream: upstream, isPromoted: promoted, isApproved: approval != nil,
+                since: max(staging.createdAt, approval ?? .distantPast)
+            )
             result.byStaging[staging.id] = adoption
             if let upstream {
                 if let current = result.byUpstream[upstream.id],

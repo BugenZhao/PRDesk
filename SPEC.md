@@ -148,7 +148,10 @@ every stage is computed from state on GitHub.
   author's branch as my commits, so there is no `bz/` PR, and I post on the upstream PR myself, from
   a comment the agent drafts in the staging PR's body
   - Paired by the number in the branch name. The adopted PR stays where it is on the Dashboard
-    throughout: it is someone else's PR, with its own board Status
+    throughout: it is someone else's PR, with its own board Status. While the adoption is under
+    way (the staging PR is open, or it was promoted), its row there carries a `link` mark after the
+    title, whose tooltip names the staging PR and where it stands (in review, approved, parked,
+    promoted)
   - Before the promote, the staging PR goes through Review / Discussing / Approved / Parked like any
     other, its Link showing the adopted PR (the tooltip names its author)
   - Promoted once the adopted PR carries a commit of mine (its commits are fetched apart from the
@@ -349,7 +352,7 @@ well
 | (row) | Closed items are faded as a whole row; so are draft PRs (keeping only the unread dot), setting them apart from PRs waiting for review at a glance |
 | (marker) | The first, narrow column: `•` for unread activity from others since I last saw the item: opened it here, or read its notification anywhere (on the web, in GitHub's apps), going by when GitHub says each notification updated in the last 14 days was last read. When the item is in a stack, this column draws the stack's lines (see §4.1), with this dot as the node: the accent color when unread, otherwise gray (the icon before the title shows state), hollow for drafts; a forked child turns from its parent onto its own line to the right; official stacks are joined by solid lines, branch- and commit-joined ones by dashed lines. Two lines fit, with narrower spacing for more. Hovering shows the stack number and position, the base branch, the PR whose commits it starts with (for a commit-joined one), and which members are in other groups. Priority has no column of its own, only the row's background (§4.3) |
 | # | Number; small icons tell PRs and issues apart |
-| Title | State icon + title (leading `[..]` / `xx:` tags faded), a reason tag on woken items; the matching emoji on items sent to Grok Bots, and a `terminal` icon on items with a board Session (§3.3); then the board Comment, if any; a gray summary of the latest event (e.g. `@xx commented 2h`, `you reviewed 2d`) always right-aligned; truncated text (title, comment, summary) shows in full in a tooltip on hover |
+| Title | State icon + title (leading `[..]` / `xx:` tags faded), a reason tag on woken items; the matching emoji on items sent to Grok Bots, and a `terminal` icon on items with a board Session (§3.3), a `link` icon on PRs the parity agent is adopting (§3.2); then the board Comment, if any; a gray summary of the latest event (e.g. `@xx commented 2h`, `you reviewed 2d`) always right-aligned; truncated text (title, comment, summary) shows in full in a tooltip on hover |
 | Author | Avatar + login (italic for first-time contributors); trust marks (seal, org badges, see §5, §5.1) right-aligned |
 | Review | A bare ✓ + total approvals (including mine): on others' PRs, green when I've approved, gray when only others have; on my own PRs (which I can't approve), green when reviewDecision = APPROVED (approvals meet the merge requirement, the same condition as the Good group), gray otherwise; a red ✗ follows when I've requested changes. Built like the CI column: a small mark + a number, in fixed positions |
 | Turn | `review` (my review requested and not done) / `me` / `them` / empty (closed) |
@@ -395,6 +398,7 @@ well
 | `⇧⌘C`, `⌘C` | Copy GitHub links, one per line (`⇧⌘C` works with any focus: all selected items when the list is focused, otherwise the item in the detail; `⌘C` only in the list). Rows can also be dragged out sideways, as links with titles |
 | `e` / `f` / `r` | Send to a Grok Bot: 👀 Investigate / 🔥 Track / 🚀 Merge (§3.3; 🚀 and re-sends open the send panel first); with `⌥`, open the panel first to write a note |
 | `t` | Open the agent session (the board's Session field, the newest one; in the desktop app when there is one; §3.3) |
+| `l` | Go to the linked PR: the other end of a parity pair (§3.2), whichever tab it is in: a staging PR's adopted or promoted upstream PR, or an upstream PR's staging PR (also Go to Linked PR in the row's context menu) |
 | `c` | Focus the comment box |
 | `⌘R` | Sync now |
 | `⌘1` / `⌘2` / `⌘3` | Switch to Dashboard / Parity / Inbox |

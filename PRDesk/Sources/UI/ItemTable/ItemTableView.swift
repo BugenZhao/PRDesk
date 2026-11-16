@@ -14,6 +14,8 @@ struct ItemTableView: NSViewRepresentable {
     var contribution: (String) -> Contribution?
     /// The affiliation submenu for the authors of the right-clicked rows.
     var affiliationMenu: ([String]) -> NSMenu
+    /// Whether an item has a PR at the other end of a parity pair (Go to Linked PR).
+    var hasLinkedPR: (Item) -> Bool
     /// Changes when badge data or avatars change, which the rows themselves don't reflect.
     var badgeVersion: Int
     /// An action on the selected items (or the right-clicked one, if it is outside the selection).
@@ -355,6 +357,7 @@ struct ItemTableView: NSViewRepresentable {
                 case "f": .sendToBot(.track)
                 case "r": .sendToBot(.merge)
                 case "t": .openSession
+                case "l": .openLinked
                 default: nil
                 }
                 guard let action else { return false }
@@ -525,6 +528,7 @@ struct ItemTableView: NSViewRepresentable {
             MenuAction(title: "🔥 Track…", action: .sendToBot(.track, withNote: true), key: "f", isAlternate: true),
             MenuAction(title: "🚀 Merge…", action: .sendToBot(.merge), key: "r"),
             MenuAction(title: "Open Agent Session", action: .openSession, symbol: "terminal", key: "t"),
+            MenuAction(title: "Go to Linked PR", action: .openLinked, symbol: "link", key: "l"),
         ]
         /// Indices of `menuActions` after which a separator goes.
         private static let menuSeparatorsAfter: Set = [1, 5, 9, 11]
@@ -596,6 +600,7 @@ struct ItemTableView: NSViewRepresentable {
                 switch Self.menuActions[item.tag].action {
                 case let .sendToBot(request, _): item.isEnabled = targets.contains { request.applies(to: $0.item) }
                 case .openSession: item.isEnabled = targets.contains { $0.board?.sessionLinks.isEmpty == false }
+                case .openLinked: item.isEnabled = targets.contains { parent.hasLinkedPR($0.item) }
                 default: break
                 }
             }
@@ -723,7 +728,10 @@ struct ItemTableView: NSViewRepresentable {
                         truncated = ([itemRow.item.title] + others).joined(separator: "\n")
                     }
                     let sessions = (itemRow.board?.sessionLinks ?? []).map { "\(AgentSession.agentName(for: $0)) session: \($0.absoluteString)" }
-                    let lines = [truncated].compactMap(\.self) + sessions
+                    let adoption = ItemColumn.showsAdoption(itemRow) ? itemRow.adoption.map { adoption in
+                        "Adopted by the parity agent in \(adoption.staging.repo)#\(adoption.staging.number): \(adoption.stage) (l to go there)"
+                    } : nil
+                    let lines = [truncated].compactMap(\.self) + sessions + [adoption].compactMap(\.self)
                     return lines.isEmpty ? nil : lines.joined(separator: "\n")
                 case .author, .avatar: return authorTooltip(itemRow.item.author)
                 case .link: return itemRow.paired.map(Self.linkTooltip)
