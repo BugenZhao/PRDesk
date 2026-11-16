@@ -529,7 +529,7 @@ struct ItemTableView: NSViewRepresentable {
         /// Indices of `menuActions` after which a separator goes.
         private static let menuSeparatorsAfter: Set = [1, 5, 9, 11]
         /// Index of `menuActions` after which the author's affiliation submenu goes.
-        private static let affiliationAfter = 13
+        private static let affiliationAfter = 1
         /// Its submenu is made when the menu opens, for the authors right-clicked.
         private let affiliationItem: NSMenuItem = {
             let item = NSMenuItem(title: "Author's Affiliation", action: nil, keyEquivalent: "")
