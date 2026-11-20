@@ -3,8 +3,9 @@ import Foundation
 /// A parsed filter string: free text plus `key:value` tokens.
 ///
 /// Supported tokens: `is:pr|issue|draft|open|closed|merged|unread|pinned|first|regular`,
-/// `status:triage|working|backlog|skipped|muted`, `turn:me|them`, `author:x`, `label:x`,
-/// `ci:fail|pending|pass`, `p:h|m|l`, `org:x`, and `merged:N` / `merged:>=N`
+/// `status:triage|desk|drawer|shelf|attic|merging` (or the old `working|backlog|skipped|muted`),
+/// `turn:me|them`, `author:x`, `label:x`, `ci:fail|pending|pass`, `p:h|m|l`, `org:x`, and
+/// `merged:N` / `merged:>=N`
 /// (also `>`, `<`, `<=`) on the author's merged PR count.
 /// A leading `-` negates a token.
 struct ItemFilter: Equatable {
@@ -69,8 +70,8 @@ struct ItemFilter: Equatable {
         case "status":
             return switch value {
             case "triage", "untriaged": row.listedTriage == nil
-            // A woken Skipped item still matches its Status.
-            default: (row.listedTriage ?? row.triage)?.rawValue.lowercased() == value
+            // A woken Shelf item still matches its Status.
+            default: TriageStatus(filterName: value).map { (row.listedTriage ?? row.triage) == $0 } ?? false
             }
         case "turn":
             return row.insight.turn?.rawValue == value

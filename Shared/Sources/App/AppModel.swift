@@ -117,7 +117,7 @@ final class AppModel {
         didSet { updateBadge() }
     }
 
-    /// Muted items' notifications don't count; GitHub can't always be stopped from sending them.
+    /// Attic items' notifications don't count; GitHub can't always be stopped from sending them.
     var unreadInboxCount: Int { inbox.count { !$0.isRead && !isMuted($0) } }
 
     private func isMuted(_ note: InboxNote) -> Bool {
@@ -154,7 +154,7 @@ final class AppModel {
     private func updateBadge() {
         Platform.setBadgeCount(unreadInboxCount)
     }
-    /// Working and Good items regardless of the filter, the viewer's move first (for the menu bar).
+    /// Desk and Good items regardless of the filter, the viewer's move first (for the menu bar).
     private(set) var workingItems: [ItemRow] = []
 
     /// The last write to the board that failed, shown until dismissed.
@@ -354,13 +354,13 @@ final class AppModel {
         repo.caseInsensitiveCompare(SyncEngine.repo) == .orderedSame && board[number]?.triage == .merging
     }
 
-    /// The item's Status on the board as the list treats it: none for a Skipped item that was
-    /// woken. What toggles act on, so the default Working of the viewer's own items is left out.
+    /// The item's Status on the board as the list treats it: none for a Shelf item that was
+    /// woken. What toggles act on, so the default Desk of the viewer's own items is left out.
     func triage(for item: Item) -> TriageStatus? {
         board(for: item)?.triage == nil ? nil : row(for: item).listedTriage
     }
 
-    /// The Status the list shows, the default Working of the viewer's own items included.
+    /// The Status the list shows, the default Desk of the viewer's own items included.
     func listedTriage(for item: Item) -> TriageStatus? {
         row(for: item).listedTriage
     }
@@ -964,7 +964,7 @@ final class AppModel {
         guard !items.isEmpty else { return }
         switch action {
         case let .triage(status):
-            // A woken Skipped item is back in Triage, so skipping it again renews the skip.
+            // A woken Shelf item is back in Triage, so skipping it again renews the skip.
             let has = { (item: Item) in self.triage(for: item) == status }
             let next = items.allSatisfy(has) ? nil : status
             let changes = next == nil ? items : items.filter { !has($0) }
@@ -1276,7 +1276,7 @@ final class AppModel {
     @ObservationIgnored private var prefetchTask: Task<Void, Never>?
     private static let prefetchConcurrency = 2
 
-    /// Fetches ahead the details of items likely to be opened (Working, Good, Triage, the Inbox,
+    /// Fetches ahead the details of items likely to be opened (Desk, Good, Triage, the Inbox,
     /// Pinned, Recently viewed and the open parity staging PRs) whose cache is missing or older than
     /// the item, so opening one shows its cache at once. A round still running skips the next; the
     /// sync after picks it up.

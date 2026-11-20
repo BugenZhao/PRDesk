@@ -1,12 +1,18 @@
 import Foundation
 import GRDB
 
-/// The triage decision recorded on the board's Status field (SPEC §3.1).
+/// The triage decision recorded on the board's Status field (SPEC §3.1). The raw value is the
+/// board option's name and what the app shows; the cases keep the names the options had before
+/// (Working, Backlog, Skipped, Muted), which the board may still use.
 enum TriageStatus: String, CaseIterable, Codable, Sendable {
-    case working = "Working"
-    case backlog = "Backlog"
-    case skipped = "Skipped"
-    case muted = "Muted"
+    /// Needs my attention now.
+    case working = "Desk"
+    /// Followed, but later.
+    case backlog = "Drawer"
+    /// Low priority; unsubscribed, back in Triage when someone asks me directly.
+    case skipped = "Shelf"
+    /// Not followed at all; unsubscribed, never back in Triage.
+    case muted = "Attic"
     /// Merger has taken the PR on to merge it. Set by Merger, and by the app on a 🚀 send (SPEC
     /// §3.3); never offered, and moving the item to another Status takes it out.
     case merging = "Merging"
@@ -16,7 +22,7 @@ enum TriageStatus: String, CaseIterable, Codable, Sendable {
 
     /// The GitHub subscription that goes with the status; nil leaves it alone. GitHub can't
     /// ignore an issue or PR any more (neither `IGNORED` nor an ignored notification thread takes),
-    /// so Muted only unsubscribes, like Skipped; the two differ only in the app.
+    /// so Attic only unsubscribes, like Shelf; the two differ only in the app.
     var subscription: String? {
         switch self {
         case .working, .backlog, .merging: nil
@@ -26,6 +32,24 @@ enum TriageStatus: String, CaseIterable, Codable, Sendable {
 
     /// Statuses that changed the subscription, so leaving them restores it.
     var isQuiet: Bool { subscription != nil }
+
+    /// The option's name before the rename, written when the board doesn't have the new one yet.
+    var previousName: String? {
+        switch self {
+        case .working: "Working"
+        case .backlog: "Backlog"
+        case .skipped: "Skipped"
+        case .muted: "Muted"
+        case .merging: nil
+        }
+    }
+
+    /// The status a `status:` filter names, by its name or its previous one.
+    init?(filterName name: String) {
+        guard let status = Self.allCases.first(where: { [$0.rawValue, $0.previousName].contains { $0?.lowercased() == name } })
+        else { return nil }
+        self = status
+    }
 }
 
 /// The board's Priority field.
@@ -107,10 +131,10 @@ struct BoardEntry: Codable, Hashable, Sendable {
     var triage: TriageStatus? {
         guard !isArchived else { return nil }
         return switch status {
-        case "Working", "Good", "Pending": .working
-        case "Backlog", "Stale": .backlog
-        case "Skipped": .skipped
-        case "Muted": .muted
+        case "Desk", "Working", "Good", "Pending": .working
+        case "Drawer", "Backlog", "Stale": .backlog
+        case "Shelf", "Skipped": .skipped
+        case "Attic", "Muted": .muted
         case "Merging": .merging
         default: nil
         }

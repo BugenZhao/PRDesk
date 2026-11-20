@@ -36,7 +36,7 @@ enum ReviewMark: Int, Comparable, Sendable {
     }
 }
 
-/// Someone turning to the viewer directly: what wakes a Skipped item (SPEC §3.1).
+/// Someone turning to the viewer directly: what wakes a Shelf item (SPEC §3.1).
 struct DirectAsk: Hashable, Sendable {
     var at: Date
     /// E.g. "mentioned you", "@x requested your review", "@x replied".

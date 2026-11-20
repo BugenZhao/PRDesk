@@ -286,7 +286,7 @@ extension SyncEngine {
 
     /// Puts a PR the viewer just approved on the board with Status Good, as the board's own "Code
     /// review approved" workflow does for items already on it (SPEC §3.1); those, and items of the
-    /// other tracker, are left to it. Good counts as Working, so the subscription stays.
+    /// other tracker, are left to it. Good counts as Desk, so the subscription stays.
     func addApproved(number: Int, contentID: String) async throws {
         if let entry = try await db.boardEntry(number: number), !entry.isArchived || entry.isForeign { return }
         approvalsAdded.insert(number)
@@ -376,7 +376,9 @@ extension SyncEngine {
                 guard let field = schema.status else { throw BoardError.missingField("Status") }
                 return (field.id, nil)
             }
-            let (id, option) = try Self.option(schema.status, named: status.rawValue, in: "Status")
+            // Until the board's option is renamed, its previous name stands in.
+            let name = schema.status?.options[status.rawValue] == nil ? status.previousName ?? status.rawValue : status.rawValue
+            let (id, option) = try Self.option(schema.status, named: name, in: "Status")
             return (id, FieldValue(singleSelectOptionId: option))
         }
         // A companion leaves the subscription to the primary device, which follows the change.
@@ -439,9 +441,9 @@ extension SyncEngine {
         }
     }
 
-    /// Keeps Muted items unsubscribed: GitHub subscribes the viewer again on a mention or review
-    /// request, after which every comment would notify, on the web and by mail too. Nothing wakes a
-    /// Muted item to undo that by hand (as `s` does for a woken skip), so a notification of that
+    /// Keeps Attic items unsubscribed: GitHub subscribes the viewer again on a mention or review
+    /// request, after which every comment would notify, on the web and by mail too. Nothing wakes an
+    /// Attic item to undo that by hand (as `s` does for a woken Shelf item), so a notification of that
     /// kind newer than the last check has the subscription looked at and, if subscribed, turned
     /// off again. A subscription the viewer turns back on by hand stands until the next such
     /// notification.
@@ -458,13 +460,13 @@ extension SyncEngine {
                 guard at > max(entry.statusAt ?? .distantPast, checked ?? .distantPast) else { continue }
                 if try await viewerSubscription(subjectID: entry.contentID) == "SUBSCRIBED" {
                     // Recording the check would keep a real run from acting on it.
-                    if isDryRun("unsubscribe from Muted #\(number) again after a \(note.reason) notification") { continue }
+                    if isDryRun("unsubscribe from Attic #\(number) again after a \(note.reason) notification") { continue }
                     try await setSubscription("UNSUBSCRIBED", subjectID: entry.contentID)
-                    Self.boardLogger.notice("Unsubscribed from Muted #\(number) again after a \(note.reason, privacy: .public) notification")
+                    Self.boardLogger.notice("Unsubscribed from Attic #\(number) again after a \(note.reason, privacy: .public) notification")
                 }
                 try await db.updateState(entry.contentID) { $0.quietCheckedAt = at }
             } catch {
-                Self.boardLogger.error("Failed to keep Muted #\(number) unsubscribed: \(String(describing: error), privacy: .public)")
+                Self.boardLogger.error("Failed to keep Attic #\(number) unsubscribed: \(String(describing: error), privacy: .public)")
             }
         }
     }

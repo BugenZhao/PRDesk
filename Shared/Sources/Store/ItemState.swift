@@ -15,10 +15,10 @@ struct ItemState: Codable, Hashable, Sendable {
     /// When GitHub last saw the item's notification read, wherever it was read (the web, GitHub's
     /// apps, here); that counts as seeing the item.
     var notificationReadAt: Date?
-    /// The viewer's subscription when the item went Skipped or Muted, put back when it leaves them.
+    /// The viewer's subscription when the item went Shelf or Attic, put back when it leaves them.
     var subscriptionBeforeQuiet: String?
     /// The latest notification (a mention or review request) checked for having subscribed the
-    /// viewer to a Muted item again (`SyncEngine.keepMutedQuiet`).
+    /// viewer to an Attic item again (`SyncEngine.keepMutedQuiet`).
     var quietCheckedAt: Date?
     /// When the item was last sent to a Grok Bot for each request.
     var investigateSentAt: Date?

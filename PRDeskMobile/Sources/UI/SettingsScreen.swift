@@ -61,7 +61,7 @@ struct SettingsScreen: View {
                         LabeledContent("API quota", value: "\(rate.remaining) left")
                     }
                 } footer: {
-                    Text("Your Mac follows up what you change here: notifications for Skipped and Muted items, approved PRs on the board.")
+                    Text("Your Mac follows up what you change here: notifications for Shelf and Attic items, approved PRs on the board.")
                 }
             }
             .navigationTitle("Settings")

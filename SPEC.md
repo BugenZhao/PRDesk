@@ -42,7 +42,7 @@ implementation that doesn't consult the source of any existing tool.
   `(involves:@me OR review-requested:@me OR reviewed-by:@me OR label:rust) updated:>=<last sync>`,
   20 per page (the first sync uses 50 per page, split into time windows fetched in parallel); ⌘R
   syncs now
-- **Detail**: after each sync, details for items in Working, Good, Triage, Inbox, Pinned and
+- **Detail**: after each sync, details for items in Desk, Good, Triage, Inbox, Pinned and
   Recently viewed are prefetched in the background, only where the cache is missing or older than
   the item, 2 at a time. Selecting an item shows the cache first and fetches live when the cache is
   older than the item or more than 2 minutes old. One detail fetch is two parallel GraphQL queries:
@@ -64,37 +64,40 @@ Status on its own, with the single exception of approvals below.
 | Status | Meaning | GitHub subscription |
 |---|---|---|
 | (not on the board, or no Status) | Untriaged | Unchanged |
-| **Working** | Needs my attention now | Unchanged |
-| **Backlog** | I want to follow it, but later (including stalled items and ones I'd rather not think about for now) | Unchanged |
-| **Skipped** | Low quality or low priority; ignored for now | UNSUBSCRIBED (notified only when participating or mentioned) |
-| **Muted** | Not following at all; a friendly close | UNSUBSCRIBED (same as Skipped) |
+| **Desk** | Needs my attention now | Unchanged |
+| **Drawer** | I want to follow it, but later (including stalled items and ones I'd rather not think about for now) | Unchanged |
+| **Shelf** | Low quality or low priority; put aside for now | UNSUBSCRIBED (notified only when participating or mentioned) |
+| **Attic** | Not following at all; a friendly close | UNSUBSCRIBED (same as Shelf) |
 | **Merging** | Merger has taken the PR on to merge it; set by Merger and by the app on 🚀 (§3.3), never offered as a choice | Unchanged |
 | **Done** | Merged or closed; set by the board's own workflow, never by the app | Unchanged |
 
 - The names describe only what I did, not a verdict on the PR, since people in the org may see the
   board
-- Setting Skipped / Muted first records the subscription at the time (SUBSCRIBED or UNSUBSCRIBED);
+- The four were renamed from Working / Backlog / Skipped / Muted. The app reads either name, and
+  writes the old one while the board still has it, so the board's options can be renamed (which
+  keeps the items' values) at any time; the `status:` filter takes the old names too
+- Setting Shelf / Attic first records the subscription at the time (SUBSCRIBED or UNSUBSCRIBED);
   changing to any other status restores the recorded one, or SUBSCRIBED when there is no record
-  (e.g. set before this rule existed). So undoing a skip returns exactly to the old subscription
-- **Skipped and Muted differ only in the app**: GitHub can no longer fully silence notifications
+  (e.g. set before this rule existed). So undoing a shelving returns exactly to the old subscription
+- **Shelf and Attic differ only in the app**: GitHub can no longer fully silence notifications
   for a single PR / issue (neither GraphQL's `IGNORED` nor REST's ignored thread setting works; the
   latter only deletes the thread subscription), so on GitHub both are just UNSUBSCRIBED: mentions
   and review requests still notify. In the app:
-  - Skipped items can be woken (see below); Muted ones can't and stay in Muted
-  - Inbox and unread counts leave out notifications for Muted items, but count Skipped ones as usual
+  - Shelf items can be woken (see below); Attic ones can't and stay in the Attic
+  - Inbox and unread counts leave out notifications for Attic items, but count Shelf ones as usual
   - A mention or review request subscribes me again on GitHub, after which every comment notifies
-    (on the web and by mail too). A woken skip is renewed by hand (`s`, below); a Muted item never
-    wakes, so the sync does it: a mention, team mention or review-request notification on a Muted
+    (on the web and by mail too). A woken Shelf item is renewed by hand (`s`, below); an Attic item never
+    wakes, so the sync does it: a mention, team mention or review-request notification on an Attic
     item, newer than its Status and than the last such check, has the subscription looked at, and
     turned back to UNSUBSCRIBED if it is SUBSCRIBED. Only on the primary device. A subscription
     turned back on by hand stands until the next such notification
 - Changing subscriptions needs a token with the `notifications` scope
   (`gh auth refresh -h github.com -s notifications`)
-- **Items I opened**: with no Status they count as Working (for display and filtering) and don't go
+- **Items I opened**: with no Status they count as Desk (for display and filtering) and don't go
   to Triage, since there's nothing to triage; this default isn't written to the board. `w` / `b` /
   `s` / `m` write Status as usual; choosing Triage in the detail doesn't clear the default
 - **PRs I approve**: the board's own "Code review approved" workflow sets PRs on the board to `Good`
-  (counted as Working; approved ones go to the Good group). It can't reach PRs that aren't on the
+  (counted as Desk; approved ones go to the Good group). It can't reach PRs that aren't on the
   board (or are archived), so the app adds those to the board as `Good`; for PRs already on the
   board it leaves the write to the workflow. Approvals made in the app are added right away;
   approvals made elsewhere (on the web) are added after the sync that reads the board: only
@@ -109,16 +112,16 @@ Status on its own, with the single exception of approvals below.
   isn't on the board adds it without a Status (so it shows in Triage unless it's mine; the board's
   automation may still give an approved PR Good). Items of the other tracker can't be pinned
 - **Other Statuses**: `Python Parity Backlog` belongs to another tracker; the app ignores those
-  items completely (doesn't show or change them). The old `Good` and `Pending` count as Working,
-  `Stale` as Backlog; Done on an open item (e.g. reopened) counts as untriaged
-- **Woken**: a Skipped item goes back to Triage, with a reason tag, if someone reaches me directly
-  after it was skipped; Status itself is unchanged. "Reaches me directly" means:
+  items completely (doesn't show or change them). The old `Good` and `Pending` count as Desk,
+  `Stale` as Drawer; Done on an open item (e.g. reopened) counts as untriaged
+- **Woken**: a Shelf item goes back to Triage, with a reason tag, if someone reaches me directly
+  after it was shelved; Status itself is unchanged. "Reaches me directly" means:
   - I'm mentioned
   - someone requests my review by hand (not the automatic requests the author sends on opening,
     marking ready or pushing)
   - on an item I've taken part in, someone else comments or reviews after my last activity
 
-  Pressing `s` on a woken item (or choosing Skipped in the detail) skips it again: Skipped is
+  Pressing `s` on a woken item (or choosing Shelf in the detail) shelves it again: Shelf is
   written again, its set time refreshed, and the subscription set back to UNSUBSCRIBED (GitHub
   subscribes automatically on mentions)
 - **Status changed on the web**: when a sync finds a Status changed outside the app (different
@@ -185,10 +188,10 @@ every stage is computed from state on GitHub.
 - Staging PRs aren't on the board and have no Status / Priority; `w` / `b` / `s` / `m` and the
   number keys do nothing on them; they don't go to the Dashboard either (nor Recently viewed or
   Pinned). Promoted upstream parity PRs, though mine, are also only in the Parity tab: the agent
-  writes and merges them, so in Working they'd just be noise. Their Status / Priority can still be
+  writes and merges them, so on the Desk they'd just be noise. Their Status / Priority can still be
   set, their notifications still go to the Inbox, and opening one (links, back and forward) jumps to
   the Parity tab. On the Dashboard, the header of the group they would be in notes how many, e.g.
-  `Working 19 (+10 in Parity)` (open ones only, following the filter)
+  `Desk 19 (+10 in Parity)` (open ones only, following the filter)
 - **Turn** (staging PRs): `me` if approved (waiting for me to have the agent promote it); `them` if
   draft; otherwise `me` if I've never commented or reviewed, or the agent pushed or replied after my
   last comment / review, and `them` in all other cases
@@ -226,7 +229,7 @@ Grok Bot as usual:
 
 - 👀 Investigate (`e`) → Richard Loop: have the agent look into it further
 - 🔥 Track (`f`) → Richard Loop: add it to the Notion tracker for the next workday; Richard sets
-  it to Working on the board, so the app leaves the board alone
+  it to Desk on the board, so the app leaves the board alone
 - 🚀 Merge (`r`) → Merger: drives CI and merges following the merge skill; only for PRs in the
   repository that are open and approved (reviewDecision = APPROVED, the same condition as the Good
   group). For other items it's grayed out in the context menu and the key is ignored (staging PRs
@@ -238,14 +241,14 @@ including ones I asked for in the chat rather than with `r`. Before working on a
 its Status to **Merging** (adding it to the board if it isn't there); once merged, the board's
 workflow sets Done. Merger works through what comes up on the way itself (trivial conflicts, CI
 failures, possibly in a short-lived Claude session); only when I explicitly take the PR over or
-call the merge off does it set the Status back to Working and write why in the Comment field.
+call the merge off does it set the Status back to Desk and write why in the Comment field.
 The app sets Merging itself once a 🚀 send goes through, so it shows at once rather than when
 Merger gets to it. A PR not on the board yet (or archived) is put on it first, and Merging goes on
 only once the board's automation has given it a Status (it sets an approved PR it is given to Good,
 which would overwrite Merging), or after 30 s without one; the app shows Merging all along. Merging
 is never offered as a choice (the detail shows it while an item has it), and `w` / `b` / `s` / `m`
 move an item out as usual. Merging PRs have no group of their
-own: they stay in Good (or Working, once no longer approved), at the bottom, with a purple icon
+own: they stay in Good (or Desk, once no longer approved), at the bottom, with a purple icon
 (§4.1). The board's "Code review approved"
 workflow may turn a Merging PR back to Good if someone approves it mid-merge; that's accepted
 
@@ -268,7 +271,7 @@ a line per item (for 🚀, one batch). Holding ⌥ (`⌥E` / `⌥F` / `⌥R`, or
 the context menu while holding ⌥) opens a send panel first, where a note for the bot can be added;
 it goes at the end of the message after a blank line, verbatim. 🚀 and re-sends always open this
 panel first (the note can be empty; `⌘↩` sends, `esc` cancels). Nothing is drawn on the row: the
-status bar shows the send, and what it leads to shows on the board (🔥 → Working, 👀 / 🔥 → a
+status bar shows the send, and what it leads to shows on the board (🔥 → Desk, 👀 / 🔥 → a
 Session link; 🚀 → Merging, which the app sets itself). The local database keeps the last send of each kind (when, and the
 note), which is what makes a send a re-send; the context menu checks the kinds already sent. Bot
 names are set in Settings → Grok Bot (name, unique prefix or id); the CLI shares its sign-in with
@@ -283,18 +286,18 @@ grokbot-cli at the commit pinned in the script (cached per commit), signs it and
 ├ List ─────────────────────────────────────────────┬ Detail ────────────────────────────────────────────┤
 │                                                   │ #56492 [Core] Extensible KV cache                  │
 │ ▾ Recently viewed 8                               │ by njhill ◆◆  draft  CI ● 16 failed  conflicts     │
-│ ▾ Pinned 2                                        │ [Triage Working Backlog Skipped Muted] [H M L –]   │
+│ ▾ Pinned 2                                        │ [Triage Desk Drawer Shelf Attic]       [H M L –]   │
 │ ▾ Good 1                                          │ [Pin] [Open ↗]   Comment: ...                      │
-│ ▾ Working 9                                       │ Conversation | Checks | Files                      │
+│ ▾ Desk 9                                          │ Conversation | Checks | Files                      │
 │ ▾ Triage 180                                      │ ...timeline...                                     │
-│ ▸ Backlog 31                                      │                                                    │
+│ ▸ Drawer 31                                       │                                                    │
 │                                                   │ ┌ Comment box ──────────── Comment / Approve … ┐  │
 ├───────────────────────────────────────────────────┴────────────────────────────────────────────────────┤
 └ Status bar: j/k move · w/b/s/m … (shortcut hints)   BugenZhao · vllm-project/vllm · Board #56 · 403 items · Synced 12s ago · API quota 4,821 left ┘
 ```
 
 The left of the status bar normally shows shortcut hints; while a write is in flight it shows that
-write instead (a spinner plus e.g. `#63887 → Working`, `🔥 #63887 → Richard Loop`,
+write instead (a spinner plus e.g. `#63887 → Desk`, `🔥 #63887 → Richard Loop`,
 `Approve #63887`), then a checkmark for 3 seconds when done before going back; on failure it goes
 straight back, and the error still shows in an alert. This covers board Status / Priority, sends to
 Grok Bots, comments / reviews, Close and Park / Resume; with several at once, the newest shows.
@@ -313,17 +316,17 @@ Top to bottom:
   Selecting inside Recently viewed only marks read and doesn't reorder it, so `j` doesn't bounce
   between the top two rows
 - **Pinned**: items pinned with `p` (the board's Pinned field, §3.1)
-- **Good**: open items with Status = Working (or Merging), plus open items I opened that have no
+- **Good**: open items with Status = Desk (or Merging), plus open items I opened that have no
   Status, that are approved PRs; mine first, then PRs Merger is merging (Status = Merging) last, so
   what waits for 🚀 comes first. A Merging PR draws its icon purple (the merge color): the open
   glyph, or the conflict glyph when it has conflicts, which Merger works through itself when they
   are mechanical; a draft keeps its own gray icon. The same goes wherever a PR's state icon shows: the detail header, the
   stack panel, Link and the adoption notes
-- **Working**: the same, without approval; mine first
-- **Triage**: untriaged open items opened by others, plus woken Skipped items
-- **Backlog**: open items with Status = Backlog, collapsed by default; mine first
+- **Desk**: the same, without approval; mine first
+- **Triage**: untriaged open items opened by others, plus woken Shelf items
+- **Drawer**: open items with Status = Drawer, collapsed by default; mine first
 - **Recently closed**: items merged / closed in the last 14 days, collapsed by default
-- **Skipped**, **Muted**: open items with that Status, collapsed by default
+- **Shelf**, **Attic**: open items with that Status, collapsed by default
 
 Apart from Recently viewed and Pinned, each item appears in exactly one group. All groups always
 show, empty ones too (with a count of 0); a group header's tooltip explains what the group holds
@@ -390,7 +393,7 @@ well
 - The filter field sits on the list side of the toolbar (`/` focuses it; return, or esc when empty,
   goes back to the list); free text matches title, number and author
 - Tokens: `is:pr` `is:issue` `is:draft` `is:open` `is:unread` `is:pinned` `is:first` `is:regular`
-  `status:triage|working|backlog|skipped|muted` `turn:me` `author:x` `label:x` `ci:fail` `p:h`
+  `status:triage|desk|drawer|shelf|attic` (the old names work too) `turn:me` `author:x` `label:x` `ci:fail` `p:h`
   `org:redhat` `merged:>=10`; a leading `-` negates
 
 ### 4.5 Keyboard shortcuts
@@ -401,7 +404,7 @@ well
 | `esc` | Deselect, returning the detail pane to its empty state; with nothing selected, clear the filter |
 | `⌘` / `⇧` click | Multiple selection; the shortcuts below and the context menu act on every selected item (right-clicking a row outside the selection acts on that row only). Toggles act on the whole selection: cleared if all are already set, otherwise set on all |
 | `/` | Focus the filter field |
-| `w` / `b` / `s` / `m` | Set Status to Working / Backlog / Skipped / Muted; pressing the same key again clears Status (back to untriaged); `s` on a woken Skipped item skips it again instead of clearing |
+| `w` / `b` / `s` / `m` | Set Status to Desk / Drawer / Shelf / Attic; pressing the same key again clears Status (back to untriaged); `s` on a woken Shelf item shelves it again instead of clearing |
 | `⌘Z` / `⇧⌘Z` | With the list focused, undo / redo list actions: Status, Priority, Pin (Mark as read and Close can't be undone); board writes for one item go out in order, so an undo never reaches GitHub before the original; in text fields it's still text undo |
 | `1` / `2` / `3` / `0` | Set Priority to H / M / L / clear |
 | `p` | Pin / unpin |
@@ -540,7 +543,7 @@ gray tier.
   an open PR still on the branch, or still carrying the commits, of a merged or closed PR. The current PR is bold and highlighted;
   clicking another row opens it in the app. `⌥↑` / `⌥↓` (with the list or conversation focused)
   move along the stack toward the base / the top. The timeline shows stack join / leave events
-- **Actions**: Status (Triage / Working / Backlog / Skipped / Muted), Priority (H / M / L / –), Pin,
+- **Actions**: Status (Triage / Desk / Drawer / Shelf / Attic), Priority (H / M / L / –), Pin,
   Open ↗; parity staging PRs get Park / Resume instead (§3.2)
 - **Conversation**:
   - The timeline includes comments, reviews (with summaries and diff hunks of inline comments),

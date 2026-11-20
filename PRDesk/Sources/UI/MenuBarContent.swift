@@ -9,7 +9,7 @@ struct MenuBarContent: View {
 
     var body: some View {
         let working = model.workingItems
-        Section("Working · \(working.count)") {
+        Section("Desk · \(working.count)") {
             ForEach(working.prefix(Self.limit), id: \.item.id) { row in
                 Button {
                     show { model.reveal(row.item.id) }

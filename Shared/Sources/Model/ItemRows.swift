@@ -27,14 +27,14 @@ struct ItemRow: Hashable, Sendable {
     var isPinned: Bool { board?.isPinned == true }
     var comment: String? { board?.isArchived == false ? board?.comment : nil }
 
-    /// Why a Skipped item is back in Triage: someone asked the viewer directly after it was skipped.
+    /// Why a Shelf item is back in Triage: someone asked the viewer directly after it was skipped.
     var wakeReason: String? {
         guard triage == .skipped, let ask = insight.directAsk, ask.at > board?.statusAt ?? .distantPast else { return nil }
         return ask.reason
     }
 
-    /// The Status as the list treats it: none for a woken Skipped item, which is back in Triage,
-    /// and Working for the viewer's own items without one, which have nothing to triage. The
+    /// The Status as the list treats it: none for a woken Shelf item, which is back in Triage,
+    /// and Desk for the viewer's own items without one, which have nothing to triage. The
     /// default is never written to the board.
     var listedTriage: TriageStatus? {
         if wakeReason != nil { return nil }
@@ -51,13 +51,13 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
         case .opened: "Opened from links"
         case .recent: "Recently viewed"
         case .pinned: "Pinned"
-        case .working: "Working"
+        case .working: "Desk"
         case .good: "Good"
         case .triage: "Triage"
-        case .backlog: "Backlog"
+        case .backlog: "Drawer"
         case .closed: "Recently closed"
-        case .skipped: "Skipped"
-        case .muted: "Muted"
+        case .skipped: "Shelf"
+        case .muted: "Attic"
         case .inbox: "Inbox"
         case .parityReview: "Review"
         case .parityDiscussing: "Discussing"
@@ -80,19 +80,19 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
         case .pinned:
             "Items you pinned (p). Kept on this Mac, not on the board; they also stay in their own section."
         case .working:
-            "Status Working on the board (old Good and Pending count too, and Merging, set on 🚀 and by Merger while it merges a PR), except approved PRs, and your own items without a Status. Your own items go first. The subscription is left alone."
+            "Status Desk on the board (old Working, Good and Pending count too, and Merging, set on 🚀 and by Merger while it merges a PR), except approved PRs, and your own items without a Status. Your own items go first. The subscription is left alone."
         case .good:
-            "Status Working (or Good) and approved: waiting to be merged. A PR you approve (here or on the web) goes on the board as Good if it isn't on it yet. Your own items go first; PRs Merger is merging (Status Merging, a purple icon) go last."
+            "Status Desk (or Good) and approved: waiting to be merged. A PR you approve (here or on the web) goes on the board as Good if it isn't on it yet. Your own items go first; PRs Merger is merging (Status Merging, a purple icon) go last."
         case .triage:
-            "No Status yet: not on the board, on it without a Status, or Done but open again. Also Skipped items someone asked you about since, with the reason. Your own items count as Working instead."
+            "No Status yet: not on the board, on it without a Status, or Done but open again. Also Shelf items someone asked you about since, with the reason. Your own items count as Desk instead."
         case .backlog:
-            "Status Backlog: worth caring about, but later. Your own items go first. The subscription is left alone."
+            "Status Drawer (old Backlog): worth caring about, but later. Your own items go first. The subscription is left alone."
         case .closed:
             "Merged or closed in the last \(Int(Self.closedRetention / 86400)) days, whatever the Status. The board's own workflow sets Done."
         case .skipped:
-            "Status Skipped: ignored for now. Unsubscribed, so GitHub only notifies on mentions or when you take part. Back in Triage when someone asks you directly; s skips it again."
+            "Status Shelf (old Skipped): low priority, put aside for now. Unsubscribed, so GitHub only notifies on mentions or when you take part. Back in Triage when someone asks you directly; s shelves it again."
         case .muted:
-            "Status Muted: dropped for good. Never back in Triage, and the Inbox and unread counts leave it out. Unsubscribed like Skipped: GitHub can't ignore an item, so it still notifies on mentions and review requests."
+            "Status Attic (old Muted): put away for good. Never back in Triage, and the Inbox and unread counts leave it out. Unsubscribed like Shelf: GitHub can't ignore an item, so mentions and review requests still notify, and the subscription they bring is turned off again."
         case .inbox:
             "GitHub notifications for this repository and the parity fork where you take part. Not tied to the board."
         case .parityReview:

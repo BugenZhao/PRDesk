@@ -491,7 +491,8 @@ extension AppDatabase {
             try BoardEntry.deleteAll(db)
             for var entry in entries where !keeping.contains(entry.number) {
                 // Setting the same option again (renewing a skip) may leave GitHub's time alone.
-                if let old = previous[entry.number], old.status == entry.status,
+                // The same status counts under either name (Shelf written as Skipped).
+                if let old = previous[entry.number], old.triage.map({ $0 == entry.triage }) ?? (old.status == entry.status),
                    let at = old.statusAt, at > entry.statusAt ?? .distantPast {
                     entry.statusAt = at
                 }
