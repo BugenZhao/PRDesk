@@ -88,7 +88,7 @@ struct StackPanel: View {
                 Text("#\(String(entry.number))")
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
-                title(entry.title, shortened: shortensTags)
+                Text(itemTitle: entry.title, shortenedTags: shortensTags)
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .fontWeight(isCurrent ? .semibold : .regular)
@@ -211,20 +211,6 @@ struct StackPanel: View {
             .padding(.horizontal, 8)
             .frame(maxWidth: .infinity, minHeight: Self.rowHeight, maxHeight: Self.rowHeight, alignment: .leading)
             .contentShape(Rectangle())
-    }
-
-    /// The title with its leading tags dimmed, and shortened ("[RF][Fix] ") when `shortened`.
-    private func title(_ title: String, shortened: Bool) -> Text {
-        let pieces = TitleMarkup.pieces(title)
-        let short = shortened ? TitlePrefix.abbreviate(TitlePrefix.split(title).prefix) : nil
-        let start = short.map { Text(verbatim: $0).foregroundStyle(.tertiary) } ?? Text(verbatim: "")
-        return pieces.reduce(start) { text, piece in
-            if piece.isPrefix, short != nil { return text }
-            var part = Text(verbatim: piece.text)
-            if piece.isCode { part = part.font(.callout.monospaced()) }
-            if piece.isPrefix { part = part.foregroundStyle(.tertiary) }
-            return Text("\(text)\(part)")
-        }
     }
 }
 

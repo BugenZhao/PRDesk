@@ -207,3 +207,20 @@ extension Color {
         )
     }
 }
+
+extension Text {
+    /// A PR or commit title with its leading tags dimmed, and shortened ("[RF][Fix] ") when
+    /// `shortenedTags`; `code` spans in `codeFont`.
+    init(itemTitle title: String, shortenedTags: Bool, codeFont: Font = .callout.monospaced()) {
+        let pieces = TitleMarkup.pieces(title)
+        let short = shortenedTags ? TitlePrefix.abbreviate(TitlePrefix.split(title).prefix) : nil
+        let start = short.map { Text(verbatim: $0).foregroundStyle(.tertiary) } ?? Text(verbatim: "")
+        self = pieces.reduce(start) { text, piece in
+            if piece.isPrefix, short != nil { return text }
+            var part = Text(verbatim: piece.text)
+            if piece.isCode { part = part.font(codeFont) }
+            if piece.isPrefix { part = part.foregroundStyle(.tertiary) }
+            return Text("\(text)\(part)")
+        }
+    }
+}

@@ -14,6 +14,8 @@ struct CommitsView: View {
     @State private var preset: CommitHistory.Preset?
     @State private var loaded: Loaded?
     @State private var error: String?
+    /// The commit list's width, for whether titles' tags are shortened.
+    @State private var listWidth: CGFloat = 0
     @AppStorage("wrapDiffLines") private var wrapLines = true
 
     private struct Loaded {
@@ -78,7 +80,7 @@ struct CommitsView: View {
             ForEach(history.rows) { row in
                 switch row {
                 case let .commit(commit, isNew):
-                    CommitRow(commit: commit, isNew: isNew, pullURL: item.url)
+                    CommitRow(commit: commit, isNew: isNew, shortensTags: shortensTags, pullURL: item.url)
                 case let .push(push):
                     PushRow(push: push)
                         .selectionDisabled(push.before == nil || push.after == nil)
@@ -87,6 +89,28 @@ struct CommitsView: View {
         }
         .listStyle(.plain)
         .environment(\.defaultMinListRowHeight, 22)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { listWidth = $0 }
+    }
+
+    /// Whether every headline's tags are shortened: when any row's wouldn't fit with them in full,
+    /// as the stack does, so a tag reads the same in every row.
+    private var shortensTags: Bool {
+        guard listWidth > 0 else { return false }
+        let body = NSFont.preferredFont(forTextStyle: .callout)
+        let mono = NSFont.monospacedSystemFont(ofSize: body.pointSize, weight: .regular)
+        let caption = NSFont.preferredFont(forTextStyle: .caption1)
+        let digits = NSFont.monospacedDigitSystemFont(ofSize: body.pointSize, weight: .regular)
+        func measure(_ text: String, _ font: NSFont) -> CGFloat {
+            ceil((text as NSString).size(withAttributes: [.font: font]).width)
+        }
+        return history.rows.contains { row in
+            guard case let .commit(commit, isNew) = row else { return false }
+            // The row's insets, then CI dot, avatar, sha, headline, "new" and age with their gaps.
+            var needed = 2 * 12 + 7 + 6 + 16 + 6 + measure(commit.shortOid, mono) + 6
+                + measure(commit.headline, body) + 4 + measure(commit.committedAt.compactAge(), digits)
+            if isNew { needed += measure("new", caption) + 10 + 6 }
+            return needed > listWidth
+        }
     }
 
     // MARK: Toolbar
@@ -198,6 +222,7 @@ struct CommitsView: View {
 private struct CommitRow: View {
     let commit: PRCommit
     let isNew: Bool
+    let shortensTags: Bool
     let pullURL: String
 
     var body: some View {
@@ -209,7 +234,7 @@ private struct CommitRow: View {
             Text(commit.shortOid)
                 .font(.callout.monospaced())
                 .foregroundStyle(.secondary)
-            Text(commit.headline)
+            Text(itemTitle: commit.headline, shortenedTags: shortensTags)
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: 4)
@@ -225,7 +250,7 @@ private struct CommitRow: View {
                 .monospacedDigit()
         }
         .font(.callout)
-        .help("\(commit.authorName ?? commit.author ?? "") · +\(commit.additions) −\(commit.deletions)")
+        .help("\(commit.headline)\n\(commit.authorName ?? commit.author ?? "") · +\(commit.additions) −\(commit.deletions)")
         .contextMenu {
             Button("Open on GitHub") {
                 if let url = URL(string: "\(pullURL)/commits/\(commit.oid)") { Platform.open(url) }
