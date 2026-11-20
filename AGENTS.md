@@ -87,6 +87,7 @@ Both apps compile `Shared/`; each adds its own views and platform parts. Put new
   filter parsing, sections and sorting, state icons
 - `Shared/Sources/App` — `AppModel` (the `@Observable` main-actor state both apps drive)
 - `Shared/Sources/Support` — `Platform` (opening links, the pasteboard, the badge count),
+  `AgentSession` (the board's Session links: agent names, rewrites to desktop-app links),
   `DeviceRole` (only the Mac, the primary, follows the board with rules and prefetches details),
   `AvatarStore`
 - `Shared/Sources/Bots` — `GrokBot` messages (SPEC §3.3); each app sends them its way
