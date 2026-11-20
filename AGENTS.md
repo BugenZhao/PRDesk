@@ -14,7 +14,9 @@ open .build/DerivedData/Build/Products/Debug/PRDesk.app
 `scripts/install.sh` builds Release and installs it as `/Applications/PR Desk.app` (quitting any
 running copy first) — that is the copy for daily use. Keep the build free of warnings.
 
-Debug builds accept `-PRDeskAppearance dark|light` to force an appearance, and
+Debug builds accept `-PRDeskAppearance dark|light` to force an appearance, `-PRDeskNoSync YES`
+to skip syncing on their own (no searches, board, inbox or prefetched details; only what is opened,
+and ⌘R), and
 `-PRDeskDryRunWrites YES` to log writes to GitHub (comments, reviews, marking notifications read,
 board fields, subscriptions, files marked viewed, messages to Grok Bots) instead of sending them — use it whenever a test could trigger a write. Both flags are
 compiled out of Release builds: a Release test copy writes to GitHub for real, so only measure with
@@ -29,8 +31,14 @@ Check UI changes in a separate test copy, never the installed app or another ses
 DD=<your scratch dir>/DerivedData   # not .build/DerivedData, which other sessions build into
 xcodebuild -workspace PRDesk.xcworkspace -scheme PRDesk -derivedDataPath "$DD" \
   PRODUCT_BUNDLE_IDENTIFIER=com.bugenzhao.PRDesk.perftest build
-"$DD/Build/Products/Debug/PRDesk.app/Contents/MacOS/PRDesk" -PRDeskDryRunWrites YES &
+"$DD/Build/Products/Debug/PRDesk.app/Contents/MacOS/PRDesk" -PRDeskDryRunWrites YES -PRDeskNoSync YES &
 ```
+
+- Mind the GraphQL quota (5,000 points an hour, shared with the installed app and the user's own
+  use; each detail is an expensive nested query). Keep `-PRDeskNoSync YES` unless the test is
+  about syncing, open only the items the test needs, and don't relaunch over and over. Check
+  `gh api rate_limit --jq .resources.graphql` (free) before and after. Never make a migration
+  empty `detailCache`: every copy then refetches every detail; decode old rows leniently instead.
 
 - The own bundle id keeps it apart from `com.bugenzhao.PRDesk` (the installed copy and
   `scripts/install.sh`, which quits that id) and gives it its own preferences (collapsed sections,

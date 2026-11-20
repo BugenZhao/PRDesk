@@ -462,6 +462,12 @@ final class AppModel {
                 self?.viewer = viewer
                 self?.rebuild()
             }
+            // Debug builds launched with `-PRDeskNoSync YES` (test copies) don't sync on their own:
+            // no searches, board, inbox or prefetched details, only what is opened (and ⌘R). A
+            // copy that syncs is a second client spending the same hourly GraphQL quota.
+            #if DEBUG
+                if UserDefaults.standard.bool(forKey: "PRDeskNoSync") { return }
+            #endif
             while !Task.isCancelled {
                 guard let self else { return }
                 if lastSyncAttemptAt.map({ Date().timeIntervalSince($0) >= nextSyncDelay }) ?? true {
