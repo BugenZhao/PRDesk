@@ -54,7 +54,7 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
         case .working: "Desk"
         case .good: "Good"
         case .triage: "Triage"
-        case .backlog: "Drawer"
+        case .backlog: "Tray"
         case .closed: "Recently closed"
         case .skipped: "Shelf"
         case .muted: "Attic"
@@ -86,7 +86,7 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
         case .triage:
             "No Status yet: not on the board, on it without a Status, or Done but open again. Also Shelf items someone asked you about since, with the reason. Your own items count as Desk instead."
         case .backlog:
-            "Status Drawer (old Backlog): worth caring about, but later. Your own items go first. The subscription is left alone."
+            "Status Tray (old Backlog): worth caring about, but later. Your own items go first. The subscription is left alone."
         case .closed:
             "Merged or closed in the last \(Int(Self.closedRetention / 86400)) days, whatever the Status. The board's own workflow sets Done."
         case .skipped:

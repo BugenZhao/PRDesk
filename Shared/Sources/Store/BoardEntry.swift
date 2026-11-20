@@ -8,7 +8,7 @@ enum TriageStatus: String, CaseIterable, Codable, Sendable {
     /// Needs my attention now.
     case working = "Desk"
     /// Followed, but later.
-    case backlog = "Drawer"
+    case backlog = "Tray"
     /// Low priority; unsubscribed, back in Triage when someone asks me directly.
     case skipped = "Shelf"
     /// Not followed at all; unsubscribed, never back in Triage.
@@ -132,7 +132,7 @@ struct BoardEntry: Codable, Hashable, Sendable {
         guard !isArchived else { return nil }
         return switch status {
         case "Desk", "Working", "Good", "Pending": .working
-        case "Drawer", "Backlog", "Stale": .backlog
+        case "Tray", "Backlog", "Stale": .backlog
         case "Shelf", "Skipped": .skipped
         case "Attic", "Muted": .muted
         case "Merging": .merging

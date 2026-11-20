@@ -513,7 +513,7 @@ struct ItemTableView: NSViewRepresentable {
             MenuAction(title: "Open in Browser", action: .openInBrowser, symbol: "safari", key: "o"),
             MenuAction(title: "Open Author's Profile", action: .openAuthorProfile, symbol: "person.crop.circle", key: "u"),
             MenuAction(title: "Desk", action: .triage(.working), symbol: "hammer", key: "w"),
-            MenuAction(title: "Drawer", action: .triage(.backlog), symbol: "tray", key: "b"),
+            MenuAction(title: "Tray", action: .triage(.backlog), symbol: "tray", key: "b"),
             MenuAction(title: "Shelf", action: .triage(.skipped), symbol: "books.vertical", key: "s"),
             MenuAction(title: "Attic", action: .triage(.muted), symbol: "shippingbox", key: "m"),
             MenuAction(title: "High Priority", action: .priority(.high), symbol: Priority.high.symbol, key: "1"),

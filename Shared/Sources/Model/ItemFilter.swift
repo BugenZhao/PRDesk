@@ -3,7 +3,7 @@ import Foundation
 /// A parsed filter string: free text plus `key:value` tokens.
 ///
 /// Supported tokens: `is:pr|issue|draft|open|closed|merged|unread|pinned|first|regular`,
-/// `status:triage|desk|drawer|shelf|attic|merging` (or the old `working|backlog|skipped|muted`),
+/// `status:triage|desk|tray|shelf|attic|merging` (or the old `working|backlog|skipped|muted`),
 /// `turn:me|them`, `author:x`, `label:x`, `ci:fail|pending|pass`, `p:h|m|l`, `org:x`, and
 /// `merged:N` / `merged:>=N`
 /// (also `>`, `<`, `<=`) on the author's merged PR count.

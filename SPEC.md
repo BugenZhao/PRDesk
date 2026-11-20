@@ -65,7 +65,7 @@ Status on its own, with the single exception of approvals below.
 |---|---|---|
 | (not on the board, or no Status) | Untriaged | Unchanged |
 | **Desk** | Needs my attention now | Unchanged |
-| **Drawer** | I want to follow it, but later (including stalled items and ones I'd rather not think about for now) | Unchanged |
+| **Tray** | I want to follow it, but later (including stalled items and ones I'd rather not think about for now) | Unchanged |
 | **Shelf** | Low quality or low priority; put aside for now | UNSUBSCRIBED (notified only when participating or mentioned) |
 | **Attic** | Not following at all; a friendly close | UNSUBSCRIBED (same as Shelf) |
 | **Merging** | Merger has taken the PR on to merge it; set by Merger and by the app on 🚀 (§3.3), never offered as a choice | Unchanged |
@@ -113,7 +113,7 @@ Status on its own, with the single exception of approvals below.
   automation may still give an approved PR Good). Items of the other tracker can't be pinned
 - **Other Statuses**: `Python Parity Backlog` belongs to another tracker; the app ignores those
   items completely (doesn't show or change them). The old `Good` and `Pending` count as Desk,
-  `Stale` as Drawer; Done on an open item (e.g. reopened) counts as untriaged
+  `Stale` as Tray; Done on an open item (e.g. reopened) counts as untriaged
 - **Woken**: a Shelf item goes back to Triage, with a reason tag, if someone reaches me directly
   after it was shelved; Status itself is unchanged. "Reaches me directly" means:
   - I'm mentioned
@@ -286,11 +286,11 @@ grokbot-cli at the commit pinned in the script (cached per commit), signs it and
 ├ List ─────────────────────────────────────────────┬ Detail ────────────────────────────────────────────┤
 │                                                   │ #56492 [Core] Extensible KV cache                  │
 │ ▾ Recently viewed 8                               │ by njhill ◆◆  draft  CI ● 16 failed  conflicts     │
-│ ▾ Pinned 2                                        │ [Triage Desk Drawer Shelf Attic]       [H M L –]   │
+│ ▾ Pinned 2                                        │ [Triage Desk Tray Shelf Attic]         [H M L –]   │
 │ ▾ Good 1                                          │ [Pin] [Open ↗]   Comment: ...                      │
 │ ▾ Desk 9                                          │ Conversation | Checks | Files                      │
 │ ▾ Triage 180                                      │ ...timeline...                                     │
-│ ▸ Drawer 31                                       │                                                    │
+│ ▸ Tray 31                                         │                                                    │
 │                                                   │ ┌ Comment box ──────────── Comment / Approve … ┐  │
 ├───────────────────────────────────────────────────┴────────────────────────────────────────────────────┤
 └ Status bar: j/k move · w/b/s/m … (shortcut hints)   BugenZhao · vllm-project/vllm · Board #56 · 403 items · Synced 12s ago · API quota 4,821 left ┘
@@ -324,7 +324,7 @@ Top to bottom:
   stack panel, Link and the adoption notes
 - **Desk**: the same, without approval; mine first
 - **Triage**: untriaged open items opened by others, plus woken Shelf items
-- **Drawer**: open items with Status = Drawer, collapsed by default; mine first
+- **Tray**: open items with Status = Tray, collapsed by default; mine first
 - **Recently closed**: items merged / closed in the last 14 days, collapsed by default
 - **Shelf**, **Attic**: open items with that Status, collapsed by default
 
@@ -393,7 +393,7 @@ well
 - The filter field sits on the list side of the toolbar (`/` focuses it; return, or esc when empty,
   goes back to the list); free text matches title, number and author
 - Tokens: `is:pr` `is:issue` `is:draft` `is:open` `is:unread` `is:pinned` `is:first` `is:regular`
-  `status:triage|desk|drawer|shelf|attic` (the old names work too) `turn:me` `author:x` `label:x` `ci:fail` `p:h`
+  `status:triage|desk|tray|shelf|attic` (the old names work too) `turn:me` `author:x` `label:x` `ci:fail` `p:h`
   `org:redhat` `merged:>=10`; a leading `-` negates
 
 ### 4.5 Keyboard shortcuts
@@ -404,7 +404,7 @@ well
 | `esc` | Deselect, returning the detail pane to its empty state; with nothing selected, clear the filter |
 | `⌘` / `⇧` click | Multiple selection; the shortcuts below and the context menu act on every selected item (right-clicking a row outside the selection acts on that row only). Toggles act on the whole selection: cleared if all are already set, otherwise set on all |
 | `/` | Focus the filter field |
-| `w` / `b` / `s` / `m` | Set Status to Desk / Drawer / Shelf / Attic; pressing the same key again clears Status (back to untriaged); `s` on a woken Shelf item shelves it again instead of clearing |
+| `w` / `b` / `s` / `m` | Set Status to Desk / Tray / Shelf / Attic; pressing the same key again clears Status (back to untriaged); `s` on a woken Shelf item shelves it again instead of clearing |
 | `⌘Z` / `⇧⌘Z` | With the list focused, undo / redo list actions: Status, Priority, Pin (Mark as read and Close can't be undone); board writes for one item go out in order, so an undo never reaches GitHub before the original; in text fields it's still text undo |
 | `1` / `2` / `3` / `0` | Set Priority to H / M / L / clear |
 | `p` | Pin / unpin |
@@ -543,7 +543,7 @@ gray tier.
   an open PR still on the branch, or still carrying the commits, of a merged or closed PR. The current PR is bold and highlighted;
   clicking another row opens it in the app. `⌥↑` / `⌥↓` (with the list or conversation focused)
   move along the stack toward the base / the top. The timeline shows stack join / leave events
-- **Actions**: Status (Triage / Desk / Drawer / Shelf / Attic), Priority (H / M / L / –), Pin,
+- **Actions**: Status (Triage / Desk / Tray / Shelf / Attic), Priority (H / M / L / –), Pin,
   Open ↗; parity staging PRs get Park / Resume instead (§3.2)
 - **Conversation**:
   - The timeline includes comments, reviews (with summaries and diff hunks of inline comments),
