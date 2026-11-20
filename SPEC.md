@@ -265,8 +265,10 @@ reads this field: items with a session show a `terminal` icon after the title, l
 on hover; a button at the top of the detail opens the newest (with a menu of all of them when
 there are several), and `t` (or Open Agent Session in the context menu) opens the newest for each
 selected item. Links can be from any agent, web links or a desktop app's own deep links: agents the
-app knows (`AgentSession.known`: Claude Code, Codex, Kimi Code) show their name; Claude Code web
-links are rewritten to `claude://code/session_…` to open in the Claude app, while Codex's
+app knows (`AgentSession.known`: Claude Code, Codex, Kimi Code, T3 Code) show their name; Claude Code web
+links are rewritten to `claude://code/session_…` to open in the Claude app, and T3 Code's
+`https://app.t3.codes/threads/<environment>/<thread>` to `t3code://threads/…` for the T3 Code app
+(either kept as the web link when no installed app takes the rewritten one), while Codex's
 `codex://threads/<id>` (ChatGPT app) and Kimi Code's `kimi-lite://sessions/<id>` (Kimi Lite) are
 handed to the system as is. Other links are named by their domain (deep links by their scheme) and
 opened as is. Switching agents only needs Richard to write that agent's session links; to show a

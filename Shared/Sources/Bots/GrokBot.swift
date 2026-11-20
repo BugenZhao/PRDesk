@@ -1,4 +1,9 @@
 import Foundation
+#if os(macOS)
+    import AppKit
+#else
+    import UIKit
+#endif
 
 /// What the viewer asks a Grok Bot to do with items, sent as the emoji the bots already know from
 /// chat: Richard Loop looks into 👀 and puts 🔥 on the Notion tracker (which also moves it to
@@ -67,6 +72,10 @@ enum AgentSession {
         Agent(name: "Codex", scheme: "codex", host: "threads"),
         // Kimi Lite's links to Kimi Code sessions: `kimi-lite://sessions/session_…`.
         Agent(name: "Kimi Code", scheme: "kimi-lite", host: "sessions"),
+        // `https://app.t3.codes/threads/<environment>/<thread>` opens in the T3 Code app as
+        // `t3code://threads/<environment>/<thread>`; the app's own links are taken as they are.
+        Agent(name: "T3 Code", host: "app.t3.codes", pathPrefix: "/threads/", appURL: { URL(string: "t3code:/\($0.path())") }),
+        Agent(name: "T3 Code", scheme: "t3code", host: "threads"),
     ]
 
     /// The agent's name; for agents not listed, the link's host, or its scheme for an app's link.
@@ -76,10 +85,21 @@ enum AgentSession {
         return url.scheme ?? url.absoluteString
     }
 
+    /// Opens the session in the agent's app when one is installed to take the app link, else the
+    /// link as it is (a web link still works without the app).
     @MainActor
     static func open(_ url: URL) {
-        let appURL = known.first { $0.matches(url) }?.appURL?(url)
-        Platform.open(appURL ?? url)
+        guard let appURL = known.first(where: { $0.matches(url) })?.appURL?(url) else {
+            Platform.open(url)
+            return
+        }
+        #if os(macOS)
+            Platform.open(NSWorkspace.shared.urlForApplication(toOpen: appURL) == nil ? url : appURL)
+        #else
+            UIApplication.shared.open(appURL) { opened in
+                if !opened { Platform.open(url) }
+            }
+        #endif
     }
 }
 
