@@ -125,6 +125,9 @@ private struct SyncStatus: View {
                 ProgressView().controlSize(.small)
             case .failed:
                 Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange)
+            case let .rateLimited(until):
+                Label(until.formatted(date: .omitted, time: .shortened), systemImage: "hourglass")
+                    .foregroundStyle(.orange)
             case .idle:
                 if let at = model.lastSyncedAt {
                     Text(at.compactAge()).foregroundStyle(.secondary)

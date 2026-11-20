@@ -57,7 +57,9 @@ struct SettingsScreen: View {
 
                 Section {
                     LabeledContent("Last synced", value: model.lastSyncedAt.map { "\($0.compactAge()) ago" } ?? "never")
-                    if let rate = model.rateLimit {
+                    if case let .rateLimited(until) = model.syncState {
+                        LabeledContent("API quota", value: "used up until \(until.formatted(date: .omitted, time: .shortened))")
+                    } else if let rate = model.rateLimit {
                         LabeledContent("API quota", value: "\(rate.remaining) left")
                     }
                 } footer: {

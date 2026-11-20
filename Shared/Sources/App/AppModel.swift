@@ -44,6 +44,12 @@ final class AppModel {
         case idle
         case syncing
         case failed(String)
+        /// GitHub refused for the hour's budget; nothing is sent until then, unless synced by hand.
+        case rateLimited(until: Date)
+
+        var isRateLimited: Bool {
+            if case .rateLimited = self { true } else { false }
+        }
     }
 
     /// Seconds between automatic syncs, set in Settings. Each round costs a few GraphQL points.
@@ -470,12 +476,18 @@ final class AppModel {
             #endif
             while !Task.isCancelled {
                 guard let self else { return }
-                if lastSyncAttemptAt.map({ Date().timeIntervalSince($0) >= nextSyncDelay }) ?? true {
+                if isSyncDue {
                     await sync(includeBoard: false)
                 }
                 try? await Task.sleep(for: Self.pollTick)
             }
         })
+    }
+
+    private var isSyncDue: Bool {
+        // Right when GitHub's limit lifts, not an interval after.
+        if case let .rateLimited(until) = syncState { return Date() >= until }
+        return lastSyncAttemptAt.map { Date().timeIntervalSince($0) >= nextSyncDelay } ?? true
     }
 
     private var nextSyncDelay: TimeInterval {
@@ -486,6 +498,8 @@ final class AppModel {
     /// Syncs now. Unless it is the timer's round, this also reads the board.
     func sync(includeBoard: Bool = true) async {
         guard syncState != .syncing else { return }
+        // A sync by hand (only the timer's leaves the board out) tries even while the limit holds.
+        if includeBoard { await engine.client.resume() }
         syncState = .syncing
         lastSyncAttemptAt = Date()
         do {
@@ -502,6 +516,9 @@ final class AppModel {
             await syncInbox()
             Task { await refreshAffiliations() }
             prefetchDetails()
+        } catch let GraphQLClientError.rateLimited(until) {
+            logger.error("Sync rate limited until \(until, privacy: .public)")
+            syncState = .rateLimited(until: until)
         } catch {
             logger.error("Sync failed: \(String(describing: error), privacy: .public)")
             syncState = .failed(error.localizedDescription)
@@ -1357,6 +1374,9 @@ final class AppModel {
                         let detail = try await engine.fetchDetail(of: item)
                         try await db.saveDetail(detail)
                         return Set(detail.entries.compactMap(\.actor))
+                    } catch GraphQLClientError.rateLimited {
+                        // The rest fail at once without a request; the sync after the limit retries.
+                        return []
                     } catch {
                         logger.error("Prefetching the detail of #\(item.number) failed: \(String(describing: error), privacy: .public)")
                         return []

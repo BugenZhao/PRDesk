@@ -219,6 +219,11 @@ private struct SyncStatus: View {
                     .labelStyle(.titleAndIcon)
                     .foregroundStyle(.red)
                     .help(message)
+            case let .rateLimited(until):
+                Label("Rate limited until \(until.formatted(date: .omitted, time: .shortened))", systemImage: "hourglass")
+                    .labelStyle(.titleAndIcon)
+                    .foregroundStyle(.orange)
+                    .help("GitHub's GraphQL budget for the hour is used up. Nothing is sent until then; ⌘R tries anyway.")
             case .idle:
                 if let last = model.lastSyncedAt {
                     TimelineView(.periodic(from: .now, by: 5)) { context in
@@ -227,7 +232,7 @@ private struct SyncStatus: View {
                     }
                 }
             }
-            if let rateLimit = model.rateLimit {
+            if let rateLimit = model.rateLimit, !model.syncState.isRateLimited {
                 Text("·")
                 Text("API quota \(rateLimit.remaining.formatted()) left")
                     .foregroundStyle(rateLimit.remaining < 500 ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
