@@ -431,7 +431,7 @@ const PRDesk = (() => {
       files.key = data.key;
       files.elements.clear();
       files.expanded = prior ? new Map(prior.expanded) : new Map();
-      files.all = prior ? prior.all : null;
+      files.all = prior ? prior.all : data.expanded ?? null;
       root.replaceChildren();
     }
     const elements = data.files.map((file) => {

@@ -10,6 +10,8 @@ struct ItemState: Codable, Hashable, Sendable {
     /// Activity by others after this is unread. Opening an item or `n` moves it forward;
     /// `n` on a read item moves it back to just before the latest activity by others.
     var seenAt: Date?
+    /// A PR's head commit when it was last opened, for "since you last looked" in Commits.
+    var seenHeadOid: String?
     /// `n` on a read item: unread until seen after this.
     var markedUnreadAt: Date?
     /// When GitHub last saw the item's notification read, wherever it was read (the web, GitHub's

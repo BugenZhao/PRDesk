@@ -36,6 +36,33 @@ extension SyncEngine {
     }
 }
 
+private struct FilesResponse: Decodable, Sendable {
+    let files: [PullFile]?
+}
+
+extension SyncEngine {
+    /// The files one commit changed, against its first parent (GitHub returns at most 3000).
+    func fetchCommitFiles(repo: String, sha: String) async throws -> [PullFile] {
+        var files: [PullFile] = []
+        for page in 1 ... 30 {
+            let batch = try await client.rest(
+                "GET", "/repos/\(repo)/commits/\(sha)",
+                query: [URLQueryItem(name: "per_page", value: "100"), URLQueryItem(name: "page", value: String(page))],
+                as: FilesResponse.self
+            ).files ?? []
+            files += batch
+            if batch.count < 100 { break }
+        }
+        return files
+    }
+
+    /// The files changed from `base` to `head`, from their merge base as GitHub compares (at most
+    /// 300).
+    func fetchCompareFiles(repo: String, base: String, head: String) async throws -> [PullFile] {
+        try await client.rest("GET", "/repos/\(repo)/compare/\(base)...\(head)", as: FilesResponse.self).files ?? []
+    }
+}
+
 /// The viewer's mark on a changed file, GitHub's "Viewed" checkbox.
 enum FileViewedState: String, Decodable, Sendable {
     case viewed = "VIEWED"

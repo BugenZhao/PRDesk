@@ -45,8 +45,9 @@ implementation that doesn't consult the source of any existing tool.
 - **Detail**: after each sync, details for items in Desk, Good, Triage, Inbox, Pinned and
   Recently viewed are prefetched in the background, only where the cache is missing or older than
   the item, 2 at a time. Selecting an item shows the cache first and fetches live when the cache is
-  older than the item or more than 2 minutes old. One detail fetch is two parallel GraphQL queries:
-  one for the body and timeline, one for a PR's checks
+  older than the item or more than 2 minutes old. One detail fetch is parallel GraphQL
+  queries: one for the body and timeline, and for a PR one for its checks and one for its latest 100
+  commits (with the commit of each review and the heads around each force push)
 - **Rate limit**: the status bar shows the remaining GraphQL quota; below 500 the polling slows
   down automatically
 - **Board**: all board items (Status, Priority, Comment) are read at most every 3 minutes, and
@@ -282,13 +283,13 @@ grokbot-cli at the commit pinned in the script (cached per commit), signs it and
 ## 4. Main window
 
 ```
-┌ Toolbar:                  Dashboard | Parity (n) | Inbox (n)  🔍 Filter (/)  ⟳  ▣ │      Conversation | Files     ┐
+┌ Toolbar:                 Dashboard | Parity (n) | Inbox (n)  🔍 Filter (/)  ⟳  ▣ │ Conversation | Commits | Files ┐
 ├ List ─────────────────────────────────────────────┬ Detail ────────────────────────────────────────────┤
 │                                                   │ #56492 [Core] Extensible KV cache                  │
 │ ▾ Recently viewed 8                               │ by njhill ◆◆  draft  CI ● 16 failed  conflicts     │
 │ ▾ Pinned 2                                        │ [Triage Desk Tray Shelf Attic]         [H M L –]   │
 │ ▾ Good 1                                          │ [Pin] [Open ↗]   Comment: ...                      │
-│ ▾ Desk 9                                          │ Conversation | Files                               │
+│ ▾ Desk 9                                          │ Conversation | Commits | Files                     │
 │ ▾ Triage 180                                      │ ...timeline...                                     │
 │ ▸ Tray 31                                         │                                                    │
 │                                                   │ ┌ Comment box ──────────── Comment / Approve … ┐  │
@@ -418,7 +419,7 @@ well
 | `c` | Focus the comment box |
 | `⌘R` | Sync now |
 | `⌘1` / `⌘2` / `⌘3` | Switch to Dashboard / Parity / Inbox |
-| `⌥⌘1` / `⌥⌘3` | Switch a PR's detail to Conversation / Files |
+| `⌥⌘1` / `⌥⌘2` / `⌥⌘3` | Switch a PR's detail to Conversation / Commits / Files |
 | `⌘B` | Show / hide the detail pane (kept across relaunches) |
 | `⌃⌥⌘D` | Global: open the issue / PR of Yab's current tab in the desk (§6, back to the desk from the browser) |
 | `⌘V` | With the list focused, open the issue / PR the link on the clipboard points to |
@@ -563,6 +564,22 @@ gray tier.
     who); clicking one adds or removes mine; a smiley button on card and inline comment headers
     (shown on hover) offers all 8. Clicks take effect locally first and revert if the write fails
   - New content since the last view is highlighted, and the page scrolls to the first new item
+- **Commits** (Mac only): the PR's latest 100 commits, newest first, above a diff of what is
+  chosen. Each row: the commit's CI as a dot, the author's avatar, the short sha, the headline,
+  "new" for commits since the viewer last opened the PR, and the age (hover for the author and
+  size; right-click to open it on GitHub or copy the sha). Force pushes sit between the commits,
+  above the head they left, in orange
+  - The diff is the Files page (highlighting, wrap, expand / collapse all), without Viewed boxes;
+    a diff of up to 10 files and 600 changed lines starts expanded. A menu over it picks the range:
+    **Since your last review** (from the commit of the viewer's latest review to the head),
+    **Since you last looked** (from the head stored when the viewer last opened the PR), or **All
+    changes**; it opens on the first of these that has anything. Selecting a commit shows just it;
+    selecting several (shift / ⌘-click) shows from the oldest to the newest of them; selecting a
+    force push shows what it changed. A range starting from a commit no longer on the branch gets
+    a warning that a rebase onto the base branch shows up in it too
+  - Opening a PR stores its head as seen once its detail is in. Single commits come from REST
+    `commits/<sha>`, ranges from `compare/<base>...<head>` (REST quota, not GraphQL), kept for the
+    run
 - **Checks**: no tab of their own. Clicking the CI status in the header opens a popover (a sheet
   on the phone, half height, pulled up for more) with the check runs and statuses grouped by state,
   failures on top; failed and pending groups start expanded, or the passed one when there are
@@ -590,7 +607,8 @@ gray tier.
   the rules for links above: selected if in the list; expanded / filter cleared and then selected
   if on the desk but hidden; otherwise fetched into **Opened from links**. This counts as opening
   (marked read, added to Recently viewed). `/files` (or `/changes`) in the link switches to the
-  Files tab and `/checks` opens the checks popover; `#issuecomment-…`, `#discussion_r…`, `#pullrequestreview-…` and the like scroll
+  Files tab, `/commits` to Commits (`/commits/<sha>` and `/changes/<sha>` with that commit selected),
+  and `/checks` opens the checks popover; `#issuecomment-…`, `#discussion_r…`, `#pullrequestreview-…` and the like scroll
   to that comment once it appears in the conversation (if the cache doesn't have it yet, once the
   live detail arrives). If the tab isn't an issue / PR of these two repositories, an alert says so.
   Without Yab: `⌘V` to paste a link with the list focused, dropping a link on the list, or typing a

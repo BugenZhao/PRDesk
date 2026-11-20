@@ -88,12 +88,12 @@ final class AppModel {
     /// Whether anything is selected. Observed apart from `selection`, so views that only care
     /// about this (the menu commands) aren't rebuilt each time the selection moves.
     private(set) var hasSelection = false
-    /// Whether the selection is a PR, which has the Files tab; observed apart from it for the same
-    /// reason.
+    /// Whether the selection is a PR, which has the Commits and Files tabs; observed apart from it
+    /// for the same reason.
     private(set) var selectionIsPullRequest = false
 
     enum DetailTab: Hashable {
-        case conversation, files
+        case conversation, commits, files
     }
 
     /// The detail pane's tab. Here rather than in the pane, for the View menu's commands.
@@ -291,6 +291,11 @@ final class AppModel {
 
     /// `seenAt` of the selected item when it was opened, before opening moved it forward.
     private(set) var selectedItemPreviousSeenAt: Date?
+    /// The selected PR's head when it was opened before, for Commits' "since you last looked".
+    private(set) var selectedItemPreviousSeenHead: String?
+    /// The selected item, if the user opened it (rather than the table selecting it); its head is
+    /// stored as seen as its detail comes in.
+    @ObservationIgnored private var openedItemID: Item.ID?
 
     @ObservationIgnored private var snapshot = Snapshot()
     @ObservationIgnored private var itemsByID: [Item.ID: Item] = [:]
@@ -716,6 +721,24 @@ final class AppModel {
         return files
     }
 
+    @ObservationIgnored private var rangeFilesCache: [String: [PullFile]] = [:]
+
+    /// The files a range of a PR's commits changed. A commit's never change, so they are kept for
+    /// the run (a hundred ranges at most).
+    func files(for item: Item, in range: CommitRange) async throws -> [PullFile] {
+        if range == .all { return try await files(for: item) }
+        let key = "\(item.repo)@\(range.key)"
+        if let cached = rangeFilesCache[key] { return cached }
+        let files = switch range {
+        case .all: try await files(for: item)
+        case let .commit(sha): try await engine.fetchCommitFiles(repo: item.repo, sha: sha)
+        case let .compare(base, head): try await engine.fetchCompareFiles(repo: item.repo, base: base, head: head)
+        }
+        if rangeFilesCache.count >= 100 { rangeFilesCache.removeAll() }
+        rangeFilesCache[key] = files
+        return files
+    }
+
     /// The viewer's "Viewed" marks on PRs' files, by PR and path; missing until fetched.
     private(set) var viewedFiles: [Item.ID: [String: FileViewedState]] = [:]
 
@@ -781,10 +804,12 @@ final class AppModel {
     func open(_ link: ItemLink) {
         switch link.page {
         case .conversation: detailTab = .conversation
+        case .commits: detailTab = .commits
         case .checks: detailTab = .conversation
         case .files: detailTab = .files
         }
         checksShownFor = link.page == .checks ? link.key : nil
+        linkedCommit = link.commit == nil ? nil : link
         linkedComment = link.anchor == nil ? nil : link
         openItem(repo: link.repo, number: link.number)
         requestTableFocus()
@@ -804,6 +829,9 @@ final class AppModel {
     /// The last opened link that points to a comment, until the selection moves to another item;
     /// the conversation scrolls to it once it shows the comment.
     private(set) var linkedComment: ItemLink?
+    /// The last opened link to one of a PR's commits, until the selection moves to another item;
+    /// the Commits tab selects that commit.
+    private(set) var linkedCommit: ItemLink?
 
     /// Brings up the window, set by the views that can open it.
     @ObservationIgnored var showWindow: (() -> Void)?
@@ -1253,6 +1281,7 @@ final class AppModel {
                 guard !Task.isCancelled else { return }
                 self?.detail = cached
             }
+            self?.recordSeenHead()
             if !force, let current = self?.detail,
                current.itemUpdatedAt >= item.updatedAt,
                Date().timeIntervalSince(current.fetchedAt) < Self.detailMaxAge
@@ -1266,6 +1295,7 @@ final class AppModel {
                 guard !Task.isCancelled, let self else { return }
                 detail = fresh
                 detailState = .idle
+                recordSeenHead()
                 let actors = Set(fresh.entries.compactMap(\.actor))
                 // Merged counts too, for what hovering a login in the conversation shows.
                 Task { try? await self.affiliationEngine.refresh(logins: actors, authors: actors) }
@@ -1276,6 +1306,13 @@ final class AppModel {
                 self?.detailState = .failed(error.localizedDescription)
             }
         }
+    }
+
+    /// Stores the head of a PR the user opened as seen, once its detail is in.
+    private func recordSeenHead() {
+        guard let item = selectedItem, item.id == openedItemID, let detail, detail.id == item.id,
+              let head = detail.commits?.last?.oid, state(for: item).seenHeadOid != head else { return }
+        updateState(item) { $0.seenHeadOid = head }
     }
 
     @ObservationIgnored private var prefetchTask: Task<Void, Never>?
@@ -1359,14 +1396,20 @@ final class AppModel {
         recordHistory(from: old)
         if let linkedComment, selectedItem?.repoNumber != linkedComment.key { self.linkedComment = nil }
         if let checksShownFor, selectedItem?.repoNumber != checksShownFor { self.checksShownFor = nil }
+        if let linkedCommit, selectedItem?.repoNumber != linkedCommit.key { self.linkedCommit = nil }
+        openedItemID = nil
+        if let item = selectedItem { selectedItemPreviousSeenHead = state(for: item).seenHeadOid }
         loadDetail()
         guard let item = selectedItem else {
             selectedItemPreviousSeenAt = nil
+            selectedItemPreviousSeenHead = nil
             return
         }
         selectedItemPreviousSeenAt = state(for: item).seenAt ?? snapshot.baseline
         // Opening counts at once; only the user's own selections open anything.
         guard !isAutoSelecting else { return }
+        openedItemID = item.id
+        recordSeenHead()
         let now = Date()
         // Recently viewed is ordered by this time, so moving through it doesn't reorder it under the
         // selection (where j would bounce between the top two rows).

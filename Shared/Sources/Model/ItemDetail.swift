@@ -15,6 +15,8 @@ struct ItemDetail: Codable, Equatable, Sendable {
     var reactions: [Reaction]
     var entries: [TimelineEntry]
     var checks: [Check]
+    /// A PR's latest commits, oldest first; nil in details cached before they were fetched.
+    var commits: [PRCommit]? = nil
     /// The item's `updatedAt` when this was fetched.
     var itemUpdatedAt: Date
     var fetchedAt: Date
@@ -41,6 +43,10 @@ struct TimelineEntry: Codable, Equatable, Identifiable, Sendable {
     var detail: String?
     /// Hex color for labels.
     var color: String?
+    /// The commit a review was made on, or the head a force push left.
+    var oid: String? = nil
+    /// The head before a force push.
+    var beforeOid: String? = nil
     var reviewComments: [ReviewComment] = []
     var reactions: [Reaction] = []
 
@@ -134,6 +140,25 @@ struct Reaction: Codable, Equatable, Sendable {
         }
         return reactions
     }
+}
+
+/// One commit of a PR, for the Commits tab.
+struct PRCommit: Codable, Equatable, Identifiable, Sendable {
+    var oid: String
+    var shortOid: String
+    var headline: String
+    var committedAt: Date
+    var url: String
+    /// The first parent: the base to diff the commit against.
+    var parentOid: String?
+    var author: String?
+    var authorName: String?
+    /// The rollup of the commit's checks: `SUCCESS`, `FAILURE`, `ERROR`, `PENDING`, `EXPECTED`.
+    var ciState: String?
+    var additions: Int
+    var deletions: Int
+
+    var id: String { oid }
 }
 
 struct Check: Codable, Equatable, Identifiable, Sendable {

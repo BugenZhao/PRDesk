@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The right-hand pane: header, then Conversation / Files for the selected item.
+/// The right-hand pane: header, then Conversation / Commits / Files for the selected item.
 struct DetailView: View {
     @Environment(AppModel.self) private var model
     /// Whether the inspector is open; its toolbar items otherwise linger after it closes.
@@ -8,6 +8,7 @@ struct DetailView: View {
     /// The pages live as long as the pane, so switching items or tabs doesn't reload them.
     @State private var timelinePage = WebDocument(kind: .timeline)
     @State private var filesPage = WebDocument(kind: .files)
+    @State private var commitsPage = WebDocument(kind: .files)
 
     typealias DetailTab = AppModel.DetailTab
 
@@ -33,7 +34,7 @@ struct DetailView: View {
         .onAppear {
             _ = timelinePage.webView
             // Links to the repository's (and the parity fork's) issues and PRs open here, not in the browser.
-            for page in [timelinePage, filesPage] {
+            for page in [timelinePage, commitsPage, filesPage] {
                 page.openItem = { [model] repo, number in model.openItem(repo: repo, number: number) }
             }
         }
@@ -50,6 +51,10 @@ struct DetailView: View {
                     Divider()
                     ComposerView(item: item, detail: detail)
                 }
+            case .commits:
+                // Its own per item, so the selection and the chosen range don't carry over.
+                CommitsView(item: item, detail: detail, page: commitsPage)
+                    .id(item.id)
             case .files:
                 FilesView(item: item, page: filesPage)
             }
@@ -67,7 +72,7 @@ struct DetailView: View {
     }
 }
 
-/// The Conversation / Files tabs in the inspector's part of the window toolbar. Its own
+/// The Conversation / Commits / Files tabs in the inspector's part of the window toolbar. Its own
 /// modifier, so the toolbar is only rebuilt when the tabs come or go, not on every selection.
 private struct DetailToolbar: ViewModifier {
     let isShown: Bool
@@ -86,6 +91,7 @@ private struct DetailToolbar: ViewModifier {
                     ToolbarItem {
                         Picker("View", selection: $tab) {
                             Text("Conversation").tag(DetailView.DetailTab.conversation)
+                            Text("Commits").tag(DetailView.DetailTab.commits)
                             Text("Files").tag(DetailView.DetailTab.files)
                         }
                         .pickerStyle(.segmented)

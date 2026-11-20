@@ -8,6 +8,8 @@ enum FilesDocument {
         /// The PR's own link, which tells links to it from links elsewhere.
         var url: String
         var files: [File]
+        /// Whether files start expanded; collapsed when nil.
+        var expanded: Bool?
     }
 
     private struct File: Encodable {
@@ -22,15 +24,19 @@ enum FilesDocument {
     }
 
     /// JSON for `PRDesk.renderFiles`; built off the main thread, as patches can run to megabytes.
+    /// - Parameters:
+    ///   - filesURL: the GitHub page the files link to; the PR's Files changed by default.
+    ///   - expanded: whether files start expanded.
     @concurrent
-    static func payload(_ files: [PullFile], key: String, pullURL: String) async -> String {
+    static func payload(_ files: [PullFile], key: String, pullURL: String, filesURL: String? = nil, expanded: Bool? = nil) async -> String {
+        let filesURL = filesURL ?? "\(pullURL)/files"
         let document = Document(key: key, url: pullURL, files: files.map { file in
             File(
                 name: file.filename, previous: file.previousFilename, symbol: symbol(for: file.status),
                 additions: file.additions, deletions: file.deletions, patch: file.patch,
-                url: "\(pullURL)/files#diff-\(anchor(file.filename))"
+                url: "\(filesURL)#diff-\(anchor(file.filename))"
             )
-        })
+        }, expanded: expanded)
         return (try? String(decoding: JSONEncoder().encode(document), as: UTF8.self)) ?? "{}"
     }
 

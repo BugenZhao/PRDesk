@@ -12,11 +12,11 @@ enum DetailQuery {
       __typename
       ... on IssueComment { id author \(actor) createdAt bodyHTML bodyText url \(reactions) }
       ... on PullRequestReview {
-        id author \(actor) state submittedAt createdAt bodyHTML bodyText url \(reactions)
+        id author \(actor) state submittedAt createdAt bodyHTML bodyText url \(reactions) reviewCommit: commit { oid }
         comments(first: 50) { nodes { id path line originalLine diffHunk bodyHTML outdated url \(reactions) } }
       }
       ... on PullRequestCommit { id url commit { abbreviatedOid messageHeadline committedDate author { user { login } name } } }
-      ... on HeadRefForcePushedEvent { id actor \(actor) createdAt afterCommit { abbreviatedOid } }
+      ... on HeadRefForcePushedEvent { id actor \(actor) createdAt beforeCommit { oid } afterCommit { oid abbreviatedOid } }
       ... on MergedEvent { id actor \(actor) createdAt }
       ... on ClosedEvent { id actor \(actor) createdAt }
       ... on ReopenedEvent { id actor \(actor) createdAt }
@@ -101,6 +101,63 @@ enum DetailQuery {
     }
     \(contextFragment)
     """
+
+    /// A PR's latest commits, oldest first, for the Commits tab.
+    static let commits = """
+    query($owner: String!, $name: String!, $number: Int!) {
+      repository(owner: $owner, name: $name) {
+        pullRequest(number: $number) {
+          commits(last: 100) {
+            nodes {
+              commit {
+                oid abbreviatedOid messageHeadline committedDate url additions deletions
+                parents(first: 1) { nodes { oid } }
+                author { user { login } name }
+                statusCheckRollup { state }
+              }
+            }
+          }
+        }
+      }
+    }
+    """
+
+    struct CommitsResponse: Decodable, Sendable {
+        struct Repository: Decodable, Sendable {
+            struct PullRequest: Decodable, Sendable { let commits: Nodes<Node> }
+            let pullRequest: PullRequest?
+        }
+
+        struct Node: Decodable, Sendable {
+            struct Commit: Decodable, Sendable {
+                struct Rollup: Decodable, Sendable { let state: String }
+                struct Parent: Decodable, Sendable { let oid: String }
+                let oid: String
+                let abbreviatedOid: String
+                let messageHeadline: String
+                let committedDate: Date
+                let url: String
+                let additions: Int
+                let deletions: Int
+                let parents: Nodes<Parent>
+                let author: DetailQuery.Node.Commit.Author?
+                let statusCheckRollup: Rollup?
+            }
+
+            let commit: Commit
+
+            var prCommit: PRCommit {
+                PRCommit(
+                    oid: commit.oid, shortOid: commit.abbreviatedOid, headline: commit.messageHeadline,
+                    committedAt: commit.committedDate, url: commit.url, parentOid: commit.parents.values.first?.oid,
+                    author: commit.author?.user?.login, authorName: commit.author?.name,
+                    ciState: commit.statusCheckRollup?.state, additions: commit.additions, deletions: commit.deletions
+                )
+            }
+        }
+
+        let repository: Repository?
+    }
 
     struct ChecksResponse: Decodable, Sendable {
         struct Repository: Decodable, Sendable {
@@ -318,7 +375,8 @@ enum DetailQuery {
             let name: String?
         }
 
-        struct AfterCommit: Decodable, Sendable { let abbreviatedOid: String }
+        struct AfterCommit: Decodable, Sendable { let oid: String; let abbreviatedOid: String }
+        struct Oid: Decodable, Sendable { let oid: String }
 
         let typename: String
         let id: String?
@@ -334,6 +392,8 @@ enum DetailQuery {
         let comments: Comments?
         let commit: Commit?
         let afterCommit: AfterCommit?
+        let beforeCommit: Oid?
+        let reviewCommit: Oid?
         let requestedReviewer: Reviewer?
         let label: Label?
         let source: Source?
@@ -344,7 +404,7 @@ enum DetailQuery {
         private enum CodingKeys: String, CodingKey {
             case typename = "__typename"
             case id, author, actor, createdAt, submittedAt, state, bodyHTML, bodyText, url, reactionGroups, comments, commit
-            case afterCommit, requestedReviewer, label, source, assignee, currentTitle, stackNumber
+            case afterCommit, beforeCommit, reviewCommit, requestedReviewer, label, source, assignee, currentTitle, stackNumber
         }
 
         var entry: TimelineEntry? {
@@ -373,6 +433,7 @@ enum DetailQuery {
                 default: .reviewed
                 }
                 var entry = make(kind, at: submittedAt ?? createdAt)
+                entry?.oid = reviewCommit?.oid
                 entry?.reviewComments = comments?.nodes?.compactMap { comment in
                     comment.map {
                         ReviewComment(id: $0.id, path: $0.path, line: $0.line ?? $0.originalLine, diffHunk: $0.diffHunk,
@@ -386,7 +447,11 @@ enum DetailQuery {
                 let login = commit.author?.user?.login
                 return TimelineEntry(id: id, kind: .commit, actor: login ?? commit.author?.name, isAutomated: login.map(Item.Event.isAutomationLogin) ?? false,
                                      at: commit.committedDate, url: url, detail: "\(commit.abbreviatedOid) \(commit.messageHeadline)")
-            case "HeadRefForcePushedEvent": return make(.forcePush, at: createdAt, detail: afterCommit?.abbreviatedOid)
+            case "HeadRefForcePushedEvent":
+                var entry = make(.forcePush, at: createdAt, detail: afterCommit?.abbreviatedOid)
+                entry?.oid = afterCommit?.oid
+                entry?.beforeOid = beforeCommit?.oid
+                return entry
             case "MergedEvent": return make(.merged, at: createdAt)
             case "ClosedEvent": return make(.closed, at: createdAt)
             case "ReopenedEvent": return make(.reopened, at: createdAt)
@@ -418,6 +483,7 @@ extension SyncEngine {
         let (owner, name) = Self.split(item.repo)
         let number = item.number
         async let checks = item.kind == .pullRequest ? fetchChecks(owner: owner, name: name, number: number) : []
+        async let commits = item.kind == .pullRequest ? fetchCommits(owner: owner, name: name, number: number) : []
         var after: String?
         var entries: [TimelineEntry] = []
         var first: DetailQuery.Subject?
@@ -445,9 +511,20 @@ extension SyncEngine {
             reactions: DetailQuery.ReactionGroup.reactions(subject.reactionGroups),
             entries: entries,
             checks: checks,
+            commits: commits,
             itemUpdatedAt: subject.updatedAt,
             fetchedAt: Date()
         )
+    }
+
+    /// A PR's latest 100 commits, oldest first.
+    private func fetchCommits(owner: String, name: String, number: Int) async throws -> [PRCommit] {
+        let response = try await client.query(
+            DetailQuery.commits,
+            variables: ItemQuery.NumberVariables(owner: owner, name: name, number: number),
+            as: DetailQuery.CommitsResponse.self
+        )
+        return response.repository?.pullRequest?.commits.values.map(\.prCommit) ?? []
     }
 
     /// The checks on a PR's latest commit, following pages.

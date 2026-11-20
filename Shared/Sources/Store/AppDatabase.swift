@@ -329,6 +329,11 @@ final class AppDatabase: Sendable {
                 t.add(column: "quietCheckedAt", .datetime)
             }
         }
+        migrator.registerMigration("v31") { db in
+            try db.alter(table: "itemState") { t in
+                t.add(column: "seenHeadOid", .text)
+            }
+        }
         return migrator
     }
 }
