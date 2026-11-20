@@ -49,11 +49,12 @@ implementation that doesn't consult the source of any existing tool.
   queries: one for the body and timeline, and for a PR one for its checks and one for its latest 100
   commits (with the commit of each review and the heads around each force push)
 - **Rate limit**: the status bar shows the remaining GraphQL quota; below 500 the polling slows
-  down automatically. When GitHub refuses a query for the hour's budget, no GraphQL is sent until
-  the reset in that response's headers (a minute when it gives none): the status bar shows "Rate
-  limited until 16:28" instead of "Sync failed", the timer syncs right at the reset, and ⌘R tries
-  anyway. GitHub can keep windows with different starts for one user, so `rate_limit` may show
-  points left while half the queries are refused; the refused one's reset is the one waited for
+  down automatically. When GitHub refuses a query for its budget, background work waits until the
+  reset in that response's headers (a minute when it gives none): the status bar shows "Rate
+  limited until 16:28" instead of "Sync failed", the timer syncs right at the reset, and
+  prefetching stops. What the user does (⌘R, opening an item, writes) is still tried: GitHub can
+  keep windows with different starts for one user, so `rate_limit` may show points left while
+  about half the queries are refused, and a retry often goes through
 - **Board**: all board items (Status, Priority, Comment) are read at most every 3 minutes, and
   always on ⌘R; board items that aren't local yet are fetched by id
 - **Inbox**: GitHub notifications (only this repository and the parity fork, only participating,

@@ -20,7 +20,7 @@ struct GraphQLError: Decodable, Sendable, LocalizedError {
 enum GraphQLClientError: LocalizedError {
     case http(status: Int, body: String)
     case emptyData([GraphQLError])
-    /// GitHub's hourly GraphQL budget is used up; no queries are sent until `until`.
+    /// GitHub refused a query for its GraphQL budget, which is back at `until`.
     case rateLimited(until: Date)
 
     var errorDescription: String? {
@@ -33,7 +33,7 @@ enum GraphQLClientError: LocalizedError {
         case let .emptyData(errors):
             errors.map(\.message).joined(separator: "\n")
         case let .rateLimited(until):
-            "GitHub's API limit is used up until \(until.formatted(date: .omitted, time: .shortened))."
+            "GitHub refused this for its API limit (back by \(until.formatted(date: .omitted, time: .shortened))). Trying again often works."
         }
     }
 }
@@ -46,10 +46,6 @@ actor GitHubClient {
 
     /// Last rate limit seen in response headers.
     private(set) var rateLimit: RateLimit?
-    /// While set and in the future, GraphQL queries fail at once instead of being sent: once GitHub
-    /// says the hour's budget is spent, more requests only fail too (and GitHub keeps windows with
-    /// different starts, so `rate_limit` can show points left while half the requests are refused).
-    private(set) var pausedUntil: Date?
 
     init(session: URLSession = .shared) {
         self.session = session
@@ -69,7 +65,6 @@ actor GitHubClient {
         as _: Response.Type = Response.self,
         strict: Bool = false
     ) async throws -> Response {
-        if let pausedUntil, pausedUntil > Date() { throw GraphQLClientError.rateLimited(until: pausedUntil) }
         let body = try JSONEncoder().encode(Body(query: query, variables: variables))
         var attempt = 0
         var envelope: Envelope<Response>
@@ -88,7 +83,7 @@ actor GitHubClient {
             }
         }
         if let errors = envelope.errors, errors.contains(where: \.isRateLimit) {
-            throw pause(limit)
+            throw rateLimited(limit)
         }
         if let errors = envelope.errors, !errors.isEmpty {
             if strict { throw GraphQLClientError.emptyData(errors) }
@@ -109,20 +104,16 @@ actor GitHubClient {
         return try await perform(method: method, url: components.url!, body: body).data
     }
 
-    /// Lets queries through again before the reset, e.g. when the user syncs by hand.
-    func resume() {
-        pausedUntil = nil
-    }
-
-    /// Stops queries until the reset of the window that refused this one, or for a minute when the
-    /// response says nothing usable (a secondary limit).
-    private func pause(_ limit: RateLimit?) -> GraphQLClientError {
+    /// When the budget that refused a query is back: the reset of the window that refused it, or a
+    /// minute when the response says nothing usable (a secondary limit). Nothing is blocked here:
+    /// the app holds back its own background work, while what the user does is always tried (GitHub
+    /// can keep windows with different starts, so a refused query's retry may well go through).
+    private func rateLimited(_ limit: RateLimit?) -> GraphQLClientError {
         let now = Date()
         let until = limit.flatMap { $0.remaining == 0 && $0.resetAt > now ? $0.resetAt : nil }
             ?? now.addingTimeInterval(60)
-        pausedUntil = max(pausedUntil ?? until, until)
-        logger.error("GraphQL rate limited; pausing until \(until, privacy: .public)")
-        return .rateLimited(until: pausedUntil!)
+        logger.error("GraphQL rate limited until \(until, privacy: .public)")
+        return .rateLimited(until: until)
     }
 
     func rest<Response: Decodable & Sendable>(
@@ -164,7 +155,7 @@ actor GitHubClient {
                 return (data, limit)
             case 403 where limit?.remaining == 0, 429 where limit?.remaining == 0:
                 // The hour's GraphQL budget: retrying within seconds can't help.
-                throw pause(limit)
+                throw rateLimited(limit)
             case 401 where attempt == 1:
                 // The token may have been rotated (e.g. `gh auth refresh`); resolve it again.
                 token = nil

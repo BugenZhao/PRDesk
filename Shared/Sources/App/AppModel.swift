@@ -44,7 +44,8 @@ final class AppModel {
         case idle
         case syncing
         case failed(String)
-        /// GitHub refused for the hour's budget; nothing is sent until then, unless synced by hand.
+        /// GitHub refused for its budget; the timer waits until then, while ⌘R and what the user
+        /// does are still tried.
         case rateLimited(until: Date)
 
         var isRateLimited: Bool {
@@ -498,8 +499,6 @@ final class AppModel {
     /// Syncs now. Unless it is the timer's round, this also reads the board.
     func sync(includeBoard: Bool = true) async {
         guard syncState != .syncing else { return }
-        // A sync by hand (only the timer's leaves the board out) tries even while the limit holds.
-        if includeBoard { await engine.client.resume() }
         syncState = .syncing
         lastSyncAttemptAt = Date()
         do {
@@ -1367,16 +1366,17 @@ final class AppModel {
             guard !stale.isEmpty else { return }
             logger.info("Prefetching \(stale.count) details")
             var actors: Set<String> = []
-            await withTaskGroup(of: Set<String>.self) { group in
+            // nil: GitHub refused for its budget, so the rest wait for the sync after the limit.
+            await withTaskGroup(of: Set<String>?.self) { group in
                 var queue = stale.makeIterator()
-                let fetch = { @Sendable (item: Item) async -> Set<String> in
+                var isRateLimited = false
+                let fetch = { @Sendable (item: Item) async -> Set<String>? in
                     do {
                         let detail = try await engine.fetchDetail(of: item)
                         try await db.saveDetail(detail)
                         return Set(detail.entries.compactMap(\.actor))
                     } catch GraphQLClientError.rateLimited {
-                        // The rest fail at once without a request; the sync after the limit retries.
-                        return []
+                        return nil
                     } catch {
                         logger.error("Prefetching the detail of #\(item.number) failed: \(String(describing: error), privacy: .public)")
                         return []
@@ -1386,8 +1386,9 @@ final class AppModel {
                     if let item = queue.next() { group.addTask { await fetch(item) } }
                 }
                 for await found in group {
+                    guard let found else { isRateLimited = true; continue }
                     actors.formUnion(found)
-                    if let item = queue.next() { group.addTask { await fetch(item) } }
+                    if !isRateLimited, let item = queue.next() { group.addTask { await fetch(item) } }
                 }
             }
             try? await self?.affiliationEngine.refresh(logins: actors)

@@ -223,7 +223,7 @@ private struct SyncStatus: View {
                 Label("Rate limited until \(until.formatted(date: .omitted, time: .shortened))", systemImage: "hourglass")
                     .labelStyle(.titleAndIcon)
                     .foregroundStyle(.orange)
-                    .help("GitHub's GraphQL budget for the hour is used up. Nothing is sent until then; ⌘R tries anyway.")
+                    .help("GitHub refused a sync for its GraphQL budget. The next one waits until then; ⌘R and what you do are still tried.")
             case .idle:
                 if let last = model.lastSyncedAt {
                     TimelineView(.periodic(from: .now, by: 5)) { context in
