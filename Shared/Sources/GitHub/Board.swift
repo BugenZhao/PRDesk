@@ -439,6 +439,39 @@ extension SyncEngine {
         }
     }
 
+    /// Keeps Muted items unsubscribed: GitHub subscribes the viewer again on a mention or review
+    /// request, after which every comment would notify, on the web and by mail too. Nothing wakes a
+    /// Muted item to undo that by hand (as `s` does for a woken skip), so a notification of that
+    /// kind newer than the last check has the subscription looked at and, if subscribed, turned
+    /// off again. A subscription the viewer turns back on by hand stands until the next such
+    /// notification.
+    func keepMutedQuiet(_ notes: [InboxNote]) async {
+        var latest: [Int: InboxNote] = [:]
+        for note in notes where note.isUpstream && Self.subscribingReasons.contains(note.reason) {
+            if note.updatedAt > latest[note.number]?.updatedAt ?? .distantPast { latest[note.number] = note }
+        }
+        for (number, note) in latest {
+            let at = note.updatedAt
+            do {
+                guard let entry = try await db.boardEntry(number: number), entry.triage == .muted else { continue }
+                let checked = try await db.state(entry.contentID)?.quietCheckedAt
+                guard at > max(entry.statusAt ?? .distantPast, checked ?? .distantPast) else { continue }
+                if try await viewerSubscription(subjectID: entry.contentID) == "SUBSCRIBED" {
+                    // Recording the check would keep a real run from acting on it.
+                    if isDryRun("unsubscribe from Muted #\(number) again after a \(note.reason) notification") { continue }
+                    try await setSubscription("UNSUBSCRIBED", subjectID: entry.contentID)
+                    Self.boardLogger.notice("Unsubscribed from Muted #\(number) again after a \(note.reason, privacy: .public) notification")
+                }
+                try await db.updateState(entry.contentID) { $0.quietCheckedAt = at }
+            } catch {
+                Self.boardLogger.error("Failed to keep Muted #\(number) unsubscribed: \(String(describing: error), privacy: .public)")
+            }
+        }
+    }
+
+    /// Notification reasons for which GitHub subscribes the viewer to the thread.
+    private static let subscribingReasons: Set = ["mention", "team_mention", "review_requested"]
+
     private static let boardLogger = Logger(subsystem: "com.bugenzhao.PRDesk", category: "Board")
 
     func setPriority(_ priority: Priority?, number: Int, contentID: String) async throws {

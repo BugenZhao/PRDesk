@@ -17,6 +17,9 @@ struct ItemState: Codable, Hashable, Sendable {
     var notificationReadAt: Date?
     /// The viewer's subscription when the item went Skipped or Muted, put back when it leaves them.
     var subscriptionBeforeQuiet: String?
+    /// The latest notification (a mention or review request) checked for having subscribed the
+    /// viewer to a Muted item again (`SyncEngine.keepMutedQuiet`).
+    var quietCheckedAt: Date?
     /// When the item was last sent to a Grok Bot for each request.
     var investigateSentAt: Date?
     var trackSentAt: Date?

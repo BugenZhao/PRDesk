@@ -82,6 +82,12 @@ Status on its own, with the single exception of approvals below.
   and review requests still notify. In the app:
   - Skipped items can be woken (see below); Muted ones can't and stay in Muted
   - Inbox and unread counts leave out notifications for Muted items, but count Skipped ones as usual
+  - A mention or review request subscribes me again on GitHub, after which every comment notifies
+    (on the web and by mail too). A woken skip is renewed by hand (`s`, below); a Muted item never
+    wakes, so the sync does it: a mention, team mention or review-request notification on a Muted
+    item, newer than its Status and than the last such check, has the subscription looked at, and
+    turned back to UNSUBSCRIBED if it is SUBSCRIBED. Only on the primary device. A subscription
+    turned back on by hand stands until the next such notification
 - Changing subscriptions needs a token with the `notifications` scope
   (`gh auth refresh -h github.com -s notifications`)
 - **Items I opened**: with no Status they count as Working (for display and filtering) and don't go

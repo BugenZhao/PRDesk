@@ -505,7 +505,10 @@ final class AppModel {
             for note in missing.prefix(10) {
                 _ = try? await engine.fetchItem(repo: note.repo, number: note.number)
             }
-            await followNotificationReads()
+            let threads = await recentThreads()
+            await followNotificationReads(threads)
+            // Read ones too: a mention read on the web has subscribed the viewer all the same.
+            if DeviceRole.current.runsRules { await engine.keepMutedQuiet(notes + threads) }
             inbox = notes.sorted { $0.updatedAt > $1.updatedAt }
             rebuild()
             restoreSelection()
@@ -514,11 +517,20 @@ final class AppModel {
         }
     }
 
+    /// Notification threads updated lately, read ones too; none if they can't be read.
+    private func recentThreads() async -> [InboxNote] {
+        do {
+            return try await engine.fetchRecentThreads()
+        } catch {
+            logger.error("Reading recent notification threads failed: \(String(describing: error), privacy: .public)")
+            return []
+        }
+    }
+
     /// Reading a notification anywhere (the web, GitHub's apps, here) counts as seeing its item:
     /// records when each recent thread was last read.
-    private func followNotificationReads() async {
+    private func followNotificationReads(_ threads: [InboxNote]) async {
         do {
-            let threads = try await engine.fetchRecentThreads()
             let ids = Dictionary(snapshot.items.map { ($0.repoNumber, $0.id) }, uniquingKeysWith: { a, _ in a })
             var readAt: [Item.ID: Date] = [:]
             for thread in threads {
@@ -528,7 +540,7 @@ final class AppModel {
             let changed = readAt.filter { snapshot.states[$0.key]?.notificationReadAt != $0.value }
             if !changed.isEmpty { try await db.setNotificationReadTimes(changed) }
         } catch {
-            logger.error("Reading notification read times failed: \(String(describing: error), privacy: .public)")
+            logger.error("Recording notification read times failed: \(String(describing: error), privacy: .public)")
         }
     }
 

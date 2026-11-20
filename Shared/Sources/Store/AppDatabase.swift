@@ -324,6 +324,11 @@ final class AppDatabase: Sendable {
                 t.add(column: "commitAuthors", .text)
             }
         }
+        migrator.registerMigration("v30") { db in
+            try db.alter(table: "itemState") { t in
+                t.add(column: "quietCheckedAt", .datetime)
+            }
+        }
         return migrator
     }
 }
