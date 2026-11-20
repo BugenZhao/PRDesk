@@ -111,7 +111,7 @@ enum DetailQuery {
             nodes {
               commit {
                 oid abbreviatedOid messageHeadline committedDate url additions deletions
-                parents(first: 1) { nodes { oid } }
+                parents(first: 1) { totalCount nodes { oid } }
                 author { user { login } name }
                 statusCheckRollup { state }
               }
@@ -132,6 +132,7 @@ enum DetailQuery {
             struct Commit: Decodable, Sendable {
                 struct Rollup: Decodable, Sendable { let state: String }
                 struct Parent: Decodable, Sendable { let oid: String }
+                struct Parents: Decodable, Sendable { let totalCount: Int; let nodes: [Parent?]? }
                 let oid: String
                 let abbreviatedOid: String
                 let messageHeadline: String
@@ -139,7 +140,7 @@ enum DetailQuery {
                 let url: String
                 let additions: Int
                 let deletions: Int
-                let parents: Nodes<Parent>
+                let parents: Parents
                 let author: DetailQuery.Node.Commit.Author?
                 let statusCheckRollup: Rollup?
             }
@@ -149,7 +150,8 @@ enum DetailQuery {
             var prCommit: PRCommit {
                 PRCommit(
                     oid: commit.oid, shortOid: commit.abbreviatedOid, headline: commit.messageHeadline,
-                    committedAt: commit.committedDate, url: commit.url, parentOid: commit.parents.values.first?.oid,
+                    committedAt: commit.committedDate, url: commit.url,
+                    parentOid: commit.parents.nodes?.first??.oid, parentCount: commit.parents.totalCount,
                     author: commit.author?.user?.login, authorName: commit.author?.name,
                     ciState: commit.statusCheckRollup?.state, additions: commit.additions, deletions: commit.deletions
                 )

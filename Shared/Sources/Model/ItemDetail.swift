@@ -151,6 +151,8 @@ struct PRCommit: Codable, Equatable, Identifiable, Sendable {
     var url: String
     /// The first parent: the base to diff the commit against.
     var parentOid: String?
+    /// More than one for a merge; nil in details cached before it was fetched.
+    var parentCount: Int? = nil
     var author: String?
     var authorName: String?
     /// The rollup of the commit's checks: `SUCCESS`, `FAILURE`, `ERROR`, `PENDING`, `EXPECTED`.
@@ -159,6 +161,8 @@ struct PRCommit: Codable, Equatable, Identifiable, Sendable {
     var deletions: Int
 
     var id: String { oid }
+
+    var isMerge: Bool { (parentCount ?? 1) > 1 }
 }
 
 struct Check: Codable, Equatable, Identifiable, Sendable {

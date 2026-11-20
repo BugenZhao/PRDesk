@@ -569,7 +569,9 @@ gray tier.
   dimmed, and shortened in every row once one doesn't fit, as in the stack),
   "new" for commits since the viewer last opened the PR, and the age (hover for the author and
   size; right-click to open it on GitHub or copy the sha). Force pushes sit between the commits,
-  above the head they left, in orange
+  above the head they left, in orange. Merges (more than one parent) show a merge icon instead of
+  the CI dot and a gray headline; selected alone, a merge's diff (everything it brought in) isn't
+  loaded: a note offers Show Diff Anyway and Open on GitHub
   - The diff is the Files page (highlighting, wrap, expand / collapse all), without Viewed boxes;
     a diff of up to 10 files and 600 changed lines starts expanded. A menu over it picks the range:
     **Since your last review** (from the commit of the viewer's latest review to the head),

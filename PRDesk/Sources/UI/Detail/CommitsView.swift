@@ -14,6 +14,8 @@ struct CommitsView: View {
     @State private var preset: CommitHistory.Preset?
     @State private var loaded: Loaded?
     @State private var error: String?
+    /// Merges whose diff the user asked for anyway.
+    @State private var shownMerges: Set<String> = []
     /// The commit list's width, for whether titles' tags are shortened.
     @State private var listWidth: CGFloat = 0
     @AppStorage("wrapDiffLines") private var wrapLines = true
@@ -37,9 +39,10 @@ struct CommitsView: View {
     var body: some View {
         let history = history
         let range = range(in: history)
+        let merge = skippedMerge(history, range: range)
         Group {
-            if detail.commits == nil {
-                // Cached before details had commits: fetch it again.
+            if detail.commits?.contains(where: { $0.parentCount == nil }) != false {
+                // Cached before details had commits, or merges told apart: fetch it again.
                 DelayedProgressView()
                     .task { model.loadDetail(force: true) }
             } else if history.commits.isEmpty {
@@ -53,13 +56,40 @@ struct CommitsView: View {
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
                     Divider()
-                    diff(range)
+                    if let merge {
+                        mergeNote(merge)
+                    } else {
+                        diff(range)
+                    }
                 }
             }
         }
-        .task(id: range) { await load(range) }
+        .task(id: [range.key, merge?.oid]) {
+            if merge == nil { await load(range) }
+        }
         .onChange(of: wrapLines, initial: true) { page.setting("wrap", "PRDesk.setWrap(\(wrapLines))") }
         .onChange(of: model.linkedCommit?.commit, initial: true) { selectLinkedCommit(history) }
+    }
+
+    /// A merge selected alone, whose diff (everything it brought in, often thousands of files)
+    /// isn't loaded unless asked for.
+    private func skippedMerge(_ history: CommitHistory, range: CommitRange) -> PRCommit? {
+        guard case let .commit(sha) = range, let commit = history.commit(matching: sha),
+              commit.isMerge, !shownMerges.contains(commit.oid) else { return nil }
+        return commit
+    }
+
+    private func mergeNote(_ commit: PRCommit) -> some View {
+        ContentUnavailableView {
+            Label("Merge Commit", systemImage: "arrow.triangle.merge")
+        } description: {
+            Text("It brings in another branch, usually the base, so its diff can run to thousands of files. It isn't loaded.")
+        } actions: {
+            Button("Show Diff Anyway") { shownMerges.insert(commit.oid) }
+            Button("Open on GitHub") {
+                if let url = URL(string: "\(item.url)/commits/\(commit.oid)") { Platform.open(url) }
+            }
+        }
     }
 
     private func range(in history: CommitHistory) -> CommitRange {
@@ -135,7 +165,7 @@ struct CommitsView: View {
                     .foregroundStyle(.orange)
                     .help("Force-pushed since: a rebase onto the base branch shows up here too")
             }
-            if let loaded, loaded.range == range {
+            if skippedMerge(history, range: range) == nil, let loaded, loaded.range == range {
                 Text("\(loaded.files.count) file\(loaded.files.count == 1 ? "" : "s")")
                     .padding(.leading, 4)
                 Text("+\(loaded.files.reduce(0) { $0 + $1.additions })").foregroundStyle(.green)
@@ -227,14 +257,23 @@ private struct CommitRow: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Circle()
-                .fill(ciColor)
-                .frame(width: 7, height: 7)
+            if commit.isMerge {
+                Image(systemName: "arrow.triangle.merge")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 7, height: 7)
+            } else {
+                Circle()
+                    .fill(ciColor)
+                    .frame(width: 7, height: 7)
+            }
             AvatarView(login: commit.author, size: 16)
             Text(commit.shortOid)
                 .font(.callout.monospaced())
                 .foregroundStyle(.secondary)
+            // Merges in gray: they are rarely what a review is about.
             Text(itemTitle: commit.headline, shortenedTags: shortensTags)
+                .foregroundStyle(commit.isMerge ? .secondary : .primary)
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: 4)
