@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The right-hand pane: header, then Conversation / Checks for the selected item.
+/// The right-hand pane: header, then Conversation / Files for the selected item.
 struct DetailView: View {
     @Environment(AppModel.self) private var model
     /// Whether the inspector is open; its toolbar items otherwise linger after it closes.
@@ -16,7 +16,7 @@ struct DetailView: View {
         return Group {
             if let item = model.selectedItem {
                 VStack(spacing: 0) {
-                    DetailHeader(item: item, tab: $model.detailTab)
+                    DetailHeader(item: item)
                         .padding(12)
                     Divider()
                     content(item)
@@ -50,10 +50,6 @@ struct DetailView: View {
                     Divider()
                     ComposerView(item: item, detail: detail)
                 }
-            case .checks:
-                // A list of its own per item, so scroll and expanded groups don't carry over.
-                ChecksView(checks: detail.checks)
-                    .id(item.id)
             case .files:
                 FilesView(item: item, page: filesPage)
             }
@@ -71,7 +67,7 @@ struct DetailView: View {
     }
 }
 
-/// The Conversation / Checks / Files tabs in the inspector's part of the window toolbar. Its own
+/// The Conversation / Files tabs in the inspector's part of the window toolbar. Its own
 /// modifier, so the toolbar is only rebuilt when the tabs come or go, not on every selection.
 private struct DetailToolbar: ViewModifier {
     let isShown: Bool
@@ -90,7 +86,6 @@ private struct DetailToolbar: ViewModifier {
                     ToolbarItem {
                         Picker("View", selection: $tab) {
                             Text("Conversation").tag(DetailView.DetailTab.conversation)
-                            Text("Checks").tag(DetailView.DetailTab.checks)
                             Text("Files").tag(DetailView.DetailTab.files)
                         }
                         .pickerStyle(.segmented)
@@ -125,7 +120,6 @@ struct DelayedProgressView: View {
 private struct DetailHeader: View {
     @Environment(AppModel.self) private var model
     let item: Item
-    @Binding var tab: DetailView.DetailTab
     @State private var isParking = false
     /// The title being edited in place, and the item it belongs to (kept, so a rename committed
     /// as another item is selected still goes to this one).
@@ -158,9 +152,26 @@ private struct DetailHeader: View {
                 StateIconView(item: item, isMerging: item.isOpen && model.board(for: item)?.triage == .merging)
                 stateChip
                 if let ci = item.ci {
-                    Button { tab = .checks } label: { CISummary(ci: ci) }
+                    Button { model.checksShownFor = isShowingChecks.wrappedValue ? nil : item.repoNumber } label: { CISummary(ci: ci) }
                         .buttonStyle(.plain)
                         .help("Show checks")
+                        .popover(isPresented: isShowingChecks, arrowEdge: .bottom) {
+                            VStack(spacing: 0) {
+                                ItemChecksView(item: item, maxHeight: 460)
+                                Divider()
+                                HStack {
+                                    Spacer()
+                                    Button("Open on GitHub", systemImage: "arrow.up.right") {
+                                        if let url = URL(string: item.url + "/checks") { Platform.open(url) }
+                                    }
+                                    .buttonStyle(.link)
+                                    .font(.callout)
+                                }
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                            }
+                            .frame(width: 420)
+                        }
                 }
                 Spacer(minLength: 0)
             }
@@ -230,6 +241,14 @@ private struct DetailHeader: View {
             if piece.isPrefix { part = part.foregroundStyle(.secondary) }
             return Text("\(text)\(part)")
         }
+    }
+
+    /// The checks popover, open while the model names this item.
+    private var isShowingChecks: Binding<Bool> {
+        Binding(
+            get: { model.checksShownFor == item.repoNumber },
+            set: { model.checksShownFor = $0 ? item.repoNumber : nil }
+        )
     }
 
     private var stateChip: some View {
@@ -366,33 +385,5 @@ private struct DetailHeader: View {
             Image(systemName: symbol).frame(width: 14, height: 14)
         }
         .accessibilityLabel(title)
-    }
-}
-
-private struct CISummary: View {
-    let ci: Item.CIStatus
-
-    var body: some View {
-        HStack(spacing: 4) {
-            Circle().fill(color).frame(width: 7, height: 7)
-            Text(text).foregroundStyle(ci.failed > 0 ? .red : .secondary)
-        }
-    }
-
-    // As the list's CI column: a failed rollup with no failed checks means they were cancelled.
-    private var color: Color {
-        if ci.failed > 0 { return .red }
-        if ci.pending > 0 || ci.state == "PENDING" || ci.state == "EXPECTED" { return .yellow }
-        return ci.state == "SUCCESS" ? .green : .gray
-    }
-
-    private var text: String {
-        if ci.failed > 0 { return "CI \(ci.failed) failed" }
-        if ci.pending > 0 { return "CI \(ci.pending) pending" }
-        switch ci.state {
-        case "SUCCESS": return "CI passed"
-        case "FAILURE", "ERROR": return "CI cancelled"
-        default: return "CI \(ci.state.lowercased())"
-        }
     }
 }

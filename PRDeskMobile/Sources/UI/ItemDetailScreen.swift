@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The selected item: a compact header with the board's controls, then the conversation (the
-/// shared timeline page) or the checks, and the composer.
+/// shared timeline page) and the composer; the CI status in the header shows the checks.
 struct ItemDetailScreen: View {
     @Environment(AppModel.self) private var model
     /// The page lives as long as the screen, so switching tabs doesn't reload it.
@@ -9,22 +9,12 @@ struct ItemDetailScreen: View {
     @AppStorage("showAutomated") private var showAutomated = false
 
     var body: some View {
-        @Bindable var model = model
         Group {
             if let item = model.selectedItem {
                 VStack(spacing: 0) {
                     DetailHeader(item: item)
                         .padding(.horizontal)
                         .padding(.vertical, 8)
-                    if item.kind == .pullRequest {
-                        Picker("View", selection: $model.detailTab) {
-                            Text("Conversation").tag(AppModel.DetailTab.conversation)
-                            Text("Checks").tag(AppModel.DetailTab.checks)
-                        }
-                        .pickerStyle(.segmented)
-                        .padding(.horizontal)
-                        .padding(.bottom, 6)
-                    }
                     Divider()
                     content(item)
                 }
@@ -40,29 +30,23 @@ struct ItemDetailScreen: View {
             // Links to the repository's issues and PRs open here, not in the browser.
             timelinePage.openItem = { [model] repo, number in model.openItem(repo: repo, number: number) }
             timelinePage.toggleReaction = { [model] content, subject in model.toggleReaction(content, on: subject) }
-            if model.detailTab == .files { model.detailTab = .conversation }
         }
     }
 
     @ViewBuilder
     private func content(_ item: Item) -> some View {
         if let detail = model.detail, detail.id == item.id {
-            switch model.detailTab {
-            case .checks:
-                ChecksView(checks: detail.checks).id(item.id)
-            case .conversation, .files:
-                let document = TimelineDocument(
-                    item: item, detail: detail, previousSeenAt: model.selectedItemPreviousSeenAt,
-                    showAutomated: showAutomated, people: model
-                )
-                WebDocumentView(document: timelinePage, key: item.id, payload: document.payload)
-                    .safeAreaInset(edge: .bottom) {
-                        ComposerView(item: item, detail: detail)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(.bar)
-                    }
-            }
+            let document = TimelineDocument(
+                item: item, detail: detail, previousSeenAt: model.selectedItemPreviousSeenAt,
+                showAutomated: showAutomated, people: model
+            )
+            WebDocumentView(document: timelinePage, key: item.id, payload: document.payload)
+                .safeAreaInset(edge: .bottom) {
+                    ComposerView(item: item, detail: detail)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(.bar)
+                }
         } else if case let .failed(message) = model.detailState {
             ContentUnavailableView {
                 Label("Couldn't load", systemImage: "exclamationmark.triangle")
@@ -82,6 +66,14 @@ private struct DetailHeader: View {
     @Environment(AppModel.self) private var model
     let item: Item
 
+    /// The checks sheet, open while the model names this item.
+    private var isShowingChecks: Binding<Bool> {
+        Binding(
+            get: { model.checksShownFor == item.repoNumber },
+            set: { model.checksShownFor = $0 ? item.repoNumber : nil }
+        )
+    }
+
     var body: some View {
         let board = model.board(for: item)
         VStack(alignment: .leading, spacing: 6) {
@@ -94,9 +86,15 @@ private struct DetailHeader: View {
                 LoginText(login: item.author)
                 BadgeIcons(login: item.author)
                 Text("· \(item.stateDescription(isMerging: board?.triage == .merging))").foregroundStyle(.secondary)
+                if let ci = item.ci {
+                    Button { model.checksShownFor = item.repoNumber } label: { CISummary(ci: ci) }
+                        .buttonStyle(.plain)
+                        .lineLimit(1)
+                }
                 Spacer(minLength: 0)
             }
             .font(.caption)
+            .sheet(isPresented: isShowingChecks) { ChecksSheet(item: item) }
             AdoptionNote(item: item)
             if !item.labels.isEmpty {
                 FlowLayout(spacing: 4) {
@@ -111,6 +109,31 @@ private struct DetailHeader: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// The checks, from the CI status in the header: half the screen, pulled up for more.
+private struct ChecksSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let item: Item
+
+    var body: some View {
+        NavigationStack {
+            ItemChecksView(item: item)
+                .navigationTitle("Checks")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Open on GitHub", systemImage: "safari") {
+                            if let url = URL(string: item.url + "/checks") { Platform.open(url) }
+                        }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done", systemImage: "checkmark") { dismiss() }
+                    }
+                }
+        }
+        .presentationDetents([.medium, .large])
     }
 }
 

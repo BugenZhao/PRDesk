@@ -88,16 +88,19 @@ final class AppModel {
     /// Whether anything is selected. Observed apart from `selection`, so views that only care
     /// about this (the menu commands) aren't rebuilt each time the selection moves.
     private(set) var hasSelection = false
-    /// Whether the selection is a PR, which has the Checks and Files tabs; observed apart from it
-    /// for the same reason.
+    /// Whether the selection is a PR, which has the Files tab; observed apart from it for the same
+    /// reason.
     private(set) var selectionIsPullRequest = false
 
     enum DetailTab: Hashable {
-        case conversation, checks, files
+        case conversation, files
     }
 
     /// The detail pane's tab. Here rather than in the pane, for the View menu's commands.
     var detailTab: DetailTab = .conversation
+    /// The item (`Item.repoNumber`) whose checks show, in a popover from its CI status (a sheet on
+    /// the phone); cleared when the selection moves to another item.
+    var checksShownFor: String?
 
     enum ListMode: String, Hashable, Codable {
         case dashboard, inbox, parity
@@ -773,13 +776,15 @@ final class AppModel {
     }
 
     /// Opens the item a link names (a browser tab, a pasted or dropped link, the filter field), on
-    /// the tab the link shows, scrolled to the comment it points to.
+    /// the tab the link shows (with the checks showing for `/checks`), scrolled to the comment it
+    /// points to.
     func open(_ link: ItemLink) {
         switch link.page {
         case .conversation: detailTab = .conversation
-        case .checks: detailTab = .checks
+        case .checks: detailTab = .conversation
         case .files: detailTab = .files
         }
+        checksShownFor = link.page == .checks ? link.key : nil
         linkedComment = link.anchor == nil ? nil : link
         openItem(repo: link.repo, number: link.number)
         requestTableFocus()
@@ -1353,6 +1358,7 @@ final class AppModel {
         guard selection?.itemID != old?.itemID else { return }
         recordHistory(from: old)
         if let linkedComment, selectedItem?.repoNumber != linkedComment.key { self.linkedComment = nil }
+        if let checksShownFor, selectedItem?.repoNumber != checksShownFor { self.checksShownFor = nil }
         loadDetail()
         guard let item = selectedItem else {
             selectedItemPreviousSeenAt = nil

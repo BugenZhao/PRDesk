@@ -282,13 +282,13 @@ grokbot-cli at the commit pinned in the script (cached per commit), signs it and
 ## 4. Main window
 
 ```
-┌ Toolbar:                  Dashboard | Parity (n) | Inbox (n)  🔍 Filter (/)  ⟳  ▣ │ Conversation | Checks | Files ┐
+┌ Toolbar:                  Dashboard | Parity (n) | Inbox (n)  🔍 Filter (/)  ⟳  ▣ │      Conversation | Files     ┐
 ├ List ─────────────────────────────────────────────┬ Detail ────────────────────────────────────────────┤
 │                                                   │ #56492 [Core] Extensible KV cache                  │
 │ ▾ Recently viewed 8                               │ by njhill ◆◆  draft  CI ● 16 failed  conflicts     │
 │ ▾ Pinned 2                                        │ [Triage Desk Tray Shelf Attic]         [H M L –]   │
 │ ▾ Good 1                                          │ [Pin] [Open ↗]   Comment: ...                      │
-│ ▾ Desk 9                                          │ Conversation | Checks | Files                      │
+│ ▾ Desk 9                                          │ Conversation | Files                               │
 │ ▾ Triage 180                                      │ ...timeline...                                     │
 │ ▸ Tray 31                                         │                                                    │
 │                                                   │ ┌ Comment box ──────────── Comment / Approve … ┐  │
@@ -418,7 +418,7 @@ well
 | `c` | Focus the comment box |
 | `⌘R` | Sync now |
 | `⌘1` / `⌘2` / `⌘3` | Switch to Dashboard / Parity / Inbox |
-| `⌥⌘1` / `⌥⌘2` / `⌥⌘3` | Switch a PR's detail to Conversation / Checks / Files |
+| `⌥⌘1` / `⌥⌘3` | Switch a PR's detail to Conversation / Files |
 | `⌘B` | Show / hide the detail pane (kept across relaunches) |
 | `⌃⌥⌘D` | Global: open the issue / PR of Yab's current tab in the desk (§6, back to the desk from the browser) |
 | `⌘V` | With the list focused, open the issue / PR the link on the clipboard points to |
@@ -563,7 +563,11 @@ gray tier.
     who); clicking one adds or removes mine; a smiley button on card and inline comment headers
     (shown on hover) offers all 8. Clicks take effect locally first and revert if the write fails
   - New content since the last view is highlighted, and the page scrolls to the first new item
-- **Checks**: check runs and statuses grouped by state, failures on top; clicking opens the log URL
+- **Checks**: no tab of their own. Clicking the CI status in the header opens a popover (a sheet
+  on the phone, half height, pulled up for more) with the check runs and statuses grouped by state,
+  failures on top; failed and pending groups start expanded, or the passed one when there are
+  neither; clicking a check opens its log URL and leaves the popover open; "Open on GitHub" opens
+  the PR's checks page
 - **Files**: the changed files and their diffs, also one `WKWebView` page; each file collapsed by
   default, long file names drop the directory part, file headers stick while scrolling; syntax
   highlighting by extension (highlight.js, the old and new sides highlighted separately); copying
@@ -585,8 +589,8 @@ gray tier.
   tab (`yab exec`, read-only), brings the window forward, and opens the issue / PR it points to by
   the rules for links above: selected if in the list; expanded / filter cleared and then selected
   if on the desk but hidden; otherwise fetched into **Opened from links**. This counts as opening
-  (marked read, added to Recently viewed). `/files` (or `/changes`) and `/checks` in the link switch
-  to that detail tab; `#issuecomment-…`, `#discussion_r…`, `#pullrequestreview-…` and the like scroll
+  (marked read, added to Recently viewed). `/files` (or `/changes`) in the link switches to the
+  Files tab and `/checks` opens the checks popover; `#issuecomment-…`, `#discussion_r…`, `#pullrequestreview-…` and the like scroll
   to that comment once it appears in the conversation (if the cache doesn't have it yet, once the
   live detail arrives). If the tab isn't an issue / PR of these two repositories, an alert says so.
   Without Yab: `⌘V` to paste a link with the list focused, dropping a link on the list, or typing a
@@ -646,6 +650,6 @@ Empty for closed items.
 1. Project skeleton, auth, GraphQL client, first and incremental sync, the list showing items
 2. Groups, local state, shortcuts, filtering, colors, persisted sorting and columns
 3. Org badges (automatic sources + manual settings)
-4. Detail: header, Conversation (native timeline + WebView bodies), Checks
+4. Detail: header, Conversation (native timeline + WebView bodies), checks
 5. Writes: comments, reviews, closing; Inbox
 6. Polish: Files diff, unread counts in the menu bar and Dock, performance

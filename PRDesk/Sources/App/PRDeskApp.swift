@@ -82,9 +82,6 @@ private struct AppCommands: Commands {
             Button("Conversation") { model.detailTab = .conversation }
                 .keyboardShortcut("1", modifiers: [.command, .option])
                 .disabled(!model.selectionIsPullRequest)
-            Button("Checks") { model.detailTab = .checks }
-                .keyboardShortcut("2", modifiers: [.command, .option])
-                .disabled(!model.selectionIsPullRequest)
             Button("Files") { model.detailTab = .files }
                 .keyboardShortcut("3", modifiers: [.command, .option])
                 .disabled(!model.selectionIsPullRequest)
