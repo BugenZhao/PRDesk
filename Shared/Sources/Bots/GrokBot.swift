@@ -1,17 +1,20 @@
 import Foundation
 
 /// What the viewer asks a Grok Bot to do with items, sent as the emoji the bots already know from
-/// chat: Richard Loop looks into 👀 and puts 🔥 on the Notion tracker (which also moves it to
-/// Working on the board); Merger drives 🚀 PRs through CI and merges them.
+/// chat: Richard Loop looks into 👀, puts 🔥 on the Notion tracker (which also moves it to Desk on
+/// the board) and has the parity agent vet 🫴 PRs for adoption (SPEC §3.2); Merger drives 🚀 PRs
+/// through CI and merges them.
 enum BotRequest: String, CaseIterable, Codable, Sendable {
     case investigate
     case track
+    case adopt
     case merge
 
     var emoji: String {
         switch self {
         case .investigate: "👀"
         case .track: "🔥"
+        case .adopt: "🫴"
         case .merge: "🚀"
         }
     }
@@ -20,14 +23,20 @@ enum BotRequest: String, CaseIterable, Codable, Sendable {
         switch self {
         case .investigate: "Investigate"
         case .track: "Track"
+        case .adopt: "Adopt"
         case .merge: "Merge"
         }
     }
 
-    /// Whether the request applies to `item`: Merger only takes open, approved PRs of the
-    /// repository (as in Good); staging PRs go through the parity agent.
+    /// Whether the request applies to `item`: adopting takes open PRs of the repository, and Merger
+    /// only the approved ones (as in Good); staging PRs go through the parity agent.
     func applies(to item: Item) -> Bool {
-        self != .merge || item.kind == .pullRequest && item.isOpen && item.isUpstream && item.reviewDecision == "APPROVED"
+        let upstreamPR = item.kind == .pullRequest && item.isOpen && item.isUpstream
+        return switch self {
+        case .investigate, .track: true
+        case .adopt: upstreamPR
+        case .merge: upstreamPR && item.reviewDecision == "APPROVED"
+        }
     }
 
     /// The bot's name to show: a bot set by id (as the phone's are) goes by the request's usual bot.

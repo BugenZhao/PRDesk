@@ -25,10 +25,12 @@ struct ItemState: Codable, Hashable, Sendable {
     /// When the item was last sent to a Grok Bot for each request.
     var investigateSentAt: Date?
     var trackSentAt: Date?
+    var adoptSentAt: Date?
     var mergeSentAt: Date?
     /// The viewer's note with the last send of each request.
     var investigateNote: String?
     var trackNote: String?
+    var adoptNote: String?
     var mergeNote: String?
 
     init(itemID: Item.ID) {
@@ -39,6 +41,7 @@ struct ItemState: Codable, Hashable, Sendable {
         switch request {
         case .investigate: investigateSentAt
         case .track: trackSentAt
+        case .adopt: adoptSentAt
         case .merge: mergeSentAt
         }
     }
@@ -47,6 +50,7 @@ struct ItemState: Codable, Hashable, Sendable {
         switch request {
         case .investigate: investigateNote
         case .track: trackNote
+        case .adopt: adoptNote
         case .merge: mergeNote
         }
     }
@@ -55,6 +59,7 @@ struct ItemState: Codable, Hashable, Sendable {
         switch request {
         case .investigate: (investigateSentAt, investigateNote) = (date, note)
         case .track: (trackSentAt, trackNote) = (date, note)
+        case .adopt: (adoptSentAt, adoptNote) = (date, note)
         case .merge: (mergeSentAt, mergeNote) = (date, note)
         }
     }

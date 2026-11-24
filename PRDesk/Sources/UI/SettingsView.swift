@@ -121,12 +121,12 @@ private struct GrokBotSettingsView: View {
     var body: some View {
         Form {
             Section {
-                TextField("👀 Investigate, 🔥 Track", text: $assistant, prompt: Text(GrokBot.defaultAssistantBot))
+                TextField("👀 Investigate, 🔥 Track, 🫴 Adopt", text: $assistant, prompt: Text(GrokBot.defaultAssistantBot))
                 TextField("🚀 Merge", text: $merger, prompt: Text(GrokBot.defaultMergeBot))
             } header: {
                 Text("Bots")
             } footer: {
-                Text("A bot's name, a unique prefix of it, or its id. e, f and r in the list send the selected items; merging asks first.")
+                Text("A bot's name, a unique prefix of it, or its id. e, f, d and r in the list send the selected items; merging asks first.")
                     .foregroundStyle(.secondary)
             }
 

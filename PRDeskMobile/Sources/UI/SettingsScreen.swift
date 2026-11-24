@@ -40,7 +40,7 @@ struct SettingsScreen: View {
                 }
 
                 Section {
-                    LabeledContent("👀 🔥") {
+                    LabeledContent("👀 🔥 🫴") {
                         TextField("Richard Loop's id", text: $assistantBot)
                     }
                     LabeledContent("🚀") {

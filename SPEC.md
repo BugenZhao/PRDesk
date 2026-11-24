@@ -243,6 +243,10 @@ covers how the app sends and shows them:
 - 👀 Investigate (`e`) → Richard Loop: have the agent look into it further
 - 🔥 Track (`f`) → Richard Loop: add it to the Notion tracker for the next workday; Richard sets
   it to Desk on the board, so the app leaves the board alone
+- 🫴 Adopt (`d`) → Richard Loop: have the parity agent vet a PR for adoption (§3.2) now rather
+  than wait for its daily sweep; it adopts the PR if it qualifies (the runbook's §2 rule 7 and
+  §8b), or records why not. Only for open PRs in the repository; for other items it's grayed out
+  in the context menu and the key is ignored
 - 🚀 Merge (`r`) → Merger: drives CI and merges following the merge skill; only for PRs in the
   repository that are open and approved (reviewDecision = APPROVED, the same condition as the Good
   group). For other items it's grayed out in the context menu and the key is ignored (staging PRs
@@ -265,9 +269,9 @@ own: they stay in Good (or Desk, once no longer approved), at the bottom, with a
 (§4.1). The board's "Code review approved"
 workflow may turn a Merging PR back to Good if someone approves it mid-merge; that's accepted
 
-👀 and 🔥 both have Richard open an agent session (Claude Code now, maybe Codex, Kimi and others
+👀, 🔥 and 🫴 all have Richard open an agent session (Claude Code now, maybe Codex, Kimi and others
 later), and it appends the link to the board's **Session** text field (space-separated, oldest
-first; for 👀 it adds the item to the board if it isn't there, without setting Status). The app only
+first; for 👀 and 🫴 it adds the item to the board if it isn't there, without setting Status). The app only
 reads this field: items with a session show a `terminal` icon after the title, listing the links
 on hover; a button at the top of the detail opens the newest (with a menu of all of them when
 there are several), and `t` (or Open Agent Session in the context menu) opens the newest for each
@@ -282,12 +286,12 @@ opened as is. Switching agents only needs Richard to write that agent's session 
 name or rewrite links, add an entry to `known`.
 
 The message is `[Sent from PR Desk] <emoji> <link> <title>`; with several selected, one message with
-a line per item (for 🚀, one batch). Holding ⌥ (`⌥E` / `⌥F` / `⌥R`, or the "…" items that appear in
+a line per item (for 🚀, one batch). Holding ⌥ (`⌥E` / `⌥F` / `⌥D` / `⌥R`, or the "…" items that appear in
 the context menu while holding ⌥) opens a send panel first, where a note for the bot can be added;
 it goes at the end of the message after a blank line, verbatim. 🚀 and re-sends always open this
 panel first (the note can be empty; `⌘↩` sends, `esc` cancels). Nothing is drawn on the row: the
-status bar shows the send, and what it leads to shows on the board (🔥 → Desk, 👀 / 🔥 → a
-Session link; 🚀 → Merging, which the app sets itself). The local database keeps the last send of each kind (when, and the
+status bar shows the send, and what it leads to shows on the board (🔥 → Desk, 👀 / 🔥 / 🫴 → a
+Session link, 🫴 → a staging PR if adopted; 🚀 → Merging, which the app sets itself). The local database keeps the last send of each kind (when, and the
 note), which is what makes a send a re-send; the context menu checks the kinds already sent. Bot
 names are set in Settings → Grok Bot (name, unique prefix or id); the CLI shares its sign-in with
 other grokbot copies (`grokbot login`). At build time `scripts/embed-grokbot.sh` compiles
@@ -427,7 +431,7 @@ well
 | `o` / `↩`, `⌘O` | Open in the browser (`⌘O` works with any focus, on the current selection) |
 | `u`, `⇧⌘O` | Open the author's GitHub profile (also in the row's context menu; `⇧⌘O` works with any focus) |
 | `⇧⌘C`, `⌘C` | Copy GitHub links, one per line (`⇧⌘C` works with any focus: all selected items when the list is focused, otherwise the item in the detail; `⌘C` only in the list). Rows can also be dragged out sideways, as links with titles |
-| `e` / `f` / `r` | Send to a Grok Bot: 👀 Investigate / 🔥 Track / 🚀 Merge (§3.3; 🚀 and re-sends open the send panel first); with `⌥`, open the panel first to write a note |
+| `e` / `f` / `d` / `r` | Send to a Grok Bot: 👀 Investigate / 🔥 Track / 🫴 Adopt / 🚀 Merge (§3.3; 🚀 and re-sends open the send panel first); with `⌥`, open the panel first to write a note |
 | `t` | Open the agent session (the board's Session field, the newest one; in the desktop app when there is one; §3.3) |
 | `l` | Go to the linked PR: the other end of a parity pair (§3.2), whichever tab it is in: a staging PR's adopted or promoted upstream PR, or an upstream PR's staging PR (also Go to Linked PR in the row's context menu) |
 | `c` | Focus the comment box |

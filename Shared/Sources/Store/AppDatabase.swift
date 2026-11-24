@@ -334,6 +334,12 @@ final class AppDatabase: Sendable {
                 t.add(column: "seenHeadOid", .text)
             }
         }
+        migrator.registerMigration("v32") { db in
+            try db.alter(table: "itemState") { t in
+                t.add(column: "adoptSentAt", .datetime)
+                t.add(column: "adoptNote", .text)
+            }
+        }
         return migrator
     }
 }

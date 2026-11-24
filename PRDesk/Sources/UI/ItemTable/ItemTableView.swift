@@ -316,6 +316,7 @@ struct ItemTableView: NSViewRepresentable {
                 let request: BotRequest? = switch key {
                 case "e": .investigate
                 case "f": .track
+                case "d": .adopt
                 case "r": .merge
                 default: nil
                 }
@@ -355,6 +356,7 @@ struct ItemTableView: NSViewRepresentable {
                 case "u": .openAuthorProfile
                 case "e": .sendToBot(.investigate)
                 case "f": .sendToBot(.track)
+                case "d": .sendToBot(.adopt)
                 case "r": .sendToBot(.merge)
                 case "t": .openSession
                 case "l": .openLinked
@@ -526,6 +528,8 @@ struct ItemTableView: NSViewRepresentable {
             MenuAction(title: "👀 Investigate…", action: .sendToBot(.investigate, withNote: true), key: "e", isAlternate: true),
             MenuAction(title: "🔥 Track", action: .sendToBot(.track), key: "f"),
             MenuAction(title: "🔥 Track…", action: .sendToBot(.track, withNote: true), key: "f", isAlternate: true),
+            MenuAction(title: "🫴 Adopt", action: .sendToBot(.adopt), key: "d"),
+            MenuAction(title: "🫴 Adopt…", action: .sendToBot(.adopt, withNote: true), key: "d", isAlternate: true),
             MenuAction(title: "🚀 Merge…", action: .sendToBot(.merge), key: "r"),
             MenuAction(title: "Open Agent Session", action: .openSession, symbol: "terminal", key: "t"),
             MenuAction(title: "Go to Linked PR", action: .openLinked, symbol: "link", key: "l"),
