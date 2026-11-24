@@ -67,6 +67,11 @@ Triage is a manual decision, written to the board; an item's live state (Turn, a
 conflicts, merged / closed) is computed from the API, not maintained by hand. The app never changes
 Status on its own, with the single exception of approvals below.
 
+The board is shared with the Grok Bots and Richard sessions. What all of them must agree on (field
+and option ids, what each Status means, who writes which field, the board's own workflows, the
+Session format) is defined in `notes/bugens-board.md` in the `richard` repository; this section
+covers the app's side of it, and where the two disagree, that note wins and this section is fixed.
+
 | Status | Meaning | GitHub subscription |
 |---|---|---|
 | (not on the board, or no Status) | Untriaged | Unchanged |
@@ -231,7 +236,9 @@ every stage is computed from state on GitHub.
 
 In Grok Bot chats I hand work to bots with emoji; the app uses the same vocabulary to send selected
 items to a bot (through the bundled grokbot CLI, `grokbot ask --no-wait`), and results come back in
-Grok Bot as usual:
+Grok Bot as usual. The message format, what each emoji does to the board and the Session field's
+format are part of the board contract (§3.1, `notes/bugens-board.md` in `richard`); this section
+covers how the app sends and shows them:
 
 - 👀 Investigate (`e`) → Richard Loop: have the agent look into it further
 - 🔥 Track (`f`) → Richard Loop: add it to the Notion tracker for the next workday; Richard sets
