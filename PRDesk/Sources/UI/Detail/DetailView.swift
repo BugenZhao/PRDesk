@@ -126,7 +126,7 @@ struct DelayedProgressView: View {
 private struct DetailHeader: View {
     @Environment(AppModel.self) private var model
     let item: Item
-    @State private var isParking = false
+    @State private var isSettingDraft = false
     /// The title being edited in place, and the item it belongs to (kept, so a rename committed
     /// as another item is selected still goes to this one).
     @State private var titleEdit: (item: Item, text: String)?
@@ -268,13 +268,11 @@ private struct DetailHeader: View {
 
     private var controls: some View {
         HStack(spacing: 8) {
-            if item.isParityStaging {
-                parkButton
-            } else {
-                boardControls
-            }
+            // Staging PRs aren't on the board (SPEC §3.2).
+            if !item.isParityStaging { boardControls }
+            draftButton
             Spacer()
-            if model.detailState == .loading || isParking {
+            if model.detailState == .loading || isSettingDraft {
                 ProgressView().controlSize(.small)
             }
             sessionButton
@@ -311,24 +309,22 @@ private struct DetailHeader: View {
         }
     }
 
-    /// A staging PR is parked as a draft, which the parity agent reads as "not now" (SPEC §3.2).
-    private var parkButton: some View {
-        Button(item.isDraft ? "Resume" : "Park", systemImage: item.isDraft ? "play" : "pause") {
-            let item = item
-            isParking = true
-            Task {
-                do {
-                    try await model.setParked(!item.isDraft, item)
-                } catch {
-                    model.writeError = "Couldn't \(item.isDraft ? "resume" : "park") #\(item.number): \(error.localizedDescription)"
+    /// Draft ⇄ ready for review; Park / Resume on a staging PR, which the parity agent reads as
+    /// "not now" (SPEC §3.2).
+    @ViewBuilder private var draftButton: some View {
+        if let toggle = item.draftToggle {
+            // Icon only, like Pin; the tooltip names it.
+            iconButton(toggle.title, icon: toggle.icon) {
+                let item = item
+                isSettingDraft = true
+                Task {
+                    await model.toggleDraft(item)
+                    isSettingDraft = false
                 }
-                isParking = false
             }
+            .disabled(isSettingDraft)
+            .help(toggle.help)
         }
-        .disabled(!item.isOpen || isParking)
-        .help(item.isDraft
-            ? "Mark ready for review: the parity agent picks the item up again"
-            : "Convert to a draft: the parity agent parks the item as backlog")
     }
 
     @ViewBuilder private var boardControls: some View {
@@ -387,8 +383,16 @@ private struct DetailHeader: View {
     /// An icon-only button whose icon gets a fixed box: symbols differ in height, and the button
     /// sizes to its icon, so otherwise neighbors come out different heights.
     private func iconButton(_ title: String, symbol: String, action: @escaping () -> Void) -> some View {
+        iconButton(title, icon: .symbol(symbol), action: action)
+    }
+
+    private func iconButton(_ title: String, icon: StateIcon, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: symbol).frame(width: 14, height: 14)
+            switch icon {
+            // The PR glyphs are drawn on a 16 px grid; scaled down they match the symbols' weight.
+            case .asset: icon.image.resizable().scaledToFit().frame(width: 13, height: 13).frame(width: 14, height: 14)
+            case .symbol: icon.image.frame(width: 14, height: 14)
+            }
         }
         .accessibilityLabel(title)
     }

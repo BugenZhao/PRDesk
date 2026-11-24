@@ -176,7 +176,7 @@ private struct BoardControls: View {
     }
 }
 
-/// The toolbar's menu: open on GitHub, mark unread, and hand the item to a Grok Bot.
+/// The toolbar's menu: open on GitHub, mark unread, mark ready or draft, and hand the item to a Grok Bot.
 private struct DetailActions: ToolbarContent {
     @Environment(AppModel.self) private var model
     let item: Item
@@ -187,6 +187,14 @@ private struct DetailActions: ToolbarContent {
                 Button("Open on GitHub", systemImage: "safari") { model.perform(.openInBrowser, on: item.id) }
                 Button("Mark as Unread", systemImage: "envelope.badge") { model.perform(.toggleRead, on: item.id) }
                 Button("Copy Link", systemImage: "link") { model.perform(.copyLink, on: item.id) }
+                if let toggle = item.draftToggle {
+                    Button {
+                        let item = item
+                        Task { await model.toggleDraft(item) }
+                    } label: {
+                        Label { Text(toggle.title) } icon: { toggle.icon.image }
+                    }
+                }
                 if let session = model.board(for: item)?.sessionLinks.last {
                     Button("Open Agent Session", systemImage: "terminal") { AgentSession.open(session) }
                 }
@@ -201,4 +209,5 @@ private struct DetailActions: ToolbarContent {
             }
         }
     }
+
 }

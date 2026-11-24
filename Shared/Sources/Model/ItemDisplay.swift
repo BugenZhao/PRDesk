@@ -12,8 +12,44 @@ enum StateTint: Hashable, Sendable {
     case green, gray, yellow, purple, red
 }
 
+/// See `Item.draftToggle`.
+struct DraftToggle: Hashable, Sendable {
+    /// Converts to a draft, rather than marking ready for review.
+    var makesDraft: Bool
+    var title: String
+    /// The state the click switches to: the PR glyphs, or play / pause for Resume / Park.
+    var icon: StateIcon
+    /// For the error: "Couldn't \(verb) #123".
+    var verb: String
+    var help: String
+}
+
 extension Item {
     var hasConflicts: Bool { isOpen && mergeable == "CONFLICTING" }
+
+    /// The button that flips an open PR between draft and ready for review; nil for issues and
+    /// closed PRs. On a parity staging PR it parks or resumes the item (SPEC §3.2).
+    var draftToggle: DraftToggle? {
+        guard kind == .pullRequest, isOpen else { return nil }
+        return switch (isParityStaging, isDraft) {
+        case (true, true): DraftToggle(
+                makesDraft: false, title: "Resume", icon: .symbol("play"), verb: "resume",
+                help: "Mark ready for review: the parity agent picks the item up again"
+            )
+        case (true, false): DraftToggle(
+                makesDraft: true, title: "Park", icon: .symbol("pause"), verb: "park",
+                help: "Convert to a draft: the parity agent parks the item as backlog"
+            )
+        case (false, true): DraftToggle(
+                makesDraft: false, title: "Ready for Review", icon: .asset("pr-open"), verb: "mark ready for review",
+                help: "Mark the pull request ready for review, which requests reviews from its code owners"
+            )
+        case (false, false): DraftToggle(
+                makesDraft: true, title: "Convert to Draft", icon: .asset("pr-draft"), verb: "convert to draft",
+                help: "Convert the pull request to a draft"
+            )
+        }
+    }
 
     /// Each PR state has its own glyph; draft wins over conflicts. Issues use SF Symbols.
     var stateIcon: StateIcon {

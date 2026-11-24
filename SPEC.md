@@ -319,7 +319,8 @@ The left of the status bar normally shows shortcut hints; while a write is in fl
 write instead (a spinner plus e.g. `#63887 → Desk`, `🔥 #63887 → Richard Loop`,
 `Approve #63887`), then a checkmark for 3 seconds when done before going back; on failure it goes
 straight back, and the error still shows in an alert. This covers board Status / Priority, sends to
-Grok Bots, comments / reviews, Close and Park / Resume; with several at once, the newest shows.
+Grok Bots, comments / reviews, Close, Ready / Draft and Park / Resume; with several at once, the
+newest shows.
 
 After a relaunch the window comes back as it was: Dashboard / Inbox, the selected item (only
 selected, not opened: not marked read and not added to Recently viewed), and whether the detail
@@ -563,7 +564,8 @@ gray tier.
   clicking another row opens it in the app. `⌥↑` / `⌥↓` (with the list or conversation focused)
   move along the stack toward the base / the top. The timeline shows stack join / leave events
 - **Actions**: Status (Triage / Desk / Tray / Shelf / Attic), Priority (H / M / L / –), Pin,
-  Open ↗; parity staging PRs get Park / Resume instead (§3.2)
+  Open ↗; open PRs also get Ready for Review (a draft) or Convert to Draft. Parity staging PRs get
+  only Park / Resume, the same switch under the agent's names (§3.2)
 - **Conversation**:
   - The timeline includes comments, reviews (with summaries and diff hunks of inline comments),
     pushes, labels and state changes

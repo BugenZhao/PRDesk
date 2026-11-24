@@ -680,10 +680,18 @@ final class AppModel {
         loadDetail(force: true)
     }
 
-    /// Parks a parity staging PR (makes it a draft) or resumes it (marks it ready for review).
-    func setParked(_ parked: Bool, _ item: Item) async throws {
-        try await withActivity("\(parked ? "Park" : "Resume") #\(item.number)") {
-            try await engine.setDraft(parked, pullRequestID: item.id)
+    /// Flips an open PR between draft and ready for review (`Item.draftToggle`); a failure shows
+    /// in the write alert.
+    func toggleDraft(_ item: Item) async {
+        guard let toggle = item.draftToggle else { return }
+        let activity = item.isParityStaging ? "\(toggle.title) #\(item.number)" : "#\(item.number) → \(toggle.makesDraft ? "Draft" : "Ready")"
+        do {
+            try await withActivity(activity) {
+                try await engine.setDraft(toggle.makesDraft, pullRequestID: item.id)
+            }
+        } catch {
+            writeError = "Couldn't \(toggle.verb) #\(item.number): \(error.localizedDescription)"
+            return
         }
         updateState(item) { $0.seenAt = Date() }
         _ = try? await engine.refresh(ids: [item.id])
