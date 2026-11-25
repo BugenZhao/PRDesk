@@ -45,12 +45,16 @@ const PRDesk = (() => {
   }
 
   let userScrolled = false;
-  for (const type of ["wheel", "keydown", "mousedown"]) {
+  for (const type of ["wheel", "keydown", "mousedown", "touchstart"]) {
     addEventListener(type, () => { userScrolled = true; }, { passive: true, capture: true });
   }
 
+  // How much of the page's top lies under bars drawn over it (on iOS, where the page scrolls
+  // beneath the navigation bar): what is scrolled to lands below them. See `setTopInset`.
+  let topInset = 0;
+
   function scrollToElement(element) {
-    const top = element.getBoundingClientRect().top + scrollY - 10;
+    const top = element.getBoundingClientRect().top + scrollY - 10 - topInset;
     scrollTo(0, Math.max(0, top));
   }
 
@@ -207,7 +211,7 @@ const PRDesk = (() => {
     timeline.expanded.set(element.dataset.id, !isExpanded(element));
     applyExpansion(element);
     // Collapsing a card read from its middle would leave the view far below it.
-    if (element.classList.contains("collapsed") && element.getBoundingClientRect().top < 0) scrollToElement(element);
+    if (element.classList.contains("collapsed") && element.getBoundingClientRect().top < topInset) scrollToElement(element);
   }
 
   function setAllCards(open) {
@@ -464,7 +468,7 @@ const PRDesk = (() => {
   function setFileExpanded(element, open) {
     files.expanded.set(element.dataset.path, open);
     applyFileExpansion(element);
-    if (!open && element.getBoundingClientRect().top < 0) scrollToElement(element);
+    if (!open && element.getBoundingClientRect().top < topInset) scrollToElement(element);
   }
 
   function toggleFile(element) {
@@ -614,5 +618,12 @@ const PRDesk = (() => {
     setViewedFiles,
     toggleViewed(path) { toggleViewed(files.elements.get(path)); },
     setWrap(wrap) { document.documentElement.classList.toggle("nowrap", !wrap); },
+    // `bars`: what stays over the page's top; `total`: with what scrolls away with the page,
+    // which the page leaves room for at its top (in points; the page may be zoomed).
+    setTopInset(bars, total) {
+      topInset = bars;
+      const zoom = parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
+      document.body.style.paddingTop = `${total / zoom}px`;
+    },
   };
 })();

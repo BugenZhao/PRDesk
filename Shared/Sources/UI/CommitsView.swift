@@ -48,19 +48,20 @@ struct CommitsView: View {
             } else if history.commits.isEmpty {
                 ContentUnavailableView("No Commits", systemImage: "point.3.connected.trianglepath.dotted")
             } else {
-                VStack(spacing: 0) {
+                Group {
+                    if let merge {
+                        mergeNote(merge)
+                    } else {
+                        diff(range)
+                    }
+                }
+                .pageBar {
                     list(history)
                         .frame(height: min(CGFloat(history.rows.count) * RowMetrics.commitRowHeight + 10, 200))
                     Divider()
                     toolbar(history, range: range)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
-                    Divider()
-                    if let merge {
-                        mergeNote(merge)
-                    } else {
-                        diff(range)
-                    }
                 }
             }
         }

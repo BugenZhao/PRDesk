@@ -729,9 +729,6 @@ rotation, multitasking and a resized window always land on the layout the new si
   detail where it would show, for the list alone at full width
 - Going from one to the other keeps the selection, the detail's tab, its pages (scroll position,
   loaded diffs) and a comment being written. Nothing remembers which layout came before
-- The detail's header gives way to its page when the pane is short: under 560 pt it keeps the
-  title and the state line, under 330 pt (the keyboard up on a small iPad on its side) the title
-  alone. Its stack, labels, dates and the board's Comment also fold away under a chevron
 
 **List.** The Mac's sections, tints, fading, stacks' rails and marks (§4.1–§4.3), in rows of two
 lines or one (≡, two by default):
@@ -749,14 +746,26 @@ lines or one (≡, two by default):
   session, author, Grok Bot
 - The filter (§4.4) is the system's search field: in the toolbar on an iPad, a button under the
   list on an iPhone
-- The line under the list shows the write under way as the Mac's status bar does, otherwise the
-  item count, the last sync and the quota; on an iPhone only while there is something to say
+- A capsule of glass over the list's foot shows the write under way as the Mac's status bar does,
+  otherwise the item count, the last sync and the quota; on an iPhone only while there is
+  something to say
 
 **Detail.** As §6, with Status and Priority as segmented controls (one touch; Triage and – clear),
 the checks in a popover from the CI status, and the rest behind •••: the row menu, rename, refresh,
 back to the previous item, and the conversation's Show Automated / Expand All / Collapse All. In
 Commits a tap picks one commit (again for the preset) and a row's menu extends the selection to it.
-Scrolling a page puts the keyboard away.
+
+The page gets the whole pane:
+
+- The header, the tabs and a tab's own bars (the commits and their options, the files' counts) lie
+  over the page's top and scroll away with it, as if they were its beginning; the page then runs
+  up under the window's toolbar. While they are away a line of glass names the item (its state
+  icon, number and title): in the empty stretch of the toolbar over the pane beside the list,
+  under the toolbar when the detail is pushed. Touching it scrolls back to the top. The header's
+  stack, labels, dates and the board's Comment also fold away under a chevron
+- The composer is folded into a glass button over the conversation's corner, which says Draft when
+  one waits. It opens the Mac's composer under the conversation with the keyboard up; a handle
+  folds it again, as does sending. Scrolling the page puts the keyboard away
 
 Not there yet: menus on people and reactions in the pages (tapping a reaction toggles it), the
 affiliation settings and overrides (badges come from what the device itself resolves), more than

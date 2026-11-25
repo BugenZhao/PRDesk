@@ -4,50 +4,72 @@ import SwiftUI
 /// pane. Beside the list in a wide window, pushed over it in a narrow one (`isPushed`); either
 /// way it shows the model's selection, and its pages belong to the desk, so a layout change keeps
 /// them.
+///
+/// The page gets the whole pane: the header lies over its top and scrolls away with it
+/// (`scrollsAway`), and the composer stays folded into a button until asked for.
 struct DetailPane: View {
     @Environment(AppModel.self) private var model
     let pages: DetailPages
     let isPushed: Bool
     @AppStorage("showAutomated") private var showAutomated = false
-    /// The pane's height, which the keyboard and a short window take from.
-    @State private var height: CGFloat = 0
-
-    /// Too short for the whole header and a page under it (an iPad on its side with the keyboard
-    /// up, a small window): the header keeps a line of title and one of state.
-    private var isShort: Bool { height > 0 && height < 560 }
-    /// Hardly any room (the keyboard up on a small iPad on its side): the title alone, so some
-    /// of the conversation still shows over the comment being written.
-    private var isTiny: Bool { height > 0 && height < 330 }
+    @State private var scroll = PageScroll()
+    /// The composer is open under the conversation.
+    @State private var isComposing = false
 
     typealias Tab = AppModel.DetailTab
 
     var body: some View {
         Group {
             if let item = model.selectedItem {
-                VStack(spacing: 0) {
-                    DetailHeader(item: item, pages: pages, isShort: isShort, isTiny: isTiny, showAutomated: $showAutomated)
-                    // Pushed, the tabs are in the navigation bar, beside the way back.
-                    if item.kind == .pullRequest, !isPushed, !isTiny {
-                        tabs.padding(.horizontal, 12).padding(.bottom, 8)
+                content(item)
+                    .safeAreaInset(edge: .top, spacing: 0) {
+                        VStack(spacing: 0) {
+                            DetailHeader(item: item, pages: pages, showAutomated: $showAutomated)
+                            // Pushed, the tabs are in the navigation bar, beside the way back.
+                            if item.kind == .pullRequest, !isPushed {
+                                tabs.padding(.horizontal, 12).padding(.bottom, 8)
+                            }
+                            Divider()
+                        }
+                        .scrollsAway()
                     }
-                    Divider()
-                    content(item)
-                }
-                .onChange(of: item.id) {
-                    if item.kind == .issue { model.detailTab = .conversation }
-                }
-                .toolbar {
-                    if isPushed, item.kind == .pullRequest {
-                        ToolbarItem(placement: .principal) { tabs.frame(maxWidth: 420) }
+                    // Once the header has left with the page, a line of glass says what this is;
+                    // touching it goes back to the top.
+                    .overlay(alignment: isPushed ? .top : .topLeading) {
+                        CompactTitle(item: item, isShown: scroll.isChromeAway) {
+                            activePage(item).run("scrollTo({ top: 0, behavior: 'smooth' })")
+                        }
+                        // Beside the list the bar over this pane is empty up to the window's
+                        // buttons: the line goes there, level with them. Pushed, the bar holds
+                        // the way back and the tabs, and the line sits under it.
+                        .padding(.trailing, isPushed ? 0 : 270)
+                        .offset(y: isPushed ? 0 : -55)
                     }
-                }
+                    .onChange(of: item.id) {
+                        if item.kind == .issue { model.detailTab = .conversation }
+                        isComposing = false
+                    }
+                    .toolbar {
+                        if isPushed, item.kind == .pullRequest {
+                            ToolbarItem(placement: .principal) { tabs.frame(maxWidth: 420) }
+                        }
+                    }
             } else {
                 ContentUnavailableView("No Selection", systemImage: "rectangle.righthalf.inset.filled", description: Text("Select a PR or issue."))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
+        .environment(scroll)
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    /// The page of the tab showing.
+    private func activePage(_ item: Item) -> WebDocument {
+        switch item.kind == .issue ? .conversation : model.detailTab {
+        case .conversation: pages.timeline
+        case .commits: pages.commits
+        case .files: pages.files
+        }
     }
 
     private var tabs: some View {
@@ -65,11 +87,26 @@ struct DetailPane: View {
         if let detail = model.detail, detail.id == item.id {
             switch item.kind == .issue ? .conversation : model.detailTab {
             case .conversation:
-                VStack(spacing: 0) {
-                    Conversation(item: item, detail: detail, page: pages.timeline, showAutomated: showAutomated)
-                    Divider()
-                    ComposerView(item: item, detail: detail)
-                }
+                Conversation(item: item, detail: detail, page: pages.timeline, showAutomated: showAutomated)
+                    .overlay(alignment: .bottomTrailing) {
+                        if !isComposing {
+                            ComposeButton(hasDraft: !model.draft(for: item.id).isEmpty) {
+                                withAnimation(.snappy(duration: 0.25)) { isComposing = true }
+                            }
+                            .padding(16)
+                            .transition(.scale(scale: 0.6).combined(with: .opacity))
+                        }
+                    }
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
+                        if isComposing {
+                            composer(item, detail)
+                                .transition(.move(edge: .bottom).combined(with: .opacity))
+                        }
+                    }
+                    // A comment that went out leaves nothing to keep the composer open for.
+                    .onChange(of: detail.entries.count) {
+                        withAnimation(.snappy(duration: 0.25)) { isComposing = false }
+                    }
             case .commits:
                 // Its own per item, so the selection and the chosen range don't carry over.
                 CommitsView(item: item, detail: detail, page: pages.commits)
@@ -88,6 +125,87 @@ struct DetailPane: View {
         } else {
             DelayedProgressView()
         }
+    }
+
+    /// The composer, open: the Mac's, under a handle that folds it away again. What is written
+    /// stays as the item's draft.
+    private func composer(_ item: Item, _ detail: ItemDetail) -> some View {
+        VStack(spacing: 0) {
+            Divider()
+            Button {
+                withAnimation(.snappy(duration: 0.25)) { isComposing = false }
+            } label: {
+                Image(systemName: "chevron.compact.down")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 18)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Hide Composer")
+            ComposerView(item: item, detail: detail)
+        }
+        .background(.bar)
+        .onAppear { model.requestComposerFocus() }
+    }
+}
+
+/// The item in one line of glass over the page's top, while the header is scrolled away.
+private struct CompactTitle: View {
+    @Environment(AppModel.self) private var model
+    let item: Item
+    let isShown: Bool
+    let action: () -> Void
+
+    var body: some View {
+        ZStack {
+            if isShown {
+                Button(action: action) {
+                    HStack(spacing: 6) {
+                        StateIconView(item: item, size: 14, isMerging: model.isMerging(item))
+                        Text("#\(String(item.number))")
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                        Text(itemTitle: item.title, shortenedTags: true, codeFont: .footnote.monospaced())
+                            .lineLimit(1)
+                    }
+                    .font(.subheadline.weight(.medium))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .glassEffect(.regular.interactive(), in: .capsule)
+                .padding(.horizontal, 12)
+                .padding(.top, 6)
+                .transition(.opacity.combined(with: .offset(y: -8)))
+                .accessibilityHint("Scrolls to the top")
+            }
+        }
+        .animation(.snappy(duration: 0.25), value: isShown)
+    }
+}
+
+/// The composer, folded away: a glass button over the conversation's corner. It says so when a
+/// draft waits behind it.
+private struct ComposeButton: View {
+    let hasDraft: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: "square.and.pencil")
+                if hasDraft { Text("Draft") }
+            }
+            .font(.body.weight(.medium))
+            .frame(minWidth: 26, minHeight: 30)
+        }
+        .buttonStyle(.glass)
+        .buttonBorderShape(.capsule)
+        .controlSize(.large)
+        .accessibilityLabel(hasDraft ? "Continue Draft" : "Comment or Review")
     }
 }
 
@@ -121,28 +239,21 @@ private struct DetailHeader: View {
     @Environment(AppModel.self) private var model
     let item: Item
     let pages: DetailPages
-    /// Little room: only the title and the state.
-    let isShort: Bool
-    /// Hardly any: the title alone.
-    let isTiny: Bool
     @Binding var showAutomated: Bool
-    /// The stack, labels, dates and branches: shown until folded, to leave a short window (an
-    /// iPad mini on its side) to the conversation.
+    /// The stack, labels, dates and branches: shown until folded.
     @AppStorage("detailHeaderExpanded") private var isExpanded = true
     @State private var renameText: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             title
-            if !isTiny { people }
-            if !isShort {
-                if isExpanded { more }
-                controls
-            }
+            people
+            if isExpanded { more }
+            controls
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
-        .padding(.vertical, isTiny ? 6 : 10)
+        .padding(.vertical, 10)
         .alert("Rename", isPresented: Binding(get: { renameText != nil }, set: { if !$0 { renameText = nil } })) {
             TextField("Title", text: Binding(get: { renameText ?? "" }, set: { renameText = $0 }))
             Button("Rename") {
@@ -156,8 +267,7 @@ private struct DetailHeader: View {
     private var title: some View {
         // One text, so a title that wraps continues under its number.
         Text("\(Text("#\(String(item.number))").foregroundStyle(.secondary).monospacedDigit()) \(titleText)")
-            .lineLimit(isShort ? 1 : 3)
-            // Its whole height: squeezed, a title gives up lines before the page under it does.
+            .lineLimit(3)
             .fixedSize(horizontal: false, vertical: true)
             .textSelection(.enabled)
             .font(.title3.weight(.semibold))
@@ -361,7 +471,7 @@ private struct DetailHeader: View {
             }
         }
         .labelStyle(.iconOnly)
-        .buttonStyle(.bordered)
+        .buttonStyle(.glass)
         .buttonBorderShape(.circle)
         .controlSize(.small)
     }

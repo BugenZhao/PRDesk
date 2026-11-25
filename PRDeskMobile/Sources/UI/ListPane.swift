@@ -18,10 +18,16 @@ struct ListPane: View {
             }
             ItemListView(density: density, highlightsSelection: highlightsSelection)
                 .overlay { emptyState }
-            // On a phone the line shows only with news: a write, or a sync that isn't idle.
-            if density.listWidth >= 450 || model.activity != nil || model.syncState != .idle {
-                StatusLine()
-            }
+                // Over the list's foot rather than under it, so the rows run to the window's edge.
+                // On a phone it shows only with news: a write, or a sync that isn't idle.
+                .overlay(alignment: .bottomLeading) {
+                    if density.listWidth >= 450 || model.activity != nil || model.syncState != .idle {
+                        StatusLine(isBrief: density.listWidth < 450)
+                            .padding(.leading, 10)
+                            .padding(.bottom, 8)
+                            .transition(.opacity)
+                    }
+                }
         }
         .searchable(text: $model.filterText, prompt: "Filter")
         // Where the field would be a bar under the list (a phone), it is a button until used.
@@ -112,6 +118,7 @@ struct ItemListView: View {
         .listStyle(.plain)
         .listSectionSpacing(0)
         .contentMargins(.top, 0, for: .scrollContent)
+        .contentMargins(.bottom, 44, for: .scrollContent)
         .environment(\.defaultMinListRowHeight, 0)
         .environment(\.defaultMinListHeaderHeight, 0)
         .refreshable { await model.sync() }
@@ -276,51 +283,50 @@ private struct ColumnTitles: View {
     }
 }
 
-/// The line under the list: the write under way (or just done), otherwise how many items, then
-/// when the desk last synced and what is left of GitHub's hourly budget.
+/// A capsule of glass over the list's foot: the write under way (or just done), otherwise how
+/// many items, then when the desk last synced and what is left of GitHub's hourly budget.
 private struct StatusLine: View {
     @Environment(AppModel.self) private var model
+    /// On a phone: the write or the sync alone.
+    let isBrief: Bool
 
     var body: some View {
-        VStack(spacing: 0) {
-            Divider()
-            HStack(spacing: 6) {
-                ZStack(alignment: .leading) {
-                    if let activity = model.activity {
-                        HStack(spacing: 5) {
-                            ZStack {
-                                if activity.isDone {
-                                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                                } else {
-                                    ProgressView().controlSize(.mini)
-                                }
+        HStack(spacing: 6) {
+            ZStack(alignment: .leading) {
+                if let activity = model.activity {
+                    HStack(spacing: 5) {
+                        ZStack {
+                            if activity.isDone {
+                                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                            } else {
+                                ProgressView().controlSize(.mini)
                             }
-                            .frame(width: 14)
-                            Text(activity.text)
-                                .foregroundStyle(.primary)
-                                .opacity(activity.isDone ? 0.6 : 1)
                         }
-                        .id(activity.id)
-                        .transition(.opacity)
-                    } else {
-                        Text(model.visibleCount == 1 ? "1 item" : "\(model.visibleCount) items")
-                            .transition(.opacity)
+                        .frame(width: 14)
+                        Text(activity.text)
+                            .foregroundStyle(Color.primary)
+                            .opacity(activity.isDone ? 0.6 : 1)
                     }
+                    .id(activity.id)
+                    .transition(.opacity)
+                } else if !isBrief {
+                    Text(model.visibleCount == 1 ? "1 item" : "\(model.visibleCount) items")
+                        .transition(.opacity)
                 }
-                .animation(.easeInOut(duration: 0.25), value: model.activity)
-                Spacer(minLength: 8)
+            }
+            .animation(.easeInOut(duration: 0.25), value: model.activity)
+            if !isBrief || model.activity == nil {
+                if !isBrief { Text("·") }
                 sync
             }
-            .font(.caption)
-            .monospacedDigit()
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-            .padding(.leading, 12)
-            // Clear of the window's resize corner on an iPad.
-            .padding(.trailing, 28)
-            .frame(height: 26)
         }
-        .background(.bar)
+        .font(.caption)
+        .monospacedDigit()
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .padding(.horizontal, 12)
+        .frame(height: 30)
+        .glassEffect(.regular, in: .capsule)
     }
 
     @ViewBuilder private var sync: some View {
@@ -342,9 +348,11 @@ private struct StatusLine: View {
                     let age = last.compactAge(relativeTo: context.date)
                     Text(age == "now" ? "Synced just now" : "Synced \(age) ago")
                 }
+            } else {
+                Text("Not synced yet")
             }
         }
-        if let rateLimit = model.rateLimit, !model.syncState.isRateLimited {
+        if !isBrief, let rateLimit = model.rateLimit, !model.syncState.isRateLimited {
             Text("·")
             Text("\(rateLimit.remaining.formatted()) left")
                 .foregroundStyle(rateLimit.remaining < 500 ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))

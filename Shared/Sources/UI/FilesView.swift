@@ -22,13 +22,12 @@ struct FilesView: View {
                 if loaded.files.isEmpty {
                     ContentUnavailableView("No Changes", systemImage: "doc")
                 } else {
-                    VStack(spacing: 0) {
-                        toolbar(loaded.files)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                        Divider()
-                        WebDocumentView(document: page, key: loaded.itemID, payload: loaded.payload)
-                    }
+                    WebDocumentView(document: page, key: loaded.itemID, payload: loaded.payload)
+                        .pageBar {
+                            toolbar(loaded.files)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                        }
                 }
             } else if let error {
                 ContentUnavailableView {
