@@ -1,19 +1,15 @@
 import UIKit
 
-/// The phone can't run the grokbot CLI, so for a bot without a webhook it opens Grok Bot on the
-/// bot's chat with the message as a draft (`grokbot://app/v1/prompt`); it goes out when the viewer
-/// sends it there.
+/// For a bot without a webhook the phone opens Grok Bot on the bot's chat with the message as a
+/// draft (`grokbot://app/v1/prompt`); it goes out when the viewer sends it there.
 extension GrokBot {
-    /// Only a draft: the viewer sends it in Grok Bot.
-    static let sendsWithoutHook = false
-
     /// The link takes at most this many characters of text.
     static let maxDraftLength = 1000
 
     /// `bot` is the bot's agent id (a UUID, as `grokbot agents` lists it), set in Settings: the
     /// link can't find a bot by name.
     @MainActor
-    static func send(_ text: String, to bot: String) async throws {
+    static func openDraft(_ text: String, to bot: String) async throws {
         guard UUID(uuidString: bot) != nil else {
             throw GrokBotError.failed("Set the id of \(bot) in Settings: Grok Bot opens a bot by its id.")
         }

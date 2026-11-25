@@ -113,50 +113,11 @@ private struct TokenSettingsView: View {
 }
 
 private struct GrokBotSettingsView: View {
-    @AppStorage(GrokBot.assistantBotKey) private var assistant = GrokBot.defaultAssistantBot
-    @AppStorage(GrokBot.mergeBotKey) private var merger = GrokBot.defaultMergeBot
-    /// nil while checking; the account, or why there is none.
-    @State private var account: Result<String?, any Error>?
-
     var body: some View {
         Form {
-            Section {
-                TextField("👀 Investigate, 🔥 Track, 🫴 Adopt", text: $assistant, prompt: Text(GrokBot.defaultAssistantBot))
-                TextField("🚀 Merge", text: $merger, prompt: Text(GrokBot.defaultMergeBot))
-            } header: {
-                Text("Bots")
-            } footer: {
-                Text("A bot's name, a unique prefix of it, or its id. e, f, d and r in the list send the selected items; merging asks first.")
-                    .foregroundStyle(.secondary)
-            }
-
-            BotHookSection(fallback: "A bot without one gets the message through the grokbot CLI below, as if you had typed it.")
-
-            Section {
-                LabeledContent("Account") {
-                    switch account {
-                    case nil: ProgressView().controlSize(.small)
-                    case let .success(name?): Text(name)
-                    case .success(nil): Text("Not signed in").foregroundStyle(.secondary)
-                    case let .failure(error): Text(error.localizedDescription).foregroundStyle(.secondary)
-                    }
-                }
-            } header: {
-                Text("grokbot CLI")
-            } footer: {
-                Text("For bots without a webhook. Built into the app, and signed in like any other grokbot: run `grokbot login` in Terminal.")
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-            }
+            BotHookSection(fallback: "e, f, d and r in the list send the selected items (merging asks first); a bot needs its webhook for them.")
         }
         .settingsPage()
-        .task {
-            do {
-                account = .success(try await GrokBot.whoami())
-            } catch {
-                account = .failure(error)
-            }
-        }
     }
 }
 

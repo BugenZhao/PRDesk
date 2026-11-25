@@ -1,7 +1,7 @@
 import Foundation
 
 /// A bot's webhook routine (SPEC §3.3): a POST with its secret wakes the routine, which takes the
-/// message as the viewer's own, so the app needn't speak as the viewer through the grokbot CLI.
+/// message as the viewer's own, so the app never speaks as the viewer.
 /// The same receivers the agents' `notify-bot` posts to (`scripts/notify-bot` in `richard`).
 /// Kept in this device's Keychain, one item per bot.
 struct BotHook: Codable, Equatable, Sendable {
@@ -74,17 +74,21 @@ struct BotHook: Codable, Equatable, Sendable {
 extension GrokBot {
     /// Whether a send for `request` goes out from here, rather than waiting as a draft in Grok Bot.
     static func sendsDirectly(_ request: BotRequest) -> Bool {
-        sendsWithoutHook || BotHook.stored(for: request.role) != nil
+        BotHook.stored(for: request.role) != nil
     }
 
-    /// Sends `text` for `request`, by the bot's webhook when one is set, otherwise the platform's
-    /// way. Returns whether it went out (false: left as a draft in Grok Bot).
+    /// Sends `text` for `request` by the bot's webhook; without one the phone leaves it as a draft
+    /// in Grok Bot. Returns whether it went out.
     static func deliver(_ text: String, for request: BotRequest) async throws -> Bool {
         if let hook = BotHook.stored(for: request.role) {
             try await hook.post(text, bot: request.botName)
             return true
         }
-        try await send(text, to: request.bot)
-        return sendsWithoutHook
+        #if os(macOS)
+            throw GrokBotError.noHook(request.botName)
+        #else
+            try await openDraft(text, to: request.bot)
+            return false
+        #endif
     }
 }

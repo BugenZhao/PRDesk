@@ -235,9 +235,9 @@ every stage is computed from state on GitHub.
 ## 3.3 Sending to Grok Bots
 
 In Grok Bot chats I hand work to bots with emoji; the app uses the same vocabulary to send selected
-items to a bot, and results come back in Grok Bot as usual. A bot with a webhook set (below) gets the
-message posted to its webhook routine; otherwise the Mac sends it through the bundled grokbot CLI
-(`grokbot ask --no-wait`) and the phone opens Grok Bot with it as a draft. The message format, what each emoji does to the board and the Session field's
+items to a bot, and results come back in Grok Bot as usual. The message is posted to the bot's
+webhook routine (below); without one set, the Mac can't send it and the phone opens Grok Bot with it
+as a draft. The message format, what each emoji does to the board and the Session field's
 format are part of the board contract (§3.1, `notes/bugens-board.md` in `richard`); this section
 covers how the app sends and shows them:
 
@@ -293,23 +293,20 @@ it goes at the end of the message after a blank line, verbatim. 🚀 and re-send
 panel first (the note can be empty; `⌘↩` sends, `esc` cancels). Nothing is drawn on the row: the
 status bar shows the send, and what it leads to shows on the board (🔥 → Desk, 👀 / 🔥 / 🫴 → a
 Session link, 🫴 → a staging PR if adopted; 🚀 → Merging, which the app sets itself). The local database keeps the last send of each kind (when, and the
-note), which is what makes a send a re-send; the context menu checks the kinds already sent. Bot
-names are set in Settings → Grok Bot (name, unique prefix or id); the CLI shares its sign-in with
-other grokbot copies (`grokbot login`).
+note), which is what makes a send a re-send; the context menu checks the kinds already sent.
 
 **Webhooks**: Richard Loop and Merger each have a webhook routine, the same receivers agent
 sessions reach with `notify-bot` (`scripts/notify-bot` in `richard`, which keeps each as
 `~/.config/grokbot-hooks/<bot>.url` and `.hdr`). Its saved prompt takes a message as mine, so the
-app needn't speak as me through the CLI, and Merger takes a 🚀 that comes this way as my
+app never speaks as me (it used to, through the grokbot CLI), and Merger takes a 🚀 that comes this way as my
 authorization, the same as one typed in its chat. Settings → Grok Bot takes each bot's URL and
 secret (bare, or the `Authorization: Bearer …` line), kept in the device's Keychain. A send is a
 POST of `{"message": …, "source": "PR Desk on the Mac"}` (or `…on the phone`) with the secret as a
 bearer token; the message is the same text as above, and only the routine's reply shows in the
-chat. The routine takes about 15–20 s to wake (a CLI message gets its first reply in about 5), which
+chat. The routine takes about 15–20 s to wake (a typed message gets its first reply in about 5), which
 doesn't matter here: the send is done once the POST is answered. With a webhook the phone sends
-directly too, and sets Merging after a 🚀 like the Mac. At build time `scripts/embed-grokbot.sh` compiles
-grokbot-cli at the commit pinned in the script (cached per commit), signs it and puts it in
-`Contents/Helpers/`. In tests, dry-run only logs instead of sending.
+directly too, and sets Merging after a 🚀 like the Mac; without one it opens the draft on the bot
+by its id, set in its Settings. In tests, dry-run only logs instead of sending.
 
 ## 4. Main window
 

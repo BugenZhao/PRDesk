@@ -24,8 +24,8 @@ coding agents.
 
 ## Building
 
-Needs macOS 26, Xcode 26, [Tuist](https://tuist.dev), a Rust toolchain (for the bundled grokbot
-CLI), and either `gh auth login` or a personal access token in Settings.
+Needs macOS 26, Xcode 26, [Tuist](https://tuist.dev), and either `gh auth login` or a personal
+access token in Settings.
 
 ```sh
 tuist generate --no-open

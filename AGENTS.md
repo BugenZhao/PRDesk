@@ -91,7 +91,7 @@ Both apps compile `Shared/`; each adds its own views and platform parts. Put new
   `DeviceRole` (only the Mac, the primary, follows the board with rules and prefetches details),
   `AvatarStore`
 - `Shared/Sources/Bots` — `GrokBot` messages (SPEC §3.3), posted to a bot's webhook routine
-  (`BotHook`, kept in the Keychain) from either app; without one each app sends them its way
+  (`BotHook`, kept in the Keychain) from either app
 - `Shared/Sources/Web` — the detail pages: `WebDocument` (one long-lived `WKWebView` that Swift
   fills with JSON from `TimelineDocument` / `FilesDocument` and `detail.js` patches in place by
   block id), `WebResources`, `AvatarSchemeHandler`
@@ -101,12 +101,10 @@ Both apps compile `Shared/`; each adds its own views and platform parts. Put new
   catalog, the app icon
 - `PRDesk/Sources` — the Mac: the app entry, `AppModel+Mac` (mouse buttons, Yab), the list (an
   `NSTableView` with drawn cells, `UI/ItemTable/`), the detail pane, `WebDocument+Mac` (find bar,
-  menus), `WebImages+Mac`, the grokbot CLI sender (`Bots/GrokBot+CLI`, built by
-  `scripts/embed-grokbot.sh` at a pinned commit, needs `~/.cargo`), `Yab/YabFrontTab` for ⌃⌥⌘D
-  (SPEC §6)
+  menus), `WebImages+Mac`, `Yab/YabFrontTab` for ⌃⌥⌘D (SPEC §6)
 - `PRDeskMobile/Sources` — the phone: tabs, list and detail screens, settings, its `WebImages`,
-  `AvatarCache` and web view host, and a Grok sender that opens Grok Bot with the message as a
-  draft (`grokbot://app/v1/prompt`)
+  `AvatarCache` and web view host, and, for a bot without a webhook, a Grok sender that opens
+  Grok Bot with the message as a draft (`grokbot://app/v1/prompt`)
 
 ## Apple's coding-assistant docs
 
@@ -158,9 +156,6 @@ are used off the main actor); no glass on content (cards, chips, rows).
   as origins only (join with `tabs` by the first 8 characters of the id). `yab exec` is documented to open a hidden Yab if none is running. Stay on
   `yab exec` rather than AppleScript: PR Desk is ad-hoc signed, so the Automation prompt would likely
   come back after each install.
-- `scripts/embed-grokbot.sh` runs cargo with `env -i`: under Xcode's environment proc-macro
-  crates fail to build ("can't find crate for `serde_derive`"), and the half-built target dir
-  keeps failing until it is deleted (`~/Library/Caches/com.bugenzhao.PRDesk.build/grokbot`).
 - The triage board (GitHub Project `vllm-project` #56) is the source of truth for Status, Priority,
   Comment and pins (its Pinned field) (SPEC §3.1). The app writes them only on an explicit user action, never from a rule (an off-board PR the user approves is added as Good, standing in for the board's own approval workflow, and 🚀 sets Merging once the board's automation has had its say);
   it also shares the board with another tracker (`Python Parity Backlog`), whose items it must

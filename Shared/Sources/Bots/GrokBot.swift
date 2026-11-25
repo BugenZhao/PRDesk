@@ -46,8 +46,8 @@ enum BotRequest: String, CaseIterable, Codable, Sendable {
     var bot: String { role.bot }
 }
 
-/// The two bots requests go to, each set in Settings by name (or id) and, optionally, by the
-/// webhook of a routine that wakes it (`BotHook`).
+/// The two bots requests go to, each reached by the webhook of a routine that wakes it (`BotHook`).
+/// The phone also takes each bot's id, for a draft when it has no webhook.
 enum BotRole: String, CaseIterable, Sendable {
     case assistant
     case merger
@@ -58,7 +58,7 @@ enum BotRole: String, CaseIterable, Sendable {
 
     private var defaultBot: String { self == .merger ? GrokBot.defaultMergeBot : GrokBot.defaultAssistantBot }
 
-    /// The bot by name (or a unique prefix of one) or id, set in Settings.
+    /// The bot by id (set on the phone, for drafts) or name.
     var bot: String {
         let key = self == .merger ? GrokBot.mergeBotKey : GrokBot.assistantBotKey
         let name = UserDefaults.standard.string(forKey: key)?.trimmingCharacters(in: .whitespaces) ?? ""
@@ -70,22 +70,19 @@ enum BotRole: String, CaseIterable, Sendable {
 }
 
 enum GrokBotError: LocalizedError {
-    case missingCLI
-    case notSignedIn
+    case noHook(String)
     case failed(String)
 
     var errorDescription: String? {
         switch self {
-        case .missingCLI: "The grokbot CLI isn't in the app bundle."
-        case .notSignedIn: "grokbot isn't signed in. Run `grokbot login` in Terminal."
+        case let .noHook(bot): "Set \(bot)'s webhook in Settings → Grok Bot."
         case let .failed(message): message
         }
     }
 }
 
-/// Messages to Grok Bots. A bot with a webhook set (`BotHook`) gets them posted there, from either
-/// app; otherwise they go the platform's way: the Mac sends them through the bundled grokbot CLI
-/// (`GrokBot+CLI.swift`), the phone opens Grok Bot with them as a draft (`GrokBot+Link.swift`).
+/// Messages to Grok Bots, posted to the bot's webhook (`BotHook`). Without one the phone opens
+/// Grok Bot with them as a draft (`GrokBot+Link.swift`); the Mac can't send them.
 enum GrokBot {
     static let assistantBotKey = "grokBotAssistant"
     static let mergeBotKey = "grokBotMerger"
