@@ -161,17 +161,8 @@ enum ItemColumn: String, CaseIterable {
 
         case .turn:
             // The viewer's move stands out by weight alone; color is left to priority.
-            // A pending review request is the most common reason it's the viewer's move; name it.
-            // The parity agent requests review on every staging PR, parked ones too.
-            // On an adopted PR the viewer's commits are on, a request (CODEOWNERS') is beside the point.
-            if item.isOpen, row.insight.isReviewRequestedFromMe, !row.insight.isCoAuthor, !item.isParityStaging || row.insight.turn == .me {
-                return [.text("review", color: .labelColor, font: CellFont.smallBold)]
-            }
-            return switch row.insight.turn {
-            case .me: [.text("me", color: .labelColor, font: CellFont.smallBold)]
-            case .them: [.text("them", color: .tertiaryLabelColor, font: CellFont.small)]
-            case nil: []
-            }
+            guard let mark = row.turnMark else { return [] }
+            return [.text(mark.text, color: mark.isMine ? .labelColor : .tertiaryLabelColor, font: mark.isMine ? CellFont.smallBold : CellFont.small)]
 
         case .ci:
             return ciRuns(item)
@@ -292,31 +283,17 @@ enum ItemColumn: String, CaseIterable {
     /// `ReviewMark`: crosses for change requests, checks for approvals; colored when it concerns
     /// the viewer, gray when only others think so.
     private func reviewRuns(_ row: ItemRow) -> [CellRun] {
-        let mark: (symbol: String, color: NSColor)? = switch row.insight.reviewMark {
-        case .none: nil
-        case .approvedByOthers: ("checkmark", .secondaryLabelColor)
-        case .approved: ("checkmark", .systemGreen)
-        case .changesRequestedByOthers: ("xmark", .secondaryLabelColor)
-        case .changesRequested: ("xmark", .systemRed)
-        }
-        return mark.map { [.symbol($0.symbol, color: $0.color, pointSize: Self.markPointSize)] } ?? []
+        let mark = row.insight.reviewMark.symbol
+        return mark.map { [.symbol($0.name, color: $0.tint.nsColor, pointSize: Self.markPointSize)] } ?? []
     }
 
     /// A dot for the CI state (green passed, red failed, yellow running, gray cancelled), filled
     /// when the PR has the `ready` label and hollow otherwise. Counts are in the tooltip.
     private func ciRuns(_ item: Item) -> [CellRun] {
-        guard let ci = item.ci else { return [] }
-        let color: NSColor = if ci.failed > 0 {
-            .systemRed
-        } else if ci.pending > 0 || ci.state == "PENDING" || ci.state == "EXPECTED" {
-            .systemYellow
-        } else if ci.state == "SUCCESS" {
-            .systemGreen
-        } else {
-            // A failed rollup with no failed checks: they were cancelled.
-            .systemGray
-        }
-        let isReady = item.labels.contains { $0.name == "ready" }
+        guard let tint = item.ciTint else { return [] }
+        // Gray here is the system gray, not the label gray of a draft's icon.
+        let color: NSColor = tint == .gray ? .systemGray : tint.nsColor
+        let isReady = item.isMarkedReady
         return [.symbol(isReady ? "circle.fill" : "circle", color: color, pointSize: Self.markPointSize)]
     }
 

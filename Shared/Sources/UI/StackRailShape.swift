@@ -1,4 +1,4 @@
-import CoreGraphics
+import SwiftUI
 
 /// How a stack rail is drawn in a row, shared by the list's cells and the detail's stack panel: a
 /// lane per branch of the tree, lines between rows, a node per PR.
@@ -62,5 +62,36 @@ enum StackRailShape {
             return [Line(path: path, isDashed: link != .stack)]
         }
         return (lines, node)
+    }
+}
+
+/// A row's piece of a stack rail, the node in `color`: in the detail's stack panel and in the
+/// iPad's list rows. `height` nil fills the row, so the lines meet from row to row.
+struct StackRailView: View {
+    let rail: StackRail
+    var height: CGFloat?
+    let color: Color
+    let hollow: Bool
+
+    var body: some View {
+        Canvas { context, size in
+            let shape = StackRailShape.layout(rail, in: CGRect(origin: .zero, size: size))
+            for line in shape.lines {
+                var context = context
+                context.opacity = line.opacity
+                context.stroke(
+                    Path(line.path), with: .style(.tertiary),
+                    style: StrokeStyle(lineWidth: StackRailShape.lineWidth, dash: line.isDashed ? StackRailShape.dash : [])
+                )
+            }
+            if hollow {
+                context.stroke(Path(ellipseIn: shape.node.insetBy(dx: 0.65, dy: 0.65)), with: .color(color), lineWidth: 1.3)
+            } else {
+                context.fill(Path(ellipseIn: shape.node), with: .color(color))
+            }
+        }
+        .frame(width: StackRailShape.width)
+        .frame(height: height)
+        .frame(maxHeight: height == nil ? .infinity : nil)
     }
 }

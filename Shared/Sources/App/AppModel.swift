@@ -380,6 +380,11 @@ final class AppModel {
         row(for: item).listedTriage
     }
 
+    /// Whether the item has activity the viewer hasn't seen, as its row's dot shows.
+    func isUnread(_ item: Item) -> Bool {
+        row(for: item).insight.isUnread
+    }
+
     private func row(for item: Item) -> ItemRow {
         var state = state(for: item)
         for (request, send) in botSends[item.id] ?? [:] {

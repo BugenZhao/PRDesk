@@ -50,7 +50,7 @@ struct CommitsView: View {
             } else {
                 VStack(spacing: 0) {
                     list(history)
-                        .frame(height: min(CGFloat(history.rows.count) * 24 + 10, 200))
+                        .frame(height: min(CGFloat(history.rows.count) * RowMetrics.commitRowHeight + 10, 200))
                     Divider()
                     toolbar(history, range: range)
                         .padding(.horizontal, 10)
@@ -106,31 +106,68 @@ struct CommitsView: View {
     // MARK: List
 
     private func list(_ history: CommitHistory) -> some View {
-        List(selection: $selection) {
-            ForEach(history.rows) { row in
-                switch row {
-                case let .commit(commit, isNew):
-                    CommitRow(commit: commit, isNew: isNew, shortensTags: shortensTags, pullURL: item.url)
-                case let .push(push):
-                    PushRow(push: push)
-                        .selectionDisabled(push.before == nil || push.after == nil)
+        #if os(macOS)
+            List(selection: $selection) {
+                ForEach(history.rows) { row in
+                    rowView(row)
+                        .selectionDisabled(!isSelectable(row))
                 }
             }
+            .listStyle(.plain)
+            .environment(\.defaultMinListRowHeight, 22)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { listWidth = $0 }
+        #else
+            // No selection without edit mode here: a tap picks one row (again to go back to the
+            // preset), and a row's menu extends the selection to it.
+            List {
+                ForEach(history.rows) { row in
+                    rowView(row)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            guard isSelectable(row) else { return }
+                            selection = selection == [row.id] ? [] : [row.id]
+                        }
+                        .contextMenu {
+                            if isSelectable(row), !selection.isEmpty, !selection.contains(row.id) {
+                                Button("Extend Selection to Here", systemImage: "arrow.up.and.down") { selection.insert(row.id) }
+                            }
+                        }
+                        .listRowBackground(selection.contains(row.id) ? Color.accentColor.opacity(0.18) : Color.clear)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12))
+                }
+            }
+            .listStyle(.plain)
+            .environment(\.defaultMinListRowHeight, RowMetrics.commitRowHeight)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { listWidth = $0 }
+        #endif
+    }
+
+    @ViewBuilder
+    private func rowView(_ row: CommitHistory.Row) -> some View {
+        switch row {
+        case let .commit(commit, isNew):
+            CommitRow(commit: commit, isNew: isNew, shortensTags: shortensTags, pullURL: item.url)
+        case let .push(push):
+            PushRow(push: push)
         }
-        .listStyle(.plain)
-        .environment(\.defaultMinListRowHeight, 22)
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { listWidth = $0 }
+    }
+
+    /// A force push whose ends aren't known has nothing to compare.
+    private func isSelectable(_ row: CommitHistory.Row) -> Bool {
+        if case let .push(push) = row { return push.before != nil && push.after != nil }
+        return true
     }
 
     /// Whether every headline's tags are shortened: when any row's wouldn't fit with them in full,
     /// as the stack does, so a tag reads the same in every row.
     private var shortensTags: Bool {
         guard listWidth > 0 else { return false }
-        let body = NSFont.preferredFont(forTextStyle: .callout)
-        let mono = NSFont.monospacedSystemFont(ofSize: body.pointSize, weight: .regular)
-        let caption = NSFont.preferredFont(forTextStyle: .caption1)
-        let digits = NSFont.monospacedDigitSystemFont(ofSize: body.pointSize, weight: .regular)
-        func measure(_ text: String, _ font: NSFont) -> CGFloat {
+        let body = PlatformFont.preferredFont(forTextStyle: .callout)
+        let mono = PlatformFont.monospacedSystemFont(ofSize: body.pointSize, weight: .regular)
+        let caption = PlatformFont.preferredFont(forTextStyle: .caption1)
+        let digits = PlatformFont.monospacedDigitSystemFont(ofSize: body.pointSize, weight: .regular)
+        func measure(_ text: String, _ font: PlatformFont) -> CGFloat {
             ceil((text as NSString).size(withAttributes: [.font: font]).width)
         }
         return history.rows.contains { row in
@@ -158,7 +195,9 @@ struct CommitsView: View {
             } label: {
                 Text(title(history, range: range))
             }
-            .menuStyle(.borderlessButton)
+            #if os(macOS)
+                .menuStyle(.borderlessButton)
+            #endif
             .fixedSize()
             if history.isRewritten(range) {
                 Image(systemName: "exclamationmark.triangle")
@@ -173,12 +212,12 @@ struct CommitsView: View {
             }
             Spacer()
             Toggle("Wrap lines", isOn: $wrapLines)
-                .toggleStyle(.checkbox)
+                .optionToggleStyle()
             Button("Expand all") { page.run("PRDesk.setAllFiles(true)") }
-                .buttonStyle(.link)
+                .textButtonStyle()
                 .padding(.leading, 4)
             Button("Collapse all") { page.run("PRDesk.setAllFiles(false)") }
-                .buttonStyle(.link)
+                .textButtonStyle()
         }
         .font(.caption.monospacedDigit())
         .controlSize(.small)

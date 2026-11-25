@@ -51,9 +51,11 @@ struct StackPanel: View {
             Image(systemName: "square.stack.3d.up")
             Text(parts.joined(separator: " · "))
             Spacer(minLength: 0)
-            Text("⌥↑ ⌥↓")
-                .foregroundStyle(.tertiary)
-                .help("Move along the stack")
+            #if os(macOS)
+                Text("⌥↑ ⌥↓")
+                    .foregroundStyle(.tertiary)
+                    .help("Move along the stack")
+            #endif
         }
         .font(.caption)
         .foregroundStyle(.secondary)
@@ -83,7 +85,7 @@ struct StackPanel: View {
                 // A staging PR landed upstream is closed on the fork; it shows as merged. One Merger
                 // is merging is purple too, as in the list.
                 let isMerging = entry.state == .open && !entry.isDraft && model.isMerging(repo: ladder.repo, number: entry.number)
-                RailView(rail: rung.rail, color: rung.upstream?.state == .merged || isMerging ? .purple : entry.stateColor, hollow: entry.state == .open && entry.isDraft)
+                StackRailView(rail: rung.rail, height: Self.rowHeight, color: rung.upstream?.state == .merged || isMerging ? .purple : entry.stateColor, hollow: entry.state == .open && entry.isDraft)
                     .help(isMerging ? "\(entry.stateDescription), being merged by Merger" : entry.stateDescription)
                 Text("#\(String(entry.number))")
                     .foregroundStyle(.secondary)
@@ -112,7 +114,7 @@ struct StackPanel: View {
             }
         } label: {
             row {
-                RailView(rail: rail, color: .purple, hollow: false)
+                StackRailView(rail: rail, height: Self.rowHeight, color: .purple, hollow: false)
                 Text("\(rungs.count) merged together" + (at.map { " · \($0.compactAge()) ago" } ?? ""))
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 8)
@@ -166,11 +168,11 @@ struct StackPanel: View {
     /// full, as the list does, so a tag reads the same in every row.
     private var shortensTags: Bool {
         guard width > 0 else { return false }
-        let body = NSFont.preferredFont(forTextStyle: .callout)
-        let bold = NSFont.systemFont(ofSize: body.pointSize, weight: .semibold)
-        let caption = NSFont.preferredFont(forTextStyle: .caption1)
-        let digits = NSFont.monospacedDigitSystemFont(ofSize: body.pointSize, weight: .regular)
-        func measure(_ text: String, _ font: NSFont) -> CGFloat {
+        let body = PlatformFont.preferredFont(forTextStyle: .callout)
+        let bold = PlatformFont.systemFont(ofSize: body.pointSize, weight: .semibold)
+        let caption = PlatformFont.preferredFont(forTextStyle: .caption1)
+        let digits = PlatformFont.monospacedDigitSystemFont(ofSize: body.pointSize, weight: .regular)
+        func measure(_ text: String, _ font: PlatformFont) -> CGFloat {
             ceil((text as NSString).size(withAttributes: [.font: font]).width)
         }
         return ladder.rungs.contains { rung in
@@ -203,7 +205,7 @@ struct StackPanel: View {
         return "Its base is still \(rung.entry.baseRef), the branch of a PR no longer open"
     }
 
-    static let rowHeight: CGFloat = 20
+    static let rowHeight = RowMetrics.stackRowHeight
 
     private func row(@ViewBuilder _ content: () -> some View) -> some View {
         // A fixed height, so the rail's lines meet from row to row.
@@ -211,33 +213,6 @@ struct StackPanel: View {
             .padding(.horizontal, 8)
             .frame(maxWidth: .infinity, minHeight: Self.rowHeight, maxHeight: Self.rowHeight, alignment: .leading)
             .contentShape(Rectangle())
-    }
-}
-
-/// A row's piece of a stack rail (see `StackRailShape`), the node in the PR's state color.
-private struct RailView: View {
-    let rail: StackRail
-    let color: Color
-    let hollow: Bool
-
-    var body: some View {
-        Canvas { context, size in
-            let shape = StackRailShape.layout(rail, in: CGRect(origin: .zero, size: size))
-            for line in shape.lines {
-                var context = context
-                context.opacity = line.opacity
-                context.stroke(
-                    Path(line.path), with: .style(.tertiary),
-                    style: StrokeStyle(lineWidth: StackRailShape.lineWidth, dash: line.isDashed ? StackRailShape.dash : [])
-                )
-            }
-            if hollow {
-                context.stroke(Path(ellipseIn: shape.node.insetBy(dx: 0.65, dy: 0.65)), with: .color(color), lineWidth: 1.3)
-            } else {
-                context.fill(Path(ellipseIn: shape.node), with: .color(color))
-            }
-        }
-        .frame(width: StackRailShape.width, height: StackPanel.rowHeight)
     }
 }
 
