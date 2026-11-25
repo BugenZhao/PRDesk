@@ -35,17 +35,29 @@ let project = Project(
                 ]
             )
         ),
-        // The iPhone and iPad companion: GitHub (the board, notifications) is its only source of
+        // The iPad (and iPhone) desk: GitHub (the board, notifications) is its only source of
         // truth, and it never runs the Mac's rules (subscriptions, approvals). See Shared/.
         .target(
             name: "PRDeskMobile",
             destinations: [.iPhone, .iPad],
             product: .app,
             bundleId: "com.bugenzhao.PRDesk.mobile",
-            deploymentTargets: .iOS("26.0"),
+            deploymentTargets: .iOS("27.0"),
             infoPlist: .extendingDefault(with: [
                 "CFBundleDisplayName": "PR Desk",
                 "UILaunchScreen": [:],
+                // Any orientation on both: the layout follows the window's size, whatever it is.
+                "UISupportedInterfaceOrientations": [
+                    "UIInterfaceOrientationPortrait",
+                    "UIInterfaceOrientationLandscapeLeft",
+                    "UIInterfaceOrientationLandscapeRight",
+                ],
+                "UISupportedInterfaceOrientations~ipad": [
+                    "UIInterfaceOrientationPortrait",
+                    "UIInterfaceOrientationPortraitUpsideDown",
+                    "UIInterfaceOrientationLandscapeLeft",
+                    "UIInterfaceOrientationLandscapeRight",
+                ],
                 // Sends to Grok Bots open its app with a draft.
                 "LSApplicationQueriesSchemes": ["grokbot"],
             ]),

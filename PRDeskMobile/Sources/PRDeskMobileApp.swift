@@ -1,17 +1,24 @@
 import SwiftUI
 
-/// The iPad and iPhone PR Desk. Its first interface was removed and the next isn't built yet, so
-/// for now this only keeps `Shared/` and the platform parts here compiling for iOS: no model is
-/// made, and nothing syncs.
+/// PR Desk on the iPad (and the iPhone): the Mac's model and sync over its own local cache, with
+/// views of its own. One window: the model is one desk.
 @main
 struct PRDeskMobileApp: App {
+    @State private var model: AppModel
+
+    init() {
+        do {
+            _model = State(initialValue: try AppModel(db: .openDefault()))
+        } catch {
+            fatalError("Failed to open the database: \(error)")
+        }
+    }
+
     var body: some Scene {
         WindowGroup {
-            ContentUnavailableView(
-                "PR Desk",
-                systemImage: "hammer",
-                description: Text("The interface for iPad is being rebuilt.")
-            )
+            DeskView()
+                .environment(model)
+                .task { model.start() }
         }
     }
 }
