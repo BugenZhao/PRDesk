@@ -34,6 +34,11 @@ final class WebDocument: NSObject {
     /// Ticks or clears a file's "Viewed" mark, by path.
     var setFileViewed: ((String, Bool) -> Void)?
 
+    #if os(iOS)
+        /// Shows a menu the page asks for at a point of the window, set by the view showing the page.
+        var menuHandler: ((MenuRequest, CGPoint) -> Void)?
+    #endif
+
     #if os(macOS)
         /// The menu for right-clicking a person, set by the view showing the page.
         var loginMenu: ((String) -> NSMenu)?

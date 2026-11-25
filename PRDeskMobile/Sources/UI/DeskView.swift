@@ -20,6 +20,8 @@ struct DeskView: View {
     @State private var width: CGFloat = 0
     @State private var pages = DetailPages()
     @State private var showsSettings = false
+    /// The menu a detail page asked for.
+    @State private var pageMenu: PageMenu?
 
     var body: some View {
         let layout = DeskLayout(width: width, prefersSplit: prefersSplit, prefersTwoLines: rowLines == .two)
@@ -38,6 +40,9 @@ struct DeskView: View {
             .toolbar { toolbar(layout) }
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+        .popover(item: $pageMenu, attachmentAnchor: .rect(.rect(pageMenu?.anchor ?? .zero))) { menu in
+            PageMenuView(menu: menu).environment(model)
+        }
         .sheet(isPresented: $showsSettings) { SettingsView() }
         .modifier(ModelAlerts())
         .onAppear {
@@ -45,6 +50,9 @@ struct DeskView: View {
             _ = pages.timeline.webView
             for page in pages.all {
                 page.openItem = { [model] repo, number in model.openItem(repo: repo, number: number) }
+                page.menuHandler = { request, point in
+                    pageMenu = PageMenu(request: request, point: point, page: page)
+                }
             }
             pages.timeline.toggleReaction = { [model] content, subject in model.toggleReaction(content, on: subject) }
         }
@@ -87,7 +95,6 @@ struct DeskView: View {
                 Button(prefersSplit ? "Hide Detail" : "Show Detail", systemImage: "sidebar.right") {
                     prefersSplit.toggle()
                 }
-                .keyboardShortcut("b", modifiers: .command)
             }
             .visibilityPriority(.high)
         }
@@ -98,7 +105,6 @@ struct DeskView: View {
             Button("Sync Now", systemImage: "arrow.clockwise") {
                 Task { await model.sync() }
             }
-            .keyboardShortcut("r", modifiers: .command)
             .disabled(model.syncState == .syncing)
         }
         ToolbarItem(placement: .topBarTrailing) {

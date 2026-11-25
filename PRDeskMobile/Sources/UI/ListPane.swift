@@ -8,6 +8,7 @@ struct ListPane: View {
     /// Side by side with the detail, the selected row stays marked.
     let highlightsSelection: Bool
     @Binding var showsSettings: Bool
+    @FocusState private var isFilterFocused: Bool
 
     var body: some View {
         @Bindable var model = model
@@ -30,6 +31,8 @@ struct ListPane: View {
                 }
         }
         .searchable(text: $model.filterText, prompt: "Filter")
+        .searchFocused($isFilterFocused)
+        .onChange(of: model.filterFocusRequest) { isFilterFocused = true }
         // Where the field would be a bar under the list (a phone), it is a button until used.
         .searchToolbarBehavior(.minimize)
         .textInputAutocapitalization(.never)
@@ -156,11 +159,14 @@ private struct SectionHeader: View {
             }
             .font(.footnote.weight(.semibold))
             .textCase(nil)
+            .padding(.horizontal, 10)
             .frame(height: 30)
+            // Its own ground from edge to edge: pinned, rows pass under it, not through it.
+            .background(Color(uiColor: .systemBackground))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .listRowInsets(EdgeInsets(top: 0, leading: 10, bottom: 0, trailing: 10))
+        .listRowInsets(EdgeInsets())
         .accessibilityHint(group.section.help)
     }
 }

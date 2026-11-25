@@ -126,7 +126,9 @@ Both apps compile `Shared/`; each adds its own views and platform parts. Put new
   menus), `WebImages+Mac`, `Yab/YabFrontTab` for ⌃⌥⌘D (SPEC §6)
 - `PRDeskMobile/Sources` — the iPad and iPhone (SPEC §9): `UI/DeskView` (the list beside the
   detail or under it, by `DeskLayout`), `ListPane` and `ItemRowView` (a SwiftUI `List`; rows of
-  two lines or one, columns by `RowDensity`), `DetailPane`, `ItemMenu`, `SettingsView`; and the
+  two lines or one, columns by `RowDensity`), `DetailPane` (its header scrolls away with the
+  page, `Shared/Sources/UI/PageChrome`), `ItemMenu`, `PageMenu` (the pages' menus, as popovers),
+  `SettingsView`, `DeskCommands` (the menu bar and the Mac's keys); and the
   platform parts: its `WebImages`, `AvatarCache` and web view host, and, for a bot without a
   webhook, a Grok sender that opens Grok Bot with the message as a draft
   (`grokbot://app/v1/prompt`)

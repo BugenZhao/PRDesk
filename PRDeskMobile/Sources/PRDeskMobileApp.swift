@@ -20,5 +20,6 @@ struct PRDeskMobileApp: App {
                 .environment(model)
                 .task { model.start() }
         }
+        .commands { DeskCommands(model: model) }
     }
 }

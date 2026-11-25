@@ -44,6 +44,9 @@ extension View {
             if abs(total - chromeHeight) > 0.5 { chromeHeight = total }
         }
 
+        /// Room to leave under the page's end, for what floats over the pane's foot.
+        var bottomRoom: CGFloat = 0
+
         /// The chrome has left with the page: something else has to say what the page is.
         var isChromeAway: Bool { chromeHeight > 0 && offset > chromeHeight - 24 }
     }

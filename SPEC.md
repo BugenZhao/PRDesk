@@ -766,10 +766,24 @@ The page gets the whole pane:
 - The composer is folded into a glass button over the conversation's corner, which says Draft when
   one waits. It opens the Mac's composer under the conversation with the keyboard up; a handle
   folds it again, as does sending. Scrolling the page puts the keyboard away
+- The page runs to the window's foot, under the home indicator, with room left under its end
 
-Not there yet: menus on people and reactions in the pages (tapping a reaction toggles it), the
-affiliation settings and overrides (badges come from what the device itself resolves), more than
-one window, the Mac's keys beyond ⌘B and ⌘R, and anything of Yab's.
+**Menus in the pages.** The smiley on a card offers the reactions in a row, mine marked (picking
+one of those takes it back). Holding a person offers their profile, their name to copy and the
+orgs to tie them to by hand (§5); holding a file's header offers Viewed, its path and its page on
+GitHub.
+
+**Keys.** With a keyboard attached the Mac's keys work (§4.5), and the iPad's menu bar lists them:
+`j` / `k` and `esc`, `w` / `b` / `s` / `m`, `1` / `2` / `3` / `0`, `p`, `n`, `o`, `u`, `c`, `l`,
+`t`, `e` / `f` / `d` / `r` (each asks first, with room for a note), `/`, ⌘B, ⌘R, ⌘1–3, ⌥⌘1–3,
+⌘[ / ⌘], ⇧⌘C. They act on the selected item and give way to typing in a text field.
+
+**Badges.** The iPad doesn't work out affiliations (§5) or merged counts itself: that takes many
+requests a day, which are the Mac's to spend. It shows the badges set by hand on it; publishing
+the Mac's resolved table for it to read is not built.
+
+Not there yet: the Mac's badges (above), the settings for affiliation overrides as a list, several
+selected rows at once, undo, more than one window, find in a page, and anything of Yab's.
 
 ## 10. Milestones
 

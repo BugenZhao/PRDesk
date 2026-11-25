@@ -18,6 +18,11 @@ struct DetailPane: View {
 
     typealias Tab = AppModel.DetailTab
 
+    /// The toolbar's row of buttons, which the bars over the pane end with.
+    private static let barHeight: CGFloat = 62
+    /// The window's buttons at the bar's trailing end, which the title's line stops short of.
+    private static let windowButtonsWidth: CGFloat = 270
+
     var body: some View {
         Group {
             if let item = model.selectedItem {
@@ -42,12 +47,18 @@ struct DetailPane: View {
                         // Beside the list the bar over this pane is empty up to the window's
                         // buttons: the line goes there, level with them. Pushed, the bar holds
                         // the way back and the tabs, and the line sits under it.
-                        .padding(.trailing, isPushed ? 0 : 270)
-                        .offset(y: isPushed ? 0 : -55)
+                        .padding(.trailing, isPushed ? 0 : Self.windowButtonsWidth)
+                        .offset(y: isPushed ? 6 : -(Self.barHeight + CompactTitle.height) / 2)
                     }
                     .onChange(of: item.id) {
                         if item.kind == .issue { model.detailTab = .conversation }
                         isComposing = false
+                    }
+                    // Asked for by key (c): the composer opens, in the conversation.
+                    .onChange(of: model.composerFocusRequest) {
+                        guard !isComposing else { return }
+                        if item.kind == .pullRequest { model.detailTab = .conversation }
+                        withAnimation(.snappy(duration: 0.25)) { isComposing = true }
                     }
                     .toolbar {
                         if isPushed, item.kind == .pullRequest {
@@ -87,26 +98,31 @@ struct DetailPane: View {
         if let detail = model.detail, detail.id == item.id {
             switch item.kind == .issue ? .conversation : model.detailTab {
             case .conversation:
-                Conversation(item: item, detail: detail, page: pages.timeline, showAutomated: showAutomated)
-                    .overlay(alignment: .bottomTrailing) {
-                        if !isComposing {
-                            ComposeButton(hasDraft: !model.draft(for: item.id).isEmpty) {
-                                withAnimation(.snappy(duration: 0.25)) { isComposing = true }
+                // The composer under the conversation rather than over it, so the page ends
+                // where the composer begins; folded, the page runs to the window's foot.
+                VStack(spacing: 0) {
+                    Conversation(item: item, detail: detail, page: pages.timeline, showAutomated: showAutomated)
+                        .overlay(alignment: .bottomTrailing) {
+                            if !isComposing {
+                                ComposeButton(hasDraft: !model.draft(for: item.id).isEmpty) {
+                                    withAnimation(.snappy(duration: 0.25)) { isComposing = true }
+                                }
+                                .padding(16)
+                                .transition(.scale(scale: 0.6).combined(with: .opacity))
                             }
-                            .padding(16)
-                            .transition(.scale(scale: 0.6).combined(with: .opacity))
                         }
+                    if isComposing {
+                        composer(item, detail)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
-                    .safeAreaInset(edge: .bottom, spacing: 0) {
-                        if isComposing {
-                            composer(item, detail)
-                                .transition(.move(edge: .bottom).combined(with: .opacity))
-                        }
-                    }
-                    // A comment that went out leaves nothing to keep the composer open for.
-                    .onChange(of: detail.entries.count) {
-                        withAnimation(.snappy(duration: 0.25)) { isComposing = false }
-                    }
+                }
+                // Room under the last comment for the button over the corner.
+                .onChange(of: isComposing, initial: true) { scroll.bottomRoom = isComposing ? 0 : 56 }
+                .onDisappear { scroll.bottomRoom = 0 }
+                // A comment that went out leaves nothing to keep the composer open for.
+                .onChange(of: detail.entries.count) {
+                    withAnimation(.snappy(duration: 0.25)) { isComposing = false }
+                }
             case .commits:
                 // Its own per item, so the selection and the chosen range don't carry over.
                 CommitsView(item: item, detail: detail, page: pages.commits)
@@ -158,6 +174,8 @@ private struct CompactTitle: View {
     let isShown: Bool
     let action: () -> Void
 
+    static let height: CGFloat = 36
+
     var body: some View {
         ZStack {
             if isShown {
@@ -172,13 +190,12 @@ private struct CompactTitle: View {
                     }
                     .font(.subheadline.weight(.medium))
                     .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
+                    .frame(height: Self.height)
                     .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
                 .glassEffect(.regular.interactive(), in: .capsule)
                 .padding(.horizontal, 12)
-                .padding(.top, 6)
                 .transition(.opacity.combined(with: .offset(y: -8)))
                 .accessibilityHint("Scrolls to the top")
             }
@@ -200,11 +217,11 @@ private struct ComposeButton: View {
                 if hasDraft { Text("Draft") }
             }
             .font(.body.weight(.medium))
-            .frame(minWidth: 26, minHeight: 30)
+            .frame(minWidth: 22, minHeight: 26)
         }
         .buttonStyle(.glass)
         .buttonBorderShape(.capsule)
-        .controlSize(.large)
+        .controlSize(.regular)
         .accessibilityLabel(hasDraft ? "Continue Draft" : "Comment or Review")
     }
 }

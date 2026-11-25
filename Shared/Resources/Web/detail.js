@@ -50,7 +50,7 @@ const PRDesk = (() => {
   }
 
   // How much of the page's top lies under bars drawn over it (on iOS, where the page scrolls
-  // beneath the navigation bar): what is scrolled to lands below them. See `setTopInset`.
+  // beneath the navigation bar): what is scrolled to lands below them. See `setInsets`.
   let topInset = 0;
 
   function scrollToElement(element) {
@@ -77,22 +77,48 @@ const PRDesk = (() => {
     }
   }
 
-  // Right-clicking a person offers the app's menu for them instead of WebKit's.
-  addEventListener("contextmenu", (event) => {
-    const login = event.target.closest("[data-login]");
+  // Right-clicking a person or a file's header offers the app's menu instead of WebKit's.
+  function requestMenu(target, x, y) {
+    const login = target.closest("[data-login]");
     if (login) {
-      event.preventDefault();
-      post({ type: "loginMenu", login: login.dataset.login, x: event.clientX, y: event.clientY });
-      return;
+      post({ type: "loginMenu", login: login.dataset.login, x, y });
+      return true;
     }
-    const head = event.target.closest(".fhead");
-    if (head && !event.target.closest("a")) {
-      event.preventDefault();
+    const head = target.closest(".fhead");
+    if (head && !target.closest("a")) {
       const file = head.parentElement;
       const viewed = file.dataset.viewed ? file.dataset.viewed === "VIEWED" : null;
-      post({ type: "fileMenu", path: file.dataset.path, url: file.dataset.url || "", viewed, x: event.clientX, y: event.clientY });
+      post({ type: "fileMenu", path: file.dataset.path, url: file.dataset.url || "", viewed, x, y });
+      return true;
     }
+    return false;
+  }
+
+  addEventListener("contextmenu", (event) => {
+    if (requestMenu(event.target, event.clientX, event.clientY)) event.preventDefault();
   });
+
+  // Under a finger, holding stands in for the right click. The click that follows the hold's end
+  // is not one: it would open the person's profile or fold the file.
+  let hold = null;
+  let heldJustNow = false;
+  addEventListener("touchstart", (event) => {
+    clearTimeout(hold);
+    heldJustNow = false;
+    if (event.touches.length !== 1 || !event.target.closest("[data-login], .fhead")) return;
+    const { target } = event;
+    const { clientX: x, clientY: y } = event.touches[0];
+    hold = setTimeout(() => { heldJustNow = requestMenu(target, x, y); }, 450);
+  }, { passive: true });
+  for (const type of ["touchmove", "touchcancel", "touchend"]) {
+    addEventListener(type, () => clearTimeout(hold), { passive: true });
+  }
+  addEventListener("click", (event) => {
+    if (!heldJustNow) return;
+    heldJustNow = false;
+    event.preventDefault();
+    event.stopPropagation();
+  }, true);
 
   // MARK: Timeline
 
@@ -619,11 +645,13 @@ const PRDesk = (() => {
     toggleViewed(path) { toggleViewed(files.elements.get(path)); },
     setWrap(wrap) { document.documentElement.classList.toggle("nowrap", !wrap); },
     // `bars`: what stays over the page's top; `total`: with what scrolls away with the page,
-    // which the page leaves room for at its top (in points; the page may be zoomed).
-    setTopInset(bars, total) {
+    // which the page leaves room for at its top; `bottom`: the room to leave under its end, for
+    // what lies over the window's foot (in points; the page may be zoomed).
+    setInsets(bars, total, bottom) {
       topInset = bars;
       const zoom = parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
       document.body.style.paddingTop = `${total / zoom}px`;
+      document.body.style.paddingBottom = `${bottom / zoom}px`;
     },
   };
 })();
