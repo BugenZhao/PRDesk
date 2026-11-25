@@ -1,7 +1,8 @@
 # PR Desk — Spec v0.1
 
 A native macOS workbench for vLLM PRs and issues: dense and keyboard-driven. A clean-room
-implementation that doesn't consult the source of any existing tool.
+implementation that doesn't consult the source of any existing tool. It also runs on the iPad and
+iPhone (§9).
 
 ## 1. Scope
 
@@ -696,7 +697,72 @@ gray tier.
 
 Empty for closed items.
 
-## 9. Milestones
+## 9. On the iPad and iPhone
+
+The same desk away from the Mac: for an iPad mini first, a small Mac version rather than a phone
+app, and usable on an iPhone. iOS 27, SwiftUI throughout, with the detail's pages in the same
+`WKWebView` as on the Mac. It shares the Mac's model, sync and pages (`Shared/`); what follows is
+only what differs.
+
+**Authority.** GitHub is the only source of truth: the board and notifications. There is no
+server and nothing syncs between the devices. The Mac alone follows the board with rules
+(subscriptions for Shelf and Attic, approved PRs added as Good) and prefetches details; the iPad
+writes what I do on it, and the Mac follows up as it would after an edit on the web. It keeps its
+own database and its own token (a PAT in Settings, in the Keychain; there is no `gh`).
+
+**Layout.** A pure function of the window's width, two preferences and the selection, so
+rotation, multitasking and a resized window always land on the layout the new size calls for:
+
+```
+900 pt and wider, detail shown                       narrower, or detail hidden
+┌ Dashboard | Parity n | Inbox n      ▣ ≡ ⟳ ⚙ 🔍 ┐   ┌ Dashboard | Parity n | Inbox n  ≡ ⟳ ⚙ 🔍 ┐
+├ List (2/5, 400–480 pt) ┬ Detail ───────────────┤   ├ List (the whole width) ─────────────────┤
+│ ▾ Good 5               │ #69856 [RF] Count …   │   │ ▾ Good 5                                │
+│  title            7h   │ author · Open · CI    │   │  title …                           7h   │
+│  author · event  me ✓● │ [Triage Desk …] [HML–]│   │  #n author · event      me ✓ ● +90 −14  │
+│ ▾ Desk 24              │ Conversation|Commits|…│   │ (a row pushes its detail, with the tabs │
+│ 582 items · Synced 12s │ …            composer │   │  in the navigation bar)                 │
+└────────────────────────┴───────────────────────┘   └─────────────────────────────────────────┘
+```
+
+- An iPad mini on its side is the first; upright, and any iPhone, the second. ▣ (⌘B) hides the
+  detail where it would show, for the list alone at full width
+- Going from one to the other keeps the selection, the detail's tab, its pages (scroll position,
+  loaded diffs) and a comment being written. Nothing remembers which layout came before
+- The detail's header gives way to its page when the pane is short: under 560 pt it keeps the
+  title and the state line, under 330 pt (the keyboard up on a small iPad on its side) the title
+  alone. Its stack, labels, dates and the board's Comment also fold away under a chevron
+
+**List.** The Mac's sections, tints, fading, stacks' rails and marks (§4.1–§4.3), in rows of two
+lines or one (≡, two by default):
+
+- Two lines: the title with its tags and the age; under it the number, author and marks of trust,
+  the latest event (or the board's Comment), then Turn, Review, CI and Size in columns
+- One line: the Mac's columns under sortable column titles. They give way as the list narrows so
+  the title keeps the most room: Author's name under 960 pt (the picture stays), Size under 720,
+  the number, the Comment and the latest event under 640, where tags are also shortened
+- Narrower than 450 pt rows are always two lines
+- ≡ also sorts (the same keys as the Mac's columns). Pulling down syncs
+- Swiping a row right marks it read / unread (a full swipe) or pins it; swiping left sets the
+  Status, Desk nearest the edge, without the one it has. Holding a row opens the Mac's row menu:
+  open, copy link, read, Status, Priority, pin, add to Desk, ready / draft, linked PR, agent
+  session, author, Grok Bot
+- The filter (§4.4) is the system's search field: in the toolbar on an iPad, a button under the
+  list on an iPhone
+- The line under the list shows the write under way as the Mac's status bar does, otherwise the
+  item count, the last sync and the quota; on an iPhone only while there is something to say
+
+**Detail.** As §6, with Status and Priority as segmented controls (one touch; Triage and – clear),
+the checks in a popover from the CI status, and the rest behind •••: the row menu, rename, refresh,
+back to the previous item, and the conversation's Show Automated / Expand All / Collapse All. In
+Commits a tap picks one commit (again for the preset) and a row's menu extends the selection to it.
+Scrolling a page puts the keyboard away.
+
+Not there yet: menus on people and reactions in the pages (tapping a reaction toggles it), the
+affiliation settings and overrides (badges come from what the device itself resolves), more than
+one window, the Mac's keys beyond ⌘B and ⌘R, and anything of Yab's.
+
+## 10. Milestones
 
 1. Project skeleton, auth, GraphQL client, first and incremental sync, the list showing items
 2. Groups, local state, shortcuts, filtering, colors, persisted sorting and columns

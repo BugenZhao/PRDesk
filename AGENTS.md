@@ -1,7 +1,7 @@
 # PR Desk
 
-Native macOS (26+) dashboard for PRs and issues in `vllm-project/vllm`, with an iPhone and iPad
-companion (`PRDeskMobile`, iOS 26+). Product spec: `SPEC.md`.
+Native macOS (26+) dashboard for PRs and issues in `vllm-project/vllm`, and the same desk for the
+iPad (an iPad mini first) and iPhone (`PRDeskMobile`, iOS 27+). Product spec: `SPEC.md`.
 
 ## Build and run
 
@@ -54,10 +54,10 @@ xcodebuild -workspace PRDesk.xcworkspace -scheme PRDesk -derivedDataPath "$DD" \
   `takeSnapshot`. Offscreen views don't animate or tick timers at full rate, so judge timing and
   transitions in the app instead.
 
-### The iOS companion
+### On the iPad and iPhone
 
-Build for a simulator and launch it with `simctl`, so debug flags and a token reach it (the phone
-has no `gh`; debug builds read `PRDESK_GITHUB_TOKEN` from the environment):
+Build for a simulator and launch it with `simctl`, so debug flags and a token reach it (iOS has
+no `gh`; debug builds read `PRDESK_GITHUB_TOKEN` from the environment):
 
 ```sh
 DD=<your scratch dir>/DerivedDataMobile
@@ -70,9 +70,29 @@ SIMCTL_CHILD_PRDESK_GITHUB_TOKEN="$(gh auth token)" xcrun simctl launch --termin
 
 - Quote the `-destination`: split by the shell, it quietly builds for a generic device instead and
   the simulator keeps the old app.
-- The companion has its own database in the simulator's app container. Its syncs spend the same
+- The app has its own database in the simulator's app container. Its syncs spend the same
   GraphQL quota as the Mac's (5,000 points an hour, per user): a first sync is about a thousand
-  items; don't relaunch it over and over with an empty database.
+  items. Seed it from the Mac's instead and launch with `-PRDeskNoSync YES`, which costs nothing
+  and shows real rows: install the app, then
+
+  ```sh
+  D="$(xcrun simctl get_app_container <udid> com.bugenzhao.PRDesk.mobile data)/Library/Application Support/PR Desk"
+  mkdir -p "$D" && sqlite3 ~/Library/Application\ Support/PR\ Desk/db.sqlite ".backup '$D/db.sqlite'"
+  cp -R ~/Library/Application\ Support/PR\ Desk/avatars "$D/"
+  ```
+
+  It is a copy: what the simulator marks read or sets stays in it.
+- Check both an iPad mini (on its side: list beside detail; upright: list alone) and an iPhone,
+  and window sizes in between: `DeskLayout` is a pure function of the width, so every size must
+  come out right whatever came before. An iPad simulator only rotates; an iPhone simulator's app
+  can be put on a freely sized display (`devicectl device appResize`, wrapped by the `duo-hinge`
+  skill's `resize start|set|stop`, screenshots with `simctl io <udid> screenshot
+  --display=resizable`). Also try the keyboard up on the iPad on its side, the shortest the detail
+  gets.
+- Xcode's own skills are worth reading before SwiftUI work here (`xcrun agent skills export`):
+  `swiftui-whats-new-27` (swipe actions outside lists, toolbar overflow), `swiftui-specialist`
+  (list rows with one root view, observation) and `app-resizability` (no `UIScreen.main`,
+  interface orientation or idiom to lay out by; the window's size instead).
 
 ## Layout
 
@@ -84,7 +104,8 @@ Both apps compile `Shared/`; each adds its own views and platform parts. Put new
   `AffiliationEngine` (badges)
 - `Shared/Sources/Store` — GRDB records and migrations (`AppDatabase`); migrations are append-only
 - `Shared/Sources/Model` — pure logic: `ItemInsight` (Turn, unread, review-request classification),
-  filter parsing, sections and sorting, state icons
+  `RowMarks` (what the Turn, Review and CI columns show, for both lists), filter parsing, sections
+  and sorting, state icons
 - `Shared/Sources/App` — `AppModel` (the `@Observable` main-actor state both apps drive)
 - `Shared/Sources/Support` — `Platform` (opening links, the pasteboard, the badge count),
   `AgentSession` (the board's Session links: agent names, rewrites to desktop-app links),
@@ -96,16 +117,19 @@ Both apps compile `Shared/`; each adds its own views and platform parts. Put new
   fills with JSON from `TimelineDocument` / `FilesDocument` and `detail.js` patches in place by
   block id), `WebResources`, `AvatarSchemeHandler`
 - `Shared/Sources/UI` — SwiftUI views both apps use: the composer, checks, header components, the
-  bot send sheet, alerts
+  Commits and Files tabs, the stack panel and rail, the bot send sheet, alerts; `PlatformStyles`
+  for what differs (fonts to measure with, checkboxes, link buttons, row heights)
 - `Shared/Resources` — the web pages' styles and scripts (`Web/`, with highlight.js), the asset
   catalog, the app icon
 - `PRDesk/Sources` — the Mac: the app entry, `AppModel+Mac` (mouse buttons, Yab), the list (an
   `NSTableView` with drawn cells, `UI/ItemTable/`), the detail pane, `WebDocument+Mac` (find bar,
   menus), `WebImages+Mac`, `Yab/YabFrontTab` for ⌃⌥⌘D (SPEC §6)
-- `PRDeskMobile/Sources` — iOS: only the platform parts for now (its `WebImages`, `AvatarCache`
-  and web view host, and, for a bot without a webhook, a Grok sender that opens Grok Bot with the
-  message as a draft, `grokbot://app/v1/prompt`) behind a placeholder screen. The first interface
-  (tabs, two-line rows) was removed; the next one is for the iPad first and not built yet
+- `PRDeskMobile/Sources` — the iPad and iPhone (SPEC §9): `UI/DeskView` (the list beside the
+  detail or under it, by `DeskLayout`), `ListPane` and `ItemRowView` (a SwiftUI `List`; rows of
+  two lines or one, columns by `RowDensity`), `DetailPane`, `ItemMenu`, `SettingsView`; and the
+  platform parts: its `WebImages`, `AvatarCache` and web view host, and, for a bot without a
+  webhook, a Grok sender that opens Grok Bot with the message as a draft
+  (`grokbot://app/v1/prompt`)
 
 ## Apple's coding-assistant docs
 
