@@ -102,9 +102,10 @@ Both apps compile `Shared/`; each adds its own views and platform parts. Put new
 - `PRDesk/Sources` — the Mac: the app entry, `AppModel+Mac` (mouse buttons, Yab), the list (an
   `NSTableView` with drawn cells, `UI/ItemTable/`), the detail pane, `WebDocument+Mac` (find bar,
   menus), `WebImages+Mac`, `Yab/YabFrontTab` for ⌃⌥⌘D (SPEC §6)
-- `PRDeskMobile/Sources` — the phone: tabs, list and detail screens, settings, its `WebImages`,
-  `AvatarCache` and web view host, and, for a bot without a webhook, a Grok sender that opens
-  Grok Bot with the message as a draft (`grokbot://app/v1/prompt`)
+- `PRDeskMobile/Sources` — iOS: only the platform parts for now (its `WebImages`, `AvatarCache`
+  and web view host, and, for a bot without a webhook, a Grok sender that opens Grok Bot with the
+  message as a draft, `grokbot://app/v1/prompt`) behind a placeholder screen. The first interface
+  (tabs, two-line rows) was removed; the next one is for the iPad first and not built yet
 
 ## Apple's coding-assistant docs
 
