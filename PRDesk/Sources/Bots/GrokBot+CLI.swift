@@ -1,9 +1,13 @@
 import Foundation
 import os
 
-/// Sends messages to Grok Bots through the grokbot CLI (github.com/BugenZhao/grokbot-cli),
-/// built into the app as `Contents/Helpers/grokbot` by `scripts/embed-grokbot.sh`.
+/// Sends messages to Grok Bots without a webhook through the grokbot CLI
+/// (github.com/BugenZhao/grokbot-cli), built into the app as `Contents/Helpers/grokbot` by
+/// `scripts/embed-grokbot.sh`.
 extension GrokBot {
+    /// The CLI sends the message itself.
+    static let sendsWithoutHook = true
+
     static var cliPath: String {
         Bundle.main.bundleURL.appending(path: "Contents/Helpers/grokbot").path(percentEncoded: false)
     }

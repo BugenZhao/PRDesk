@@ -64,13 +64,9 @@ struct BotSendSheet: View {
         .onAppear { noteFocused = true }
     }
 
-    /// The phone hands the message to Grok Bot as a draft, sent from there.
+    /// Without a webhook the phone hands the message to Grok Bot as a draft, sent from there.
     private var sendTitle: String {
-        #if os(macOS)
-            "Send"
-        #else
-            "Open in Grok Bot"
-        #endif
+        GrokBot.sendsDirectly(pending.request) ? "Send" : "Open in Grok Bot"
     }
 
     private var title: String {

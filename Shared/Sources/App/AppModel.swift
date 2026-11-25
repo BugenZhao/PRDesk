@@ -1100,7 +1100,7 @@ final class AppModel {
     func sendToBot(_ request: BotRequest, items: [Item], note: String? = nil) {
         let note = note.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.flatMap { $0.isEmpty ? nil : $0 }
         let text = GrokBot.message(request, items: items, note: note)
-        let bot = request.bot
+        let bot = request.botName
         let now = Date()
         for item in items {
             botSends[item.id, default: [:]][request] = BotSendOverlay(at: now, note: note)
@@ -1108,9 +1108,10 @@ final class AppModel {
         rebuild()
         let what = items.count == 1 ? "#\(items[0].number)" : "\(items.count) items"
         Task {
+            let sent: Bool
             do {
-                try await withActivity("\(request.emoji) \(what) → \(bot)") {
-                    try await GrokBot.send(text, to: bot)
+                sent = try await withActivity("\(request.emoji) \(what) → \(bot)") {
+                    try await GrokBot.deliver(text, for: request)
                 }
             } catch {
                 logger.error("Failed to send to \(bot, privacy: .public): \(String(describing: error), privacy: .public)")
@@ -1121,7 +1122,8 @@ final class AppModel {
             }
             for item in items { botSends[item.id]?[request]?.isSent = true }
             rebuild()
-            if request == .merge, DeviceRole.current.sendsToBotsDirectly { setMerging(items) }
+            // Merger has the PR only once the message is out, not while it waits as a draft.
+            if request == .merge, sent { setMerging(items) }
             for item in items {
                 do {
                     try await db.updateState(item.id) { $0.setSent(at: now, note: note, for: request) }

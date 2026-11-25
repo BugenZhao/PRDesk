@@ -130,6 +130,8 @@ private struct GrokBotSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            BotHookSection(fallback: "A bot without one gets the message through the grokbot CLI below, as if you had typed it.")
+
             Section {
                 LabeledContent("Account") {
                     switch account {
@@ -142,7 +144,7 @@ private struct GrokBotSettingsView: View {
             } header: {
                 Text("grokbot CLI")
             } footer: {
-                Text("Built into the app, and signed in like any other grokbot: run `grokbot login` in Terminal.")
+                Text("For bots without a webhook. Built into the app, and signed in like any other grokbot: run `grokbot login` in Terminal.")
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
             }

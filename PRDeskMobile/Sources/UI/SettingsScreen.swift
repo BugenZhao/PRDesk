@@ -49,11 +49,13 @@ struct SettingsScreen: View {
                 } header: {
                     Text("Grok Bot")
                 } footer: {
-                    Text("Bot ids as `grokbot agents` lists them. A send opens Grok Bot on the bot's chat with the message as a draft; nothing goes out until you send it there.")
+                    Text("Bot ids as `grokbot agents` lists them, for bots without a webhook below: a send to one opens Grok Bot on the bot's chat with the message as a draft, and nothing goes out until you send it there.")
                 }
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .font(.callout.monospaced())
+
+                BotHookSection(fallback: "With one set, sends go out from here.")
 
                 Section {
                     LabeledContent("Last synced", value: model.lastSyncedAt.map { "\($0.compactAge()) ago" } ?? "never")

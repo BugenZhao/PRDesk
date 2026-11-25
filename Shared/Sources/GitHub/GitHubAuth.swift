@@ -61,12 +61,12 @@ enum GitHubAuth {
     #endif
 }
 
-/// Stores a personal access token as a generic password item.
+/// Secrets kept as generic password items: the GitHub token and the bots' webhooks.
 enum Keychain {
     private static let service = "com.bugenzhao.PRDesk"
-    private static let account = "github-token"
+    private static let tokenAccount = "github-token"
 
-    private static var baseQuery: [String: Any] {
+    private static func query(_ account: String) -> [String: Any] {
         [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -74,29 +74,37 @@ enum Keychain {
         ]
     }
 
-    static func readToken() -> String? {
-        var query = baseQuery
-        query[kSecReturnData as String] = true
-        query[kSecMatchLimit as String] = kSecMatchLimitOne
+    static func read(_ account: String) -> String? {
+        var item = query(account)
+        item[kSecReturnData as String] = true
+        item[kSecMatchLimit as String] = kSecMatchLimitOne
         var result: AnyObject?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+        guard SecItemCopyMatching(item as CFDictionary, &result) == errSecSuccess,
               let data = result as? Data
         else { return nil }
-        let token = String(decoding: data, as: UTF8.self)
-        return token.isEmpty ? nil : token
+        let value = String(decoding: data, as: UTF8.self)
+        return value.isEmpty ? nil : value
     }
 
     @discardableResult
-    static func saveToken(_ token: String) -> Bool {
-        deleteToken()
-        var query = baseQuery
-        query[kSecValueData as String] = Data(token.utf8)
-        return SecItemAdd(query as CFDictionary, nil) == errSecSuccess
+    static func save(_ value: String, as account: String) -> Bool {
+        delete(account)
+        var item = query(account)
+        item[kSecValueData as String] = Data(value.utf8)
+        return SecItemAdd(item as CFDictionary, nil) == errSecSuccess
     }
 
     @discardableResult
-    static func deleteToken() -> Bool {
-        let status = SecItemDelete(baseQuery as CFDictionary)
+    static func delete(_ account: String) -> Bool {
+        let status = SecItemDelete(query(account) as CFDictionary)
         return status == errSecSuccess || status == errSecItemNotFound
     }
+
+    static func readToken() -> String? { read(tokenAccount) }
+
+    @discardableResult
+    static func saveToken(_ token: String) -> Bool { save(token, as: tokenAccount) }
+
+    @discardableResult
+    static func deleteToken() -> Bool { delete(tokenAccount) }
 }

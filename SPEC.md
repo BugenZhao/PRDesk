@@ -11,8 +11,8 @@ implementation that doesn't consult the source of any existing tool.
 - User: the user signed in to `gh` (BugenZhao); every "me / you" means them
 - Source of truth for triage and pins: the GitHub Project **Bugen's Board** (`vllm-project` #56), see §3.1
 - Out of scope: Claude / terminal panels, task items, collections, notes, IDE / worktree integration
-- Grok Bot: the app only hands items to bots (§3.3); it doesn't run agents or read bot
-  conversations or state
+- Grok Bot: the app only hands items to bots (§3.3), by their webhooks or as messages; it doesn't
+  run agents or read bot conversations or state
 
 ## 2. Tech stack
 
@@ -235,8 +235,9 @@ every stage is computed from state on GitHub.
 ## 3.3 Sending to Grok Bots
 
 In Grok Bot chats I hand work to bots with emoji; the app uses the same vocabulary to send selected
-items to a bot (through the bundled grokbot CLI, `grokbot ask --no-wait`), and results come back in
-Grok Bot as usual. The message format, what each emoji does to the board and the Session field's
+items to a bot, and results come back in Grok Bot as usual. A bot with a webhook set (below) gets the
+message posted to its webhook routine; otherwise the Mac sends it through the bundled grokbot CLI
+(`grokbot ask --no-wait`) and the phone opens Grok Bot with it as a draft. The message format, what each emoji does to the board and the Session field's
 format are part of the board contract (§3.1, `notes/bugens-board.md` in `richard`); this section
 covers how the app sends and shows them:
 
@@ -294,7 +295,19 @@ status bar shows the send, and what it leads to shows on the board (🔥 → Des
 Session link, 🫴 → a staging PR if adopted; 🚀 → Merging, which the app sets itself). The local database keeps the last send of each kind (when, and the
 note), which is what makes a send a re-send; the context menu checks the kinds already sent. Bot
 names are set in Settings → Grok Bot (name, unique prefix or id); the CLI shares its sign-in with
-other grokbot copies (`grokbot login`). At build time `scripts/embed-grokbot.sh` compiles
+other grokbot copies (`grokbot login`).
+
+**Webhooks**: Richard Loop and Merger each have a webhook routine, the same receivers agent
+sessions reach with `notify-bot` (`scripts/notify-bot` in `richard`, which keeps each as
+`~/.config/grokbot-hooks/<bot>.url` and `.hdr`). Its saved prompt takes a message as mine, so the
+app needn't speak as me through the CLI, and Merger takes a 🚀 that comes this way as my
+authorization, the same as one typed in its chat. Settings → Grok Bot takes each bot's URL and
+secret (bare, or the `Authorization: Bearer …` line), kept in the device's Keychain. A send is a
+POST of `{"message": …, "source": "PR Desk on the Mac"}` (or `…on the phone`) with the secret as a
+bearer token; the message is the same text as above, and only the routine's reply shows in the
+chat. The routine takes about 15–20 s to wake (a CLI message gets its first reply in about 5), which
+doesn't matter here: the send is done once the POST is answered. With a webhook the phone sends
+directly too, and sets Merging after a 🚀 like the Mac. At build time `scripts/embed-grokbot.sh` compiles
 grokbot-cli at the commit pinned in the script (cached per commit), signs it and puts it in
 `Contents/Helpers/`. In tests, dry-run only logs instead of sending.
 

@@ -90,7 +90,8 @@ Both apps compile `Shared/`; each adds its own views and platform parts. Put new
   `AgentSession` (the board's Session links: agent names, rewrites to desktop-app links),
   `DeviceRole` (only the Mac, the primary, follows the board with rules and prefetches details),
   `AvatarStore`
-- `Shared/Sources/Bots` — `GrokBot` messages (SPEC §3.3); each app sends them its way
+- `Shared/Sources/Bots` — `GrokBot` messages (SPEC §3.3), posted to a bot's webhook routine
+  (`BotHook`, kept in the Keychain) from either app; without one each app sends them its way
 - `Shared/Sources/Web` — the detail pages: `WebDocument` (one long-lived `WKWebView` that Swift
   fills with JSON from `TimelineDocument` / `FilesDocument` and `detail.js` patches in place by
   block id), `WebResources`, `AvatarSchemeHandler`

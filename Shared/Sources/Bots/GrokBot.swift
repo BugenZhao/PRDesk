@@ -39,17 +39,34 @@ enum BotRequest: String, CaseIterable, Codable, Sendable {
         }
     }
 
-    /// The bot's name to show: a bot set by id (as the phone's are) goes by the request's usual bot.
-    var botName: String {
-        UUID(uuidString: bot) == nil ? bot : (self == .merge ? GrokBot.defaultMergeBot : GrokBot.defaultAssistantBot)
+    /// The bot it goes to: Merger for 🚀, Richard Loop for the rest.
+    var role: BotRole { self == .merge ? .merger : .assistant }
+
+    var botName: String { role.botName }
+    var bot: String { role.bot }
+}
+
+/// The two bots requests go to, each set in Settings by name (or id) and, optionally, by the
+/// webhook of a routine that wakes it (`BotHook`).
+enum BotRole: String, CaseIterable, Sendable {
+    case assistant
+    case merger
+
+    var emojis: String {
+        BotRequest.allCases.filter { $0.role == self }.map(\.emoji).joined(separator: " ")
     }
 
-    /// The bot it goes to, by name (or a unique prefix of one), set in Settings.
+    private var defaultBot: String { self == .merger ? GrokBot.defaultMergeBot : GrokBot.defaultAssistantBot }
+
+    /// The bot by name (or a unique prefix of one) or id, set in Settings.
     var bot: String {
-        let key = self == .merge ? GrokBot.mergeBotKey : GrokBot.assistantBotKey
+        let key = self == .merger ? GrokBot.mergeBotKey : GrokBot.assistantBotKey
         let name = UserDefaults.standard.string(forKey: key)?.trimmingCharacters(in: .whitespaces) ?? ""
-        return name.isEmpty ? (self == .merge ? GrokBot.defaultMergeBot : GrokBot.defaultAssistantBot) : name
+        return name.isEmpty ? defaultBot : name
     }
+
+    /// The bot's name to show: a bot set by id (as the phone's are) goes by its usual name.
+    var botName: String { UUID(uuidString: bot) == nil ? bot : defaultBot }
 }
 
 enum GrokBotError: LocalizedError {
@@ -66,8 +83,9 @@ enum GrokBotError: LocalizedError {
     }
 }
 
-/// Messages to Grok Bots. How they go out is the platform's: the Mac sends them through the
-/// bundled grokbot CLI (`GrokBot+CLI.swift`), the phone opens Grok Bot with them as a draft.
+/// Messages to Grok Bots. A bot with a webhook set (`BotHook`) gets them posted there, from either
+/// app; otherwise they go the platform's way: the Mac sends them through the bundled grokbot CLI
+/// (`GrokBot+CLI.swift`), the phone opens Grok Bot with them as a draft (`GrokBot+Link.swift`).
 enum GrokBot {
     static let assistantBotKey = "grokBotAssistant"
     static let mergeBotKey = "grokBotMerger"

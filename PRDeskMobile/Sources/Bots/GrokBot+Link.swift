@@ -1,8 +1,12 @@
 import UIKit
 
-/// The phone can't run the grokbot CLI, so it opens Grok Bot on the bot's chat with the message
-/// as a draft (`grokbot://app/v1/prompt`); it goes out when the viewer sends it there.
+/// The phone can't run the grokbot CLI, so for a bot without a webhook it opens Grok Bot on the
+/// bot's chat with the message as a draft (`grokbot://app/v1/prompt`); it goes out when the viewer
+/// sends it there.
 extension GrokBot {
+    /// Only a draft: the viewer sends it in Grok Bot.
+    static let sendsWithoutHook = false
+
     /// The link takes at most this many characters of text.
     static let maxDraftLength = 1000
 

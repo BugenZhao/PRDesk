@@ -22,10 +22,6 @@ enum DeviceRole: Sendable {
     /// Follows Status changes with the subscription and puts approved PRs on the board.
     var runsRules: Bool { self == .primary }
 
-    /// Sends to Grok Bots itself, so a 🚀 send means Merger has the PR (and Merging can go on the
-    /// board); the companion only opens Grok Bot with a draft.
-    var sendsToBotsDirectly: Bool { self == .primary }
-
     /// Works out affiliation badges itself, which takes many requests a day (committers, org
     /// members, profiles, merged counts).
     var computesAffiliations: Bool { self == .primary }
