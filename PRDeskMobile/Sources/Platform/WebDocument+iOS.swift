@@ -2,16 +2,18 @@ import SwiftUI
 import UIKit
 import WebKit
 
-/// The page's web view on the phone: WebKit's own, with a clear background.
+/// The page's web view on iOS: WebKit's own, with a clear background.
 typealias DocumentWebView = WKWebView
 
-/// The phone's side of `WebDocument`: the view hosting the page. Long-press menus (people,
+/// The iOS side of `WebDocument`: the view hosting the page. Long-press menus (people,
 /// reactions, files) aren't offered yet; tapping links and reactions works as on the Mac.
 extension WebDocument {
     func prepare(_ webView: DocumentWebView) {
         webView.isOpaque = false
         webView.backgroundColor = .clear
         webView.scrollView.backgroundColor = .clear
+        // Reading on puts the keyboard away: a phone's has no key for that.
+        webView.scrollView.keyboardDismissMode = .onDrag
     }
 
     func showMenu(_: MenuRequest, at _: CGPoint) {}

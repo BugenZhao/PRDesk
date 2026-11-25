@@ -23,7 +23,7 @@ struct RowColumns {
     /// Fits "+8888" and "−8888".
     var size: CGFloat { 86 * scale }
     var updated: CGFloat { 30 * scale }
-    var height: CGFloat { (density.isCompact ? 50 : 36) * scale }
+    var height: CGFloat { (density.usesTwoLines ? 50 : 36) * scale }
 }
 
 /// A row of the list: the Mac's columns, as many as the width has room for (`RowDensity`). One
@@ -46,8 +46,8 @@ struct ItemRowView: View {
         HStack(spacing: RowColumns.spacing) {
             marker.frame(width: columns.marker)
             Group {
-                if density.isCompact {
-                    compactCells(columns)
+                if density.usesTwoLines {
+                    twoLineCells(columns)
                 } else {
                     lineCells(columns)
                 }
@@ -110,33 +110,48 @@ struct ItemRowView: View {
         tags
     }
 
-    private func compactCells(_ columns: RowColumns) -> some View {
+    /// The title on the first line with the age; under it who and what happened, then the marks,
+    /// which keep their columns so they line up down the list.
+    private func twoLineCells(_ columns: RowColumns) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 5) {
-                StateIconView(item: item, size: 15 * scale, isMerging: row.isMerging)
-                title
-                tags
+                titleCell
+                if density.showsNotes { comment }
                 Spacer(minLength: 0)
                 updated
             }
             HStack(spacing: 5) {
+                if density.showsNumber {
+                    Text("#\(String(item.number))").monospacedDigit()
+                }
                 AvatarView(login: item.author, size: 15 * scale)
                 Text(item.author ?? "ghost")
                     .lineLimit(1)
                     .layoutPriority(1)
                 BadgeIcons(login: item.author, size: 12 * scale)
-                if let text = row.comment ?? row.insight.summary {
+                if isParity { link }
+                if let text = secondLineNote {
                     Text(text).foregroundStyle(.tertiary).lineLimit(1)
                 }
                 Spacer(minLength: 0)
-                review
+                // Whose turn, then the two marks side by side in their columns.
                 turn
+                review.frame(width: columns.review)
                 ci.frame(width: columns.ci)
+                if density.showsSize { size.frame(width: columns.size) }
             }
             .font(.caption)
             .foregroundStyle(.secondary)
         }
         .padding(.vertical, 6)
+    }
+
+    /// Under the title: the latest event, or the board's Comment where the first line has no
+    /// room for it.
+    private var secondLineNote: String? {
+        if !density.showsNotes, let comment = row.comment { return comment }
+        guard let summary = row.insight.summary else { return nil }
+        return row.insight.summaryAt.map { "\(summary) \($0.compactAge())" } ?? summary
     }
 
     // MARK: Cells
@@ -246,11 +261,14 @@ struct ItemRowView: View {
         }
     }
 
-    @ViewBuilder private var review: some View {
-        if let mark = row.insight.reviewMark.symbol {
-            Image(systemName: mark.name)
-                .font(.system(size: 11 * scale, weight: .bold))
-                .foregroundStyle(mark.tint.color)
+    private var review: some View {
+        // Always a view, so its column keeps its room without a mark.
+        ZStack {
+            if let mark = row.insight.reviewMark.symbol {
+                Image(systemName: mark.name)
+                    .font(.system(size: 11 * scale, weight: .bold))
+                    .foregroundStyle(mark.tint.color)
+            }
         }
     }
 
@@ -266,18 +284,19 @@ struct ItemRowView: View {
     }
 
     /// Solid with the `ready` label, hollow without.
-    @ViewBuilder private var ci: some View {
-        if item.kind == .pullRequest, let tint = item.ciTint {
-            let color: Color = tint == .gray ? .gray : tint.color
-            ZStack {
+    private var ci: some View {
+        // Always a view, so its column keeps its room without a dot.
+        ZStack {
+            if item.kind == .pullRequest, let tint = item.ciTint {
+                let color: Color = tint == .gray ? .gray : tint.color
                 if item.isMarkedReady {
                     Circle().fill(color)
                 } else {
                     Circle().strokeBorder(color, lineWidth: 1.5)
                 }
             }
-            .frame(width: 9 * scale, height: 9 * scale)
         }
+        .frame(width: 9 * scale, height: 9 * scale)
     }
 
     @ViewBuilder private var size: some View {

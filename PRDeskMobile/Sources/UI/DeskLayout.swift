@@ -9,6 +9,8 @@ struct DeskLayout: Equatable {
     /// The viewer's choice where there is room for both: the list beside the detail, or the list
     /// alone at full width with every column.
     var prefersSplit: Bool
+    /// The viewer's choice of rows: two lines each, or one as on the Mac.
+    var prefersTwoLines: Bool
 
     /// Below this the list and the detail don't fit side by side (an iPad mini in portrait, any
     /// iPhone): the list fills the window and an item's detail is pushed over it.
@@ -24,16 +26,18 @@ struct DeskLayout: Equatable {
         isSplit ? min(480, max(400, (width * 0.4).rounded())) : width
     }
 
-    var density: RowDensity { RowDensity(listWidth: listWidth) }
+    var density: RowDensity { RowDensity(listWidth: listWidth, prefersTwoLines: prefersTwoLines) }
 }
 
 /// Which of the Mac's columns a list this wide has room for, the title keeping the most of it:
 /// the columns looked at least give way first, as the Mac's do when its window narrows.
 struct RowDensity: Equatable {
     var listWidth: CGFloat
+    var prefersTwoLines: Bool
 
-    /// A phone: the title on its own line, the rest beneath it.
-    var isCompact: Bool { listWidth < 450 }
+    /// The title on its own line, the rest beneath it: by choice, and on a phone always, where
+    /// one line has no room for both.
+    var usesTwoLines: Bool { prefersTwoLines || listWidth < 450 }
     var showsNumber: Bool { listWidth >= 640 }
     var showsSize: Bool { listWidth >= 720 }
     /// The author's login and marks beside the picture.

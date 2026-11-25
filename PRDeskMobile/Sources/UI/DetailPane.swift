@@ -9,24 +9,26 @@ struct DetailPane: View {
     let pages: DetailPages
     let isPushed: Bool
     @AppStorage("showAutomated") private var showAutomated = false
+    /// The pane's height, which the keyboard and a short window take from.
+    @State private var height: CGFloat = 0
+
+    /// Too short for the whole header and a page under it (an iPad on its side with the keyboard
+    /// up, a small window): the header keeps a line of title and one of state.
+    private var isShort: Bool { height > 0 && height < 560 }
+    /// Hardly any room (the keyboard up on a small iPad on its side): the title alone, so some
+    /// of the conversation still shows over the comment being written.
+    private var isTiny: Bool { height > 0 && height < 330 }
 
     typealias Tab = AppModel.DetailTab
 
     var body: some View {
-        @Bindable var model = model
         Group {
             if let item = model.selectedItem {
                 VStack(spacing: 0) {
-                    DetailHeader(item: item, pages: pages, showAutomated: $showAutomated)
-                    if item.kind == .pullRequest {
-                        Picker("View", selection: $model.detailTab) {
-                            Text("Conversation").tag(Tab.conversation)
-                            Text("Commits").tag(Tab.commits)
-                            Text("Files").tag(Tab.files)
-                        }
-                        .pickerStyle(.segmented)
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 8)
+                    DetailHeader(item: item, pages: pages, isShort: isShort, isTiny: isTiny, showAutomated: $showAutomated)
+                    // Pushed, the tabs are in the navigation bar, beside the way back.
+                    if item.kind == .pullRequest, !isPushed, !isTiny {
+                        tabs.padding(.horizontal, 12).padding(.bottom, 8)
                     }
                     Divider()
                     content(item)
@@ -34,13 +36,28 @@ struct DetailPane: View {
                 .onChange(of: item.id) {
                     if item.kind == .issue { model.detailTab = .conversation }
                 }
-                .navigationTitle(isPushed ? "#\(String(item.number))" : "")
+                .toolbar {
+                    if isPushed, item.kind == .pullRequest {
+                        ToolbarItem(placement: .principal) { tabs.frame(maxWidth: 420) }
+                    }
+                }
             } else {
                 ContentUnavailableView("No Selection", systemImage: "rectangle.righthalf.inset.filled", description: Text("Select a PR or issue."))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var tabs: some View {
+        @Bindable var model = model
+        return Picker("View", selection: $model.detailTab) {
+            Text("Conversation").tag(Tab.conversation)
+            Text("Commits").tag(Tab.commits)
+            Text("Files").tag(Tab.files)
+        }
+        .pickerStyle(.segmented)
     }
 
     @ViewBuilder
@@ -104,6 +121,10 @@ private struct DetailHeader: View {
     @Environment(AppModel.self) private var model
     let item: Item
     let pages: DetailPages
+    /// Little room: only the title and the state.
+    let isShort: Bool
+    /// Hardly any: the title alone.
+    let isTiny: Bool
     @Binding var showAutomated: Bool
     /// The stack, labels, dates and branches: shown until folded, to leave a short window (an
     /// iPad mini on its side) to the conversation.
@@ -113,13 +134,15 @@ private struct DetailHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             title
-            people
-            if isExpanded { more }
-            controls
+            if !isTiny { people }
+            if !isShort {
+                if isExpanded { more }
+                controls
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.vertical, isTiny ? 6 : 10)
         .alert("Rename", isPresented: Binding(get: { renameText != nil }, set: { if !$0 { renameText = nil } })) {
             TextField("Title", text: Binding(get: { renameText ?? "" }, set: { renameText = $0 }))
             Button("Rename") {
@@ -131,15 +154,13 @@ private struct DetailHeader: View {
     }
 
     private var title: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Text("#\(String(item.number))")
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
-            titleText
-                .lineLimit(3)
-                .textSelection(.enabled)
-        }
-        .font(.title3.weight(.semibold))
+        // One text, so a title that wraps continues under its number.
+        Text("\(Text("#\(String(item.number))").foregroundStyle(.secondary).monospacedDigit()) \(titleText)")
+            .lineLimit(isShort ? 1 : 3)
+            // Its whole height: squeezed, a title gives up lines before the page under it does.
+            .fixedSize(horizontal: false, vertical: true)
+            .textSelection(.enabled)
+            .font(.title3.weight(.semibold))
     }
 
     /// The title with its leading tags ("[Core] ", "fix(x): ") dimmed and its inline code monospaced.

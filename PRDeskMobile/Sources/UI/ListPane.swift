@@ -12,18 +12,20 @@ struct ListPane: View {
     var body: some View {
         @Bindable var model = model
         VStack(spacing: 0) {
-            if !density.isCompact {
+            if !density.usesTwoLines {
                 ColumnTitles(density: density, isParity: model.mode == .parity, sort: $model.sort)
                 Divider()
             }
             ItemListView(density: density, highlightsSelection: highlightsSelection)
                 .overlay { emptyState }
-            // On a phone the filter sits under the list; the line joins it only with news.
-            if !density.isCompact || model.activity != nil || model.syncState != .idle {
+            // On a phone the line shows only with news: a write, or a sync that isn't idle.
+            if density.listWidth >= 450 || model.activity != nil || model.syncState != .idle {
                 StatusLine()
             }
         }
         .searchable(text: $model.filterText, prompt: "Filter")
+        // Where the field would be a bar under the list (a phone), it is a button until used.
+        .searchToolbarBehavior(.minimize)
         .textInputAutocapitalization(.never)
         .autocorrectionDisabled()
     }
@@ -56,6 +58,8 @@ struct ItemListView: View {
     @Environment(AppModel.self) private var model
     let density: RowDensity
     let highlightsSelection: Bool
+    /// The filter the rows were last laid out for.
+    @State private var settledFilter = ""
 
     struct Group: Identifiable {
         let section: ListSection
@@ -111,7 +115,10 @@ struct ItemListView: View {
         .environment(\.defaultMinListRowHeight, 0)
         .environment(\.defaultMinListHeaderHeight, 0)
         .refreshable { await model.sync() }
-        .animation(.snappy(duration: 0.25), value: model.rows)
+        // Rows move to their new places (a Status set, a section folded), except while the
+        // filter is typed: every keystroke would start another move over the last.
+        .animation(model.filterText == settledFilter ? .snappy(duration: 0.25) : nil, value: model.rows)
+        .onChange(of: model.filterText) { settledFilter = model.filterText }
     }
 }
 
@@ -184,8 +191,9 @@ private struct ItemRowButton: View {
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             if ItemMenu.isOnBoard(row.item, model: model) {
-                // Nearest the edge first: Desk, then further away from it.
-                ForEach(TriageStatus.settable, id: \.self) { status in
+                // Nearest the edge first: Desk, then further away from it. Not the Status the
+                // item has: setting that again would clear it, a surprise under a swipe.
+                ForEach(TriageStatus.settable.filter { $0 != row.listedTriage }, id: \.self) { status in
                     Button(status.rawValue, systemImage: status.symbol) {
                         model.perform(.triage(status), on: row.item.id)
                     }

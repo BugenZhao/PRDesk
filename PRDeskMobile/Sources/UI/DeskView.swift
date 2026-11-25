@@ -16,12 +16,13 @@ final class DetailPages {
 struct DeskView: View {
     @Environment(AppModel.self) private var model
     @AppStorage("prefersSplit") private var prefersSplit = true
+    @AppStorage(RowLines.key) private var rowLines = RowLines.two
     @State private var width: CGFloat = 0
     @State private var pages = DetailPages()
     @State private var showsSettings = false
 
     var body: some View {
-        let layout = DeskLayout(width: width, prefersSplit: prefersSplit)
+        let layout = DeskLayout(width: width, prefersSplit: prefersSplit, prefersTwoLines: rowLines == .two)
         NavigationStack {
             Group {
                 if layout.isMeasured {
@@ -91,6 +92,9 @@ struct DeskView: View {
             .visibilityPriority(.high)
         }
         ToolbarItem(placement: .topBarTrailing) {
+            ViewOptionsMenu(rowLines: $rowLines)
+        }
+        ToolbarItem(placement: .topBarTrailing) {
             Button("Sync Now", systemImage: "arrow.clockwise") {
                 Task { await model.sync() }
             }
@@ -101,5 +105,41 @@ struct DeskView: View {
             Button("Settings", systemImage: "gearshape") { showsSettings = true }
         }
         .visibilityPriority(.low)
+    }
+}
+
+/// Whether a row takes one line, as on the Mac, or two.
+enum RowLines: Int {
+    case one = 1, two = 2
+    static let key = "rowLines"
+}
+
+/// How the list is shown: the rows' lines, and the order within a section (which the column
+/// titles also set, where rows have them).
+private struct ViewOptionsMenu: View {
+    @Environment(AppModel.self) private var model
+    @Binding var rowLines: RowLines
+
+    private static let keys: [(ItemSort.Key, String)] = [
+        (.updated, "Updated"), (.age, "Opened"), (.number, "Number"), (.title, "Title"), (.author, "Author"),
+        (.priority, "Priority"), (.review, "Review"), (.turn, "Turn"), (.ci, "CI"), (.size, "Size"),
+    ]
+
+    var body: some View {
+        @Bindable var model = model
+        Menu("View Options", systemImage: "line.3.horizontal.decrease") {
+            Picker("Rows", selection: $rowLines) {
+                Label("Two Lines", systemImage: "rectangle.grid.1x2").tag(RowLines.two)
+                Label("One Line", systemImage: "list.dash").tag(RowLines.one)
+            }
+            Picker("Sort By", selection: $model.sort.key) {
+                ForEach(Self.keys, id: \.0) { key, name in Text(name).tag(key) }
+            }
+            .pickerStyle(.menu)
+            Picker("Order", selection: $model.sort.ascending) {
+                Label("Descending", systemImage: "arrow.down").tag(false)
+                Label("Ascending", systemImage: "arrow.up").tag(true)
+            }
+        }
     }
 }
