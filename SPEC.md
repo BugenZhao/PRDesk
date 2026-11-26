@@ -782,8 +782,8 @@ The page gets the whole pane:
 - The header, the tabs and a tab's own bars (the commits and their options, the files' counts) lie
   over the page's top and scroll away with it under the pane's bar, as if they were its
   beginning. Once the title is under the bar, the item fades into the bar's title place in two
-  lines of our own: its state icon, number and title, and under them the author, Draft, the CI
-  status and the size. Touching it scrolls back to the top. The header's stack, labels, dates and
+  lines of our own, from the bar's leading end: its state icon and title, and under them the
+  author (picture, name, marks of trust), Draft and the size. No number and no CI status there. Touching it scrolls back to the top. The header's stack, labels, dates and
   the board's Comment also fold away under a chevron
 - Pulled past its top the page gives as any scroll view does, and the header goes down with it
 - The composer is folded into a round glass button over the conversation's corner, which grows

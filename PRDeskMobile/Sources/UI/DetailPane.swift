@@ -195,9 +195,9 @@ struct DetailPane: View {
     }
 }
 
-/// The item in the pane's bar while its header is out of sight: its state, number and title,
-/// and under them who, how it stands and how big it is. It fades in and out; touching it goes
-/// back to the top.
+/// The item in the pane's bar while its header is out of sight, from the bar's leading end: its
+/// state and title, and under them who wrote it (picture, name, marks of trust) and how big it
+/// is. It fades in and out; touching it goes back to the top.
 private struct BarTitle: View {
     @Environment(AppModel.self) private var model
     let item: Item
@@ -206,22 +206,17 @@ private struct BarTitle: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 1) {
+            VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 5) {
                     StateIconView(item: item, size: 13, isMerging: model.isMerging(item))
-                    Text("#\(String(item.number))")
-                        .foregroundStyle(Color.secondaryText)
-                        .monospacedDigit()
                     Text(itemTitle: item.title, shortenedTags: true, codeFont: .footnote.monospaced())
                 }
                 .font(.subheadline.weight(.semibold))
-                HStack(spacing: 5) {
+                HStack(spacing: 4) {
+                    AvatarView(login: item.author, size: 14)
                     Text(item.author ?? "ghost")
+                    BadgeIcons(login: item.author, size: 11)
                     if item.isDraft, item.isOpen { Text("· Draft") }
-                    if let ci = item.ci {
-                        Text("·")
-                        CISummary(ci: ci)
-                    }
                     if let additions = item.additions, let deletions = item.deletions {
                         Text("·")
                         Text("+\(additions)").foregroundStyle(Color.diffAdded)
@@ -233,6 +228,8 @@ private struct BarTitle: View {
                 .foregroundStyle(Color.secondaryText)
             }
             .lineLimit(1)
+            // The whole of the bar between its buttons, the text at its leading end.
+            .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
