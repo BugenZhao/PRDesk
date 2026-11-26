@@ -5,7 +5,9 @@
 .md p, .md ul, .md ol, .md pre, .md .tscroll, .md blockquote, .md details, .md .markdown-alert { margin: 0 0 8px; }
 .md ul, .md ol { padding-left: 22px; }
 .md li + li { margin-top: 2px; }
-.md a { color: -apple-system-control-accent; text-decoration: none; }
+/* The page's accent (`detail.css`); on its own (a preview), the system's blue, which both
+   platforms' WebKit knows. */
+.md a { color: var(--accent, -apple-system-blue); text-decoration: none; }
 .md a:hover { text-decoration: underline; }
 .md h1, .md h2, .md h3, .md h4, .md h5, .md h6 { margin: 12px 0 6px; line-height: 1.25; }
 .md h1 { font-size: 17px; } .md h2 { font-size: 15px; } .md h3, .md h4, .md h5, .md h6 { font-size: 13px; }

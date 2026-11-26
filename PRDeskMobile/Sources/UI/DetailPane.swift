@@ -46,7 +46,7 @@ struct DetailPane: View {
                                 }
                                 Divider()
                             }
-                            .background(Color(uiColor: .systemBackground))
+                            .background(Color.pageGround)
                             // Over every tab's page, each of which leaves it room at its top.
                             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
                                 headerHeight = $0
@@ -91,6 +91,8 @@ struct DetailPane: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Under the pages too, whose web views are clear, and to the window's edges.
+        .background(Color.pageGround.ignoresSafeArea())
         .onGeometryChange(for: EdgeInsets.self) { $0.safeAreaInsets } action: { bars = $0 }
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { paneHeight = $0 }
         .navigationBarTitleDisplayMode(.inline)

@@ -99,7 +99,7 @@ extension View {
 
         func body(content: Content) -> some View {
             content
-                .background(Color(uiColor: .systemBackground))
+                .background(Color.pageGround)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { scroll?.setChrome(id, height: $0) }
                 .onDisappear { scroll?.setChrome(id, height: nil) }
                 // With the page both ways: up and away, and down when the page is pulled past its

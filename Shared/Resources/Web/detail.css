@@ -19,10 +19,20 @@ body { font: 13px -apple-system, system-ui, sans-serif; color: var(--label); -we
    (`PRDesk.setTextScale`); this is what shows until it has. */
 html[data-platform="phone"] { -webkit-text-size-adjust: 100%; zoom: 1.2; }
 /* Secondary and tertiary text in the Mac's grays: iOS's own label colors are a shade lighter
-   (the same values as `Color.secondaryText`). */
-html[data-platform="phone"] { --secondary: rgba(0, 0, 0, .5); --tertiary: rgba(0, 0, 0, .26); }
+   (the same values as `Color.secondaryText`).
+   The accent and the two grounds by value: their keywords above are the Mac's, and mean nothing
+   to WebKit on iOS, where a link then had no color and a card no ground. The accent is the
+   system's blue; a card and a diff are the color of a grouped list's cells, on the pane's own
+   ground, which the app paints (`Color.pageGround`). */
+html[data-platform="phone"] {
+  --secondary: rgba(0, 0, 0, .5); --tertiary: rgba(0, 0, 0, .26);
+  --accent: rgb(0, 122, 255); --card: #fff; --text-bg: #fff;
+}
 @media (prefers-color-scheme: dark) {
-  html[data-platform="phone"] { --secondary: rgba(255, 255, 255, .55); --tertiary: rgba(255, 255, 255, .25); }
+  html[data-platform="phone"] {
+    --secondary: rgba(255, 255, 255, .55); --tertiary: rgba(255, 255, 255, .25);
+    --accent: rgb(10, 132, 255); --card: #1c1c1e; --text-bg: #1c1c1e;
+  }
 }
 /* Holding a person or a file's header asks for the app's menu, not the system's callout. */
 html[data-platform="phone"] [data-login], html[data-platform="phone"] .fhead { -webkit-touch-callout: none; -webkit-user-select: none; }

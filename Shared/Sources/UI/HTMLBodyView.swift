@@ -166,8 +166,15 @@ enum HTMLTemplate {
         """
     }
 
+    /// Links in the Mac's accent, as in the pages (`markdown.css` falls back to the system's blue).
+    #if os(macOS)
+        private static let accent = " --accent: -apple-system-control-accent;"
+    #else
+        private static let accent = ""
+    #endif
+
     static let css = """
-    :root { color-scheme: light dark; }
+    :root { color-scheme: light dark;\(accent) }
     html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; }
     body { font: 13px -apple-system, system-ui, sans-serif; color: CanvasText; }
     #content { display: flow-root; }

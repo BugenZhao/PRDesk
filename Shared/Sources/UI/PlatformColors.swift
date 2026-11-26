@@ -17,6 +17,13 @@ extension Color {
         #endif
     }
 
+    #if os(iOS)
+        /// The detail pane's ground on iOS, under its header and its pages: a grouped list's,
+        /// so that the pages' cards and diffs (a grouped list's cells in color) stand out on it
+        /// as they do on the Mac's window.
+        static var pageGround: Color { Color(uiColor: .systemGroupedBackground) }
+    #endif
+
     static var separator: Color {
         #if os(macOS)
             Color(nsColor: .separatorColor)

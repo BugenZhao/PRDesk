@@ -879,6 +879,10 @@ The page gets the whole pane:
   it viewed, reacts
 - The page runs to the window's foot, under the home indicator, with room left under its end
 
+**Ground.** The detail pane is on a grouped list's ground (light gray; black in dark mode),
+header and pages alike, and the pages' cards and diffs are that list's cells in color (white;
+dark gray), so a card stands out as it does on the Mac's window. Links are the system's blue.
+
 **Text.** Secondary and tertiary text (authors, events, ages, a card's "commented 6d ago") are
 the Mac's grays (50% and 26% black, 55% and 25% white in dark mode), a little darker than iOS's
 own label colors, in the list and in the pages. The pages' text is the size of the list's titles (their 13 px base a size
