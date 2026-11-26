@@ -79,7 +79,7 @@ struct SettingsView: View {
                         .autocorrectionDisabled()
                         .font(.callout.monospaced())
                         .onSubmit { Task { await model.shareBadges(soon: true) } }
-                    LabeledContent("Badges") {
+                    LabeledContent("Status") {
                         BadgeShareStatus(state: model.badgeShareState, verb: "Read")
                     }
                 } header: {

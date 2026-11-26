@@ -72,7 +72,8 @@ struct BadgeShareStatus: View {
             Text("Not yet").foregroundStyle(.secondary)
         case let .done(date):
             TimelineView(.periodic(from: .now, by: 30)) { _ in
-                Text("\(verb) \(date.compactAge()) ago").foregroundStyle(.secondary)
+                let age = date.compactAge()
+                Text(age == "now" ? "\(verb) just now" : "\(verb) \(age) ago").foregroundStyle(.secondary)
             }
         case let .failed(message):
             Text(message).foregroundStyle(.red).lineLimit(2)

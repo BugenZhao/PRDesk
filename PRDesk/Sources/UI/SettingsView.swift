@@ -206,7 +206,7 @@ private struct AffiliationSettingsView: View {
                 TextField("Repository", text: $badgesRepository, prompt: Text("owner/name"))
                     .autocorrectionDisabled()
                     .onSubmit { Task { await model.shareBadges(soon: true) } }
-                LabeledContent("Published") {
+                LabeledContent("Status") {
                     HStack {
                         BadgeShareStatus(state: model.badgeShareState, verb: "Published")
                         Button("Publish Now") { Task { await model.shareBadges(soon: true) } }
