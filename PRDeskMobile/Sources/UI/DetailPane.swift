@@ -16,6 +16,7 @@ struct DetailPane: View {
     /// How much of the pane the system's bars cover, which the pages reach under.
     @State private var bars = EdgeInsets()
     @State private var headerHeight: CGFloat = 0
+    @State private var paneWidth: CGFloat = 0
     /// The composer is open under the conversation.
     @State private var isComposing = false
 
@@ -82,6 +83,9 @@ struct DetailPane: View {
                                 ActivePage(scrolls: scrolls, item: item) { scroll in
                                     if scroll.isChromeAway {
                                         Button { scrollToTop(item) } label: { CompactTitle.Line(item: item) }
+                                            // Within the pane's bar: a long title is cut short,
+                                            // not laid over the bar's ends.
+                                            .frame(maxWidth: max(0, paneWidth - 48))
                                             .accessibilityHint("Scrolls to the top")
                                     }
                                 }
@@ -94,6 +98,7 @@ struct DetailPane: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onGeometryChange(for: EdgeInsets.self) { $0.safeAreaInsets } action: { bars = $0 }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { paneWidth = $0 }
         .navigationBarTitleDisplayMode(.inline)
     }
 

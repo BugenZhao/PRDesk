@@ -38,7 +38,7 @@ struct DeskView: View {
         )
         Group {
             if layout.isMeasured {
-                NavigationSplitView(columnVisibility: columnVisibility(layout), preferredCompactColumn: compactColumn) {
+                NavigationSplitView(columnVisibility: columnVisibility(layout), preferredCompactColumn: compactColumn(layout)) {
                     ListPane(density: layout.density, highlightsSelection: !layout.isListPage, showsSettings: $showsSettings)
                         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { listWidth = $0 }
                         .navigationSplitViewColumnWidth(min: 400, ideal: 460, max: 480)
@@ -122,10 +122,12 @@ struct DeskView: View {
     }
 
     /// In one column, the detail is on top while there is a selection; going back drops it.
-    private var compactColumn: Binding<NavigationSplitViewColumn> {
+    /// Only there: as a sidebar the list isn't a column to go back to, and what the split view
+    /// writes then (it does, after having been one column) must not cost the selection.
+    private func compactColumn(_ layout: DeskLayout) -> Binding<NavigationSplitViewColumn> {
         Binding(
             get: { model.selection == nil ? .sidebar : .detail },
-            set: { if $0 == .sidebar { model.selection = nil } }
+            set: { if $0 == .sidebar, layout.isListPage { model.selection = nil } }
         )
     }
 

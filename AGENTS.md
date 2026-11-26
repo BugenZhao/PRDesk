@@ -176,7 +176,9 @@ are used off the main actor); no glass on content (cards, chips, rows).
   unobserved copies (`PageScroll`).
 - `NavigationSplitView` lays out by the horizontal size class, and an iPad mini upright is
   regular: `DeskView` sets the class itself to say whether the list is a page (compact) or a
-  sidebar (regular). Don't lay anything else out by the class under it.
+  sidebar (regular). Don't lay anything else out by the class under it. After having been one
+  column, the split view still writes `preferredCompactColumn = .sidebar` while regular: the
+  binding drops the selection only while the list is a page.
 - Views in a `ScrollView` can't reach under the bars with `ignoresSafeArea`, and a
   `safeAreaInset` on the scroll view pushes its content down. The detail's pager (`DetailPager`)
   gives each page negative padding to the window's edges and `safeAreaPadding` back, and the
