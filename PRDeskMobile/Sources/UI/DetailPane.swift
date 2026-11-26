@@ -93,6 +93,16 @@ struct DetailPane: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         // Under the pages too, whose web views are clear, and to the window's edges.
         .background(Color.pageGround.ignoresSafeArea())
+        // And over them behind the bar. A page lies under the bar from its very top (it leaves
+        // the room itself, so the system never sees it at rest), and the bar's edge effect, made
+        // for a scroll view's content, lightened the ground there: a band paler than the header
+        // right under it. The pages' content leaves under this as the header does.
+        .overlay(alignment: .top) {
+            // No height of its own at the pane's top: all of it is what it reaches up under
+            // the bar.
+            Color.pageGround.ignoresSafeArea(edges: .top).frame(height: 0).allowsHitTesting(false)
+        }
+        .scrollEdgeEffectHidden(true, for: .top)
         .onGeometryChange(for: EdgeInsets.self) { $0.safeAreaInsets } action: { bars = $0 }
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { paneHeight = $0 }
         .navigationBarTitleDisplayMode(.inline)
