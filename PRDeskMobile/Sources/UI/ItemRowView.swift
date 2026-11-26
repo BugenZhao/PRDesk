@@ -44,7 +44,7 @@ struct ItemRowView: View {
     var body: some View {
         let columns = columns
         HStack(spacing: RowColumns.spacing) {
-            marker.frame(width: columns.marker)
+            marker.column(columns.marker)
             Group {
                 if density.usesTwoLines {
                     twoLineCells(columns)
@@ -92,16 +92,16 @@ struct ItemRowView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         if isParity {
-            link.frame(width: density.showsAuthorName ? columns.author : columns.link, alignment: .leading)
+            link.column(density.showsAuthorName ? columns.author : columns.link, alignment: .leading)
         } else if density.showsAuthorName {
-            author.frame(width: columns.author, alignment: .leading)
+            author.column(columns.author, alignment: .leading)
         } else {
             AvatarView(login: item.author, size: columns.avatar)
         }
-        review.frame(width: columns.review)
-        turn.frame(width: columns.turn, alignment: .leading)
-        ci.frame(width: columns.ci)
-        if density.showsSize { size.frame(width: columns.size) }
+        review.column(columns.review)
+        turn.column(columns.turn, alignment: .leading)
+        ci.column(columns.ci)
+        if density.showsSize { size.column(columns.size) }
         updated.frame(width: columns.updated, alignment: .trailing)
     }
 
@@ -140,8 +140,8 @@ struct ItemRowView: View {
                 // or on a phone is never wide enough for the one-line rows' Size column.
                 size.fixedSize().padding(.trailing, 4)
                 turn
-                review.frame(width: columns.review)
-                ci.frame(width: columns.ci)
+                review.column(columns.review)
+                ci.column(columns.ci)
             }
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -321,6 +321,15 @@ struct ItemRowView: View {
             .lineLimit(1)
             .fixedSize()
             .layoutPriority(2)
+    }
+}
+
+private extension View {
+    /// A column of a row: its width whether or not the row has anything to put in it. A frame
+    /// on a cell that is empty for this row (an issue has no size, no checks, no review) lays
+    /// out nothing, and the columns after it would move over.
+    func column(_ width: CGFloat, alignment: Alignment = .center) -> some View {
+        ZStack { self }.frame(width: width, alignment: alignment)
     }
 }
 
