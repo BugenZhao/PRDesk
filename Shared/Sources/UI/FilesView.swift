@@ -68,16 +68,12 @@ struct FilesView: View {
                     .foregroundStyle(.secondary)
                     .padding(.leading, 4)
             }
-            Spacer()
-            Toggle("Wrap lines", isOn: $wrapLines)
-                .optionToggleStyle()
-            Button("Expand all") { page.run("PRDesk.setAllFiles(true)") }
-                .padding(.leading, 4)
-            Button("Collapse all") { page.run("PRDesk.setAllFiles(false)") }
+            Spacer(minLength: 0)
+            DiffOptions(wrapLines: $wrapLines, page: page)
         }
+        .lineLimit(1)
         .font(.caption.monospacedDigit())
         .controlSize(.small)
-        .textButtonStyle()
     }
 
     private func load() async {

@@ -211,15 +211,10 @@ struct CommitsView: View {
                 Text("+\(loaded.files.reduce(0) { $0 + $1.additions })").foregroundStyle(.green)
                 Text("−\(loaded.files.reduce(0) { $0 + $1.deletions })").foregroundStyle(.red)
             }
-            Spacer()
-            Toggle("Wrap lines", isOn: $wrapLines)
-                .optionToggleStyle()
-            Button("Expand all") { page.run("PRDesk.setAllFiles(true)") }
-                .textButtonStyle()
-                .padding(.leading, 4)
-            Button("Collapse all") { page.run("PRDesk.setAllFiles(false)") }
-                .textButtonStyle()
+            Spacer(minLength: 0)
+            DiffOptions(wrapLines: $wrapLines, page: page)
         }
+        .lineLimit(1)
         .font(.caption.monospacedDigit())
         .controlSize(.small)
     }

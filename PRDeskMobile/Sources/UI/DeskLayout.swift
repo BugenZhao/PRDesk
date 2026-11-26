@@ -45,7 +45,9 @@ struct RowDensity: Equatable {
 
     /// The title on its own line, the rest beneath it: by choice, and on a phone always, where
     /// one line has no room for both.
-    var usesTwoLines: Bool { prefersTwoLines || listWidth < 450 }
+    var usesTwoLines: Bool { prefersTwoLines || !canUseOneLine }
+    /// One line is there to choose.
+    var canUseOneLine: Bool { listWidth >= 450 }
     var showsNumber: Bool { listWidth >= 640 }
     var showsSize: Bool { listWidth >= 720 }
     /// The author's login and marks beside the picture.

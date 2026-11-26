@@ -737,12 +737,15 @@ rotation, multitasking and a resized window always land on the layout the new si
 **List.** The Mac's sections, tints, fading, stacks' rails and marks (§4.1–§4.3), in rows of two
 lines or one (•••, two by default):
 
+- A section's title and count sit on a capsule of glass, which floats over the rows once the
+  section's top has scrolled away; touching it folds the section
+
 - Two lines: the title with its tags and the age; under it the number, author and marks of trust,
   the latest event (or the board's Comment), then Turn, Review, CI and Size in columns
 - One line: the Mac's columns under sortable column titles. They give way as the list narrows so
   the title keeps the most room: Author's name under 960 pt (the picture stays), Size under 720,
   the number, the Comment and the latest event under 640, where tags are also shortened
-- Narrower than 450 pt rows are always two lines
+- Narrower than 450 pt rows are always two lines, and ••• doesn't offer the choice
 - ••• also sorts (the same keys as the Mac's columns). Pulling down syncs, as does Sync Now there
 - Swiping a row right marks it read / unread (a full swipe) or pins it; swiping left sets the
   Status, Desk nearest the edge, without the one it has. Holding a row opens the Mac's row menu:
@@ -759,6 +762,8 @@ the checks in a popover from the CI status, and round glass buttons of one size 
 GitHub and the rest (•••): the row menu, rename, refresh,
 back to the previous item, and the conversation's Show Automated / Expand All / Collapse All. In
 Commits a tap picks one commit (again for the preset) and a row's menu extends the selection to it.
+A diff's options (Wrap Lines, Expand All, Collapse All) are behind ••• at the end of its bar, which
+has to fit a phone.
 
 The page gets the whole pane:
 

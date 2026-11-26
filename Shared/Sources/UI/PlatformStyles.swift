@@ -11,23 +11,34 @@ import SwiftUI
     typealias PlatformFont = UIFont
 #endif
 
-extension View {
-    /// A small on/off option in a bar above a page ("Wrap lines"): a checkbox on the Mac, a
-    /// button that stays pressed where there are no checkboxes.
-    @ViewBuilder func optionToggleStyle() -> some View {
-        #if os(macOS)
-            toggleStyle(.checkbox)
-        #else
-            toggleStyle(.button)
-        #endif
-    }
+/// A diff page's options at the end of its bar: wrapping, and every file open or shut. Spelled
+/// out on the Mac; behind one button on the iPad and iPhone, whose bar can be a phone's width.
+struct DiffOptions: View {
+    @Binding var wrapLines: Bool
+    let page: WebDocument
 
-    /// A text button in such a bar ("Expand all").
-    @ViewBuilder func textButtonStyle() -> some View {
+    var body: some View {
         #if os(macOS)
-            buttonStyle(.link)
+            Toggle("Wrap lines", isOn: $wrapLines)
+                .toggleStyle(.checkbox)
+            Button("Expand all") { page.run("PRDesk.setAllFiles(true)") }
+                .buttonStyle(.link)
+                .padding(.leading, 4)
+            Button("Collapse all") { page.run("PRDesk.setAllFiles(false)") }
+                .buttonStyle(.link)
         #else
-            buttonStyle(.borderless)
+            Menu {
+                Toggle("Wrap Lines", systemImage: "arrow.turn.down.left", isOn: $wrapLines)
+                Button("Expand All", systemImage: "rectangle.expand.vertical") { page.run("PRDesk.setAllFiles(true)") }
+                Button("Collapse All", systemImage: "rectangle.compress.vertical") { page.run("PRDesk.setAllFiles(false)") }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(Color.secondary)
+                    .frame(width: 36, height: 26)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel("Diff Options")
         #endif
     }
 }

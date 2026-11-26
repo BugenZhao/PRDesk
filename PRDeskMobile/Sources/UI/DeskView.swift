@@ -115,7 +115,7 @@ struct DeskView: View {
             ToolbarSpacer(.fixed, placement: .topBarTrailing)
         }
         ToolbarItem(placement: .topBarTrailing) {
-            DeskMenu(rowLines: $rowLines, showsSettings: $showsSettings)
+            DeskMenu(rowLines: $rowLines, canChooseLines: layout.density.canUseOneLine, showsSettings: $showsSettings)
         }
     }
 }
@@ -132,6 +132,8 @@ enum RowLines: Int {
 private struct DeskMenu: View {
     @Environment(AppModel.self) private var model
     @Binding var rowLines: RowLines
+    /// The list is wide enough for rows of one line; a phone's never is, and isn't offered them.
+    let canChooseLines: Bool
     @Binding var showsSettings: Bool
 
     private static let keys: [(ItemSort.Key, String)] = [
@@ -142,9 +144,11 @@ private struct DeskMenu: View {
     var body: some View {
         @Bindable var model = model
         Menu("More", systemImage: "ellipsis") {
-            Picker("Rows", selection: $rowLines) {
-                Label("Two Lines", systemImage: "rectangle.grid.1x2").tag(RowLines.two)
-                Label("One Line", systemImage: "list.dash").tag(RowLines.one)
+            if canChooseLines {
+                Picker("Rows", selection: $rowLines) {
+                    Label("Two Lines", systemImage: "rectangle.grid.1x2").tag(RowLines.two)
+                    Label("One Line", systemImage: "list.dash").tag(RowLines.one)
+                }
             }
             Picker("Sort By", selection: $model.sort.key) {
                 ForEach(Self.keys, id: \.0) { key, name in Text(name).tag(key) }

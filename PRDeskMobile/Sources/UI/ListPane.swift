@@ -132,7 +132,8 @@ struct ItemListView: View {
     }
 }
 
-/// A section's title and count; tapping folds it.
+/// A section's title and count, on a capsule of glass; tapping folds it. Pinned at the list's
+/// top it floats over the rows, which pass under and around it.
 private struct SectionHeader: View {
     @Environment(AppModel.self) private var model
     let group: ItemListView.Group
@@ -144,28 +145,28 @@ private struct SectionHeader: View {
             HStack(spacing: 6) {
                 Image(systemName: "chevron.right")
                     .font(.caption2.weight(.bold))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
                     .rotationEffect(.degrees(group.collapsed ? 0 : 90))
-                    .frame(width: 14)
                 Text(group.section.title)
                     .foregroundStyle(Color.primary)
                 Text(String(group.count))
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
                 if group.inParity > 0 {
-                    Text("+\(group.inParity) in Parity").foregroundStyle(.tertiary)
+                    Text("+\(group.inParity) in Parity").foregroundStyle(.secondary)
                 }
-                Spacer(minLength: 0)
             }
             .font(.footnote.weight(.semibold))
             .textCase(nil)
-            .padding(.horizontal, 10)
-            .frame(height: 30)
-            // Its own ground from edge to edge: pinned, rows pass under it, not through it.
-            .background(Color(uiColor: .systemBackground))
-            .contentShape(Rectangle())
+            .padding(.horizontal, 11)
+            .frame(height: 26)
+            .contentShape(Capsule())
+            .glassEffect(.regular.interactive(), in: .capsule)
         }
         .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
         .listRowInsets(EdgeInsets())
         .accessibilityHint(group.section.help)
     }
