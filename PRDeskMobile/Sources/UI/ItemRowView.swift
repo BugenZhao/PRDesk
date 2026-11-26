@@ -331,18 +331,3 @@ private extension View {
         ZStack { self }.frame(width: width, alignment: alignment)
     }
 }
-
-extension Color {
-    /// Diff stat colors, a shade deeper than the system green and red (GitHub's diff palette).
-    static let diffAdded = Color(uiColor: UIColor { traits in
-        traits.userInterfaceStyle == .dark
-            ? UIColor(red: 0.18, green: 0.63, blue: 0.26, alpha: 1)
-            : UIColor(red: 0.10, green: 0.50, blue: 0.22, alpha: 1)
-    })
-
-    static let diffRemoved = Color(uiColor: UIColor { traits in
-        traits.userInterfaceStyle == .dark
-            ? UIColor(red: 0.85, green: 0.21, blue: 0.20, alpha: 1)
-            : UIColor(red: 0.81, green: 0.13, blue: 0.18, alpha: 1)
-    })
-}

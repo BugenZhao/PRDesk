@@ -1,5 +1,11 @@
 import SwiftUI
 
+#if os(macOS)
+    typealias PlatformColor = NSColor
+#else
+    typealias PlatformColor = UIColor
+#endif
+
 /// System colors the shared views use, from each platform's palette.
 extension Color {
     /// Behind text the viewer types or previews.
@@ -66,4 +72,30 @@ extension ShapeStyle where Self == AnyShapeStyle {
             AnyShapeStyle(Color.tertiaryText)
         #endif
     }
+}
+
+/// Diff stat colors, a shade deeper than the system green and red (GitHub's diff palette): as
+/// the platform's color for cells that are drawn (the Mac's list), and as SwiftUI's.
+extension PlatformColor {
+    static let diffAdded = adaptive(light: (0.10, 0.50, 0.22), dark: (0.18, 0.63, 0.26))
+    static let diffRemoved = adaptive(light: (0.81, 0.13, 0.18), dark: (0.85, 0.21, 0.20))
+
+    private static func adaptive(light: (CGFloat, CGFloat, CGFloat), dark: (CGFloat, CGFloat, CGFloat)) -> PlatformColor {
+        #if os(macOS)
+            NSColor(name: nil) { appearance in
+                let rgb = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? dark : light
+                return NSColor(srgbRed: rgb.0, green: rgb.1, blue: rgb.2, alpha: 1)
+            }
+        #else
+            UIColor { traits in
+                let rgb = traits.userInterfaceStyle == .dark ? dark : light
+                return UIColor(red: rgb.0, green: rgb.1, blue: rgb.2, alpha: 1)
+            }
+        #endif
+    }
+}
+
+extension Color {
+    static let diffAdded = Color(PlatformColor.diffAdded)
+    static let diffRemoved = Color(PlatformColor.diffRemoved)
 }
