@@ -736,7 +736,8 @@ one out, with its own button, edge swipe and animation), the list its sidebar:
   with room for every column: the split view is told its width is compact, so it is the system's
   own one column, the list the whole window wide; a row pushes its detail over it, with the way
   back. Kept for wide and for narrower windows apart; turning it off brings the sidebar back.
-  Rows of one line or two is a choice of its own (••• too), the same for the table and the sidebar
+  Rows of one line or two is a choice of its own (••• too), the same for the table and the sidebar.
+  Going between full width and the sidebar, the window dissolves from one to the other
 - The list keeps the desk's own white ground as a sidebar, not a sidebar's tint: the rows' colors
   say things
 - The bar over the list holds the lists, the filter, ⤢ and ◧, a round button each, the two about

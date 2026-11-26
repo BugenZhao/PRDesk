@@ -200,6 +200,10 @@ are used off the main actor); no glass on content (cards, chips, rows).
   left this view centered, and a view in `.largeTitle` didn't show at all. The title is always
   there and fades by opacity once the header's own title has scrolled under the bar. The header
   is an overlay clipped at the bar's edge, or it shows through the bar's buttons.
+- Going between one column and two (the Full-Width List), the split view rebuilds its columns
+  at once: `withAnimation` around the change animates nothing. `DeskView.dissolveWindow` adds a
+  fade `CATransition` to the window's layer just before the change, which crossfades whatever
+  that turn of the run loop changes (checked frame by frame in a simulator recording).
 - The split view writes `columnVisibility` itself: `.detailOnly` when the window gets narrower
   or comes out of one column, and in the background (snapshots at other sizes), and it writes
   *before* the view sees the new width. Don't take a write for the viewer's choice at once, and

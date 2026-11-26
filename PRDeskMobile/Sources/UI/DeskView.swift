@@ -190,6 +190,7 @@ struct DeskView: View {
     /// top (the detail is pushed over it only for a selection), as a sidebar it is out.
     private func setTable(_ isTable: Bool, _ layout: DeskLayout) {
         guard !layout.isCompact else { return }
+        dissolveWindow()
         if layout.isWide { tableWhenWide = isTable } else { tableWhenNarrow = isTable }
         if isTable {
             model.selection = nil
@@ -197,6 +198,20 @@ struct DeskView: View {
             showsList = true
             showsFloatingList = true
         }
+    }
+
+    /// The split view goes from one column to two and back at once, whatever animation the
+    /// change is made with (it is UIKit's, rebuilding its columns). So the window dissolves from
+    /// how it looked to how it looks: a transition on its layer, which takes in whatever this
+    /// turn of the run loop changes.
+    private func dissolveWindow() {
+        let windows = UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow }
+        guard let window = windows.first, !UIAccessibility.isReduceMotionEnabled else { return }
+        let transition = CATransition()
+        transition.type = .fade
+        transition.duration = 0.28
+        transition.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        window.layer.add(transition, forKey: "deskLayout")
     }
 
     /// In one column, the detail is on top while there is a selection; going back drops it.
