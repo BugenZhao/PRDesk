@@ -66,6 +66,7 @@ struct LoginText: View {
 /// Affiliation badges for a login, as small org avatars with explanatory tooltips.
 struct BadgeIcons: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.colorScheme) private var colorScheme
     let login: String?
     var size: CGFloat = 13
 
@@ -84,8 +85,8 @@ struct BadgeIcons: View {
             }
             ForEach(badges, id: \.org) { badge in
                 Group {
-                    if let image = badge.image {
-                        Image(platformImage: image).resizable().scaledToFit()
+                    if let image = badge.image(isDark: colorScheme == .dark) {
+                        Image(platformImage: image).resizable().interpolation(.high).scaledToFit()
                     } else {
                         BadgeTile(text: badge.org.shortLabel, color: Color.tertiaryText, size: size)
                     }
