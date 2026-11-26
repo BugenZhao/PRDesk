@@ -18,6 +18,8 @@ struct DeskView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.horizontalSizeClass) private var sizeClass
     @AppStorage(DeskLayout.showsListKey) private var showsList = true
+    @AppStorage(DeskLayout.tableWideKey) private var tableWhenWide = false
+    @AppStorage(DeskLayout.tableNarrowKey) private var tableWhenNarrow = false
     @AppStorage(RowLines.key) private var rowLines = RowLines.two
     /// The sidebar floating over the detail is out. Kept with the scene, so it comes back as it
     /// was when the system has put the app away and starts it again.
@@ -32,7 +34,11 @@ struct DeskView: View {
     @State private var pageMenu: PageMenu?
 
     var body: some View {
-        let layout = DeskLayout(width: width, listWidth: listWidth, isCompact: sizeClass == .compact, prefersTwoLines: rowLines == .two)
+        let layout = DeskLayout(
+            width: width, listWidth: listWidth, isCompact: sizeClass == .compact,
+            prefersTable: width >= DeskLayout.wideMinWidth ? tableWhenWide : tableWhenNarrow,
+            prefersTwoLines: rowLines == .two
+        )
         Group {
             if layout.isMeasured {
                 NavigationSplitView(columnVisibility: columnVisibility(layout), preferredCompactColumn: compactColumn(layout)) {
@@ -44,6 +50,9 @@ struct DeskView: View {
                 } detail: {
                     DetailPane(pages: pages)
                 }
+                // The split view goes by the size class: told the width is compact, it is the
+                // one column a phone has, with the list the whole window wide (the table).
+                .environment(\.horizontalSizeClass, layout.isTable ? .compact : sizeClass)
             } else {
                 Color.clear
             }
@@ -63,7 +72,8 @@ struct DeskView: View {
             if layout.listFloats, model.selection != nil { showsFloatingList = false }
         }
         .focusedSceneValue(\.deskActions, DeskActions(
-            toggleList: { withAnimation { setListShown(!isListShown(layout), layout) } }
+            toggleList: { withAnimation { setListShown(!isListShown(layout), layout) } },
+            toggleTable: { setTable(!layout.isTable, layout) }
         ))
         .onAppear {
             // Start WebKit ahead of the first selection, and open the repository's own links here.
@@ -102,6 +112,20 @@ struct DeskView: View {
         )
     }
 
+    /// The list as a table the whole window wide, or back as the detail's sidebar: kept for this
+    /// kind of width. Either way the list was asked for and is there to see: as a table it is on
+    /// top (the detail is pushed over it only for a selection), as a sidebar it is out.
+    private func setTable(_ isTable: Bool, _ layout: DeskLayout) {
+        guard !layout.isCompact else { return }
+        if layout.isWide { tableWhenWide = isTable } else { tableWhenNarrow = isTable }
+        if isTable {
+            model.selection = nil
+        } else {
+            showsList = true
+            showsFloatingList = true
+        }
+    }
+
     /// In one column, the detail is on top while there is a selection; going back drops it.
     /// Only there: as a sidebar the list isn't a column to go back to, and what the split view
     /// writes then (it does, after having been one column) must not cost the selection.
@@ -134,7 +158,12 @@ struct DeskView: View {
         DefaultToolbarItem(kind: .search, placement: .bottomBar)
         ToolbarSpacer(.fixed, placement: .bottomBar)
         ToolbarItem(placement: .bottomBar) {
-            DeskMenu(rowLines: $rowLines, canChooseLines: layout.density.canUseOneLine, showsSettings: $showsSettings)
+            DeskMenu(
+                rowLines: $rowLines, canChooseLines: layout.density.canUseOneLine && !layout.isTable,
+                // Offered where the window isn't one column already.
+                isTable: layout.isCompact ? nil : Binding(get: { layout.isTable }, set: { setTable($0, layout) }),
+                showsSettings: $showsSettings
+            )
         }
     }
 }
@@ -143,6 +172,8 @@ struct DeskView: View {
 struct DeskActions {
     /// Shows the list as a sidebar, or puts it away.
     var toggleList: () -> Void
+    /// The list as a table the whole window wide, or back as the sidebar.
+    var toggleTable: () -> Void
 }
 
 extension FocusedValues {
@@ -162,6 +193,8 @@ private struct DeskMenu: View {
     @Binding var rowLines: RowLines
     /// The list is wide enough for rows of one line; a phone's never is, and isn't offered them.
     let canChooseLines: Bool
+    /// The list as a table the whole window wide; nil where there is no such choice (a phone).
+    let isTable: Binding<Bool>?
     @Binding var showsSettings: Bool
 
     private static let keys: [(ItemSort.Key, String)] = [
@@ -172,6 +205,9 @@ private struct DeskMenu: View {
     var body: some View {
         @Bindable var model = model
         Menu("More", systemImage: "ellipsis") {
+            if let isTable {
+                Toggle("Full-Width Table", systemImage: "tablecells", isOn: isTable)
+            }
             if canChooseLines {
                 Picker("Rows", selection: $rowLines) {
                     Label("Two Lines", systemImage: "rectangle.grid.1x2").tag(RowLines.two)

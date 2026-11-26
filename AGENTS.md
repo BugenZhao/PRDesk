@@ -185,11 +185,13 @@ are used off the main actor); no glass on content (cards, chips, rows).
   observed state in it made the web view lay out at every step of a scroll, which put the offset
   back in bounds and killed the overscroll. Such callbacks write observed state and read only
   unobserved copies (`PageScroll`).
-- `NavigationSplitView` lays out by the horizontal size class, which `DeskLayout` takes as it is
-  (compact: one column, the list a page; regular: the list a sidebar, which the system floats
-  over the detail in a narrower window). After having been one column, the split view still
-  writes `preferredCompactColumn = .sidebar` while regular: the binding drops the selection only
-  while compact.
+- `NavigationSplitView` lays out by the horizontal size class (compact: one column, the list a
+  page; regular: the list a sidebar, which the system floats over the detail in a narrower
+  window). `DeskLayout` takes the system's class, except for the Full-Width Table, where
+  `DeskView` sets it to compact on the split view to get the system's own one column on an iPad.
+  Don't lay anything else out by the class under it. After having been one column, the split
+  view still writes `preferredCompactColumn = .sidebar` while regular: the binding drops the
+  selection only while the list is a page.
 - The detail's bar title is a view of our own in `ToolbarItem(placement: .title)`, which the
   system keeps between the bar's buttons (a `principal` item took the width it liked, over them).
   It is always there and fades by opacity once the header's own title has scrolled under the

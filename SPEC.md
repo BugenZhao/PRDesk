@@ -730,6 +730,11 @@ one out, with its own button, edge swipe and animation), the list its sidebar:
   is out while nothing is selected. Whether it is out is kept across leaving the app and coming
   back, also when the system has stopped the app meanwhile. In a compact window (a phone) the split view is one column:
   the list is a page, and a row pushes its detail over it
+- **Full-Width Table** (in the list's •••, ⇧⌘B) is a third state on an iPad, for reading the list
+  as the Mac's table: the split view is told its width is compact, so it is the system's own one
+  column, the list the whole window wide with a line a row and every column that fits; a row
+  pushes its detail over it, with the way back. Kept for wide and for narrower windows apart;
+  turning it off brings the sidebar back
 - The list keeps the desk's own white ground as a sidebar, not a sidebar's tint: the rows' colors
   say things
 - The bar over the list holds only the lists (the segments are the glass, with none behind
