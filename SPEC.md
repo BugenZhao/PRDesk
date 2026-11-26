@@ -754,10 +754,13 @@ lines or one (•••, two by default):
   the number, the Comment and the latest event under 640, where tags are also shortened
 - Narrower than 450 pt rows are always two lines, and ••• doesn't offer the choice
 - ••• also sorts (the same keys as the Mac's columns). Pulling down syncs, as does Sync Now there
-- Swiping a row right marks it read / unread (a full swipe) or pins it; swiping left sets the
-  Status, Desk nearest the edge, without the one it has. Holding a row opens the Mac's row menu:
-  open, copy link, read, Status, Priority, pin, add to Desk, ready / draft, linked PR, agent
-  session, author, Grok Bot
+- A swipe does one thing, all the way across or by its button. Right: read / unread. Left: the
+  item's next place on the board, by the Status it has (not the section the row is in, since an
+  item is in several): onto the Desk from Tray, Shelf or Attic, off the Desk to the Shelf (Good
+  is Desk too), and in Triage, where that choice is made, Desk with Shelf beside it. Nothing for
+  a PR Merger is merging. Tray, Attic and the pin are in the row's menu and the detail
+- Holding a row opens the Mac's row menu: open, copy link, read, Status, Priority, pin, add to
+  Desk, ready / draft, linked PR, agent session, author, Grok Bot
 - The filter (§4.4) is the system's search field, a button at the list's foot
 - The list's foot shows the write under way as the Mac's status bar does, otherwise the item
   count, the last sync and the quota; on an iPhone only while there is something to say

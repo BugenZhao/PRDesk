@@ -182,23 +182,20 @@ private struct ItemRowButton: View {
         .listRowInsets(EdgeInsets())
         .listRowBackground(background)
         .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
+        // One thing a side, done by swiping all the way: read or unread, and the item's next
+        // place on the board. The rest (Tray, Attic, the pin) is in the row's menu and the detail.
         .swipeActions(edge: .leading, allowsFullSwipe: true) {
             Button(row.showsUnread ? "Read" : "Unread", systemImage: row.showsUnread ? "envelope.open" : "envelope.badge") {
                 model.perform(.toggleRead, on: row.item.id)
             }
             .tint(.blue)
-            if ItemMenu.isOnBoard(row.item, model: model) {
-                Button(row.isPinned ? "Unpin" : "Pin", systemImage: row.isPinned ? "pin.slash" : "pin") {
-                    model.perform(.togglePin, on: row.item.id)
-                }
-                .tint(.orange)
-            }
         }
-        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             if ItemMenu.isOnBoard(row.item, model: model) {
-                // Nearest the edge first: Desk, then further away from it. Not the Status the
-                // item has: setting that again would clear it, a surprise under a swipe.
-                ForEach(TriageStatus.settable.filter { $0 != row.listedTriage }, id: \.self) { status in
+                // By the Status the item has, not the section the row is in (an item is in
+                // several): onto the Desk, or off it to the Shelf. Triage is where the choice
+                // between the two is made, so there the Shelf is beside the Desk.
+                ForEach(Self.swipeStatuses(from: row.listedTriage), id: \.self) { status in
                     Button(status.rawValue, systemImage: status.symbol) {
                         model.perform(.triage(status), on: row.item.id)
                     }
@@ -207,6 +204,17 @@ private struct ItemRowButton: View {
             }
         }
         .contextMenu { ItemMenu(item: row.item, model: model) }
+    }
+
+    /// Where a swipe sends an item with this Status, the full swipe's first.
+    static func swipeStatuses(from status: TriageStatus?) -> [TriageStatus] {
+        switch status {
+        case .working: [.skipped]
+        case nil: [.working, .skipped]
+        case .backlog, .skipped, .muted: [.working]
+        // Merger has it: a swipe would take it back from Merger.
+        case .merging: []
+        }
     }
 
     private var background: Color {
