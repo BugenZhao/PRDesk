@@ -741,8 +741,10 @@ one out, with its own button, edge swipe and animation), the list its sidebar:
   say things
 - The bar over the list holds the lists (the segments are the glass, with none behind them), ⤢,
   the filter and ◧. As a sidebar it is short of room, and the lists are symbols there
-  (▤ Dashboard, = Parity, 🔔 Inbox); at full width and on a phone they are named. What waits in
-  Parity and the Inbox is a red badge on the label's corner either way; at its foot are the sync status button, the filter and ••• (rows, sorting, Settings)
+  (a grid for Dashboard, two arrows for Parity, a bell for the Inbox, at the size and weight of
+  the bar's buttons); at full width and on a phone they are named. What waits in Parity and the
+  Inbox is a badge on the label's corner either way, in the blue of the unread dots. ⤢, the
+  filter and ◧ are a round button each; at its foot are the sync status button, the filter and ••• (rows, sorting, Settings)
 - Going from one to the other keeps the selection, the detail's tab, its pages (scroll position,
   loaded diffs) and a comment being written. Nothing remembers which layout came before
 

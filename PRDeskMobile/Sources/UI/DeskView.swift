@@ -220,10 +220,10 @@ struct DeskView: View {
             ListSwitcher(isBrief: !layout.isListPage)
         }
         .sharedBackgroundVisibility(.hidden)
-        // The list the whole window wide, or back beside the detail: where the window isn't one
-        // column already. A button of its own, beside the filter's.
+        // Where the window isn't one column already: the list the whole window wide, or back
+        // beside the detail, and the filter, each a button of its own. The filter is placed here
+        // by name, between spacers: left to the system it joins whatever is at the bar's end.
         if !layout.isCompact {
-            ToolbarSpacer(.fixed, placement: .topBarTrailing)
             ToolbarItem(placement: .topBarTrailing) {
                 Button(
                     layout.isTable ? "List Beside the Detail" : "Full-Width List",
@@ -231,11 +231,15 @@ struct DeskView: View {
                 ) { setTable(!layout.isTable, layout) }
             }
             ToolbarSpacer(.fixed, placement: .topBarTrailing)
+            DefaultToolbarItem(kind: .search, placement: .topBarTrailing)
+            ToolbarSpacer(.fixed, placement: .topBarTrailing)
         }
         ToolbarItem(placement: .bottomBar) { SyncStatusButton() }
         ToolbarSpacer(.flexible, placement: .bottomBar)
-        DefaultToolbarItem(kind: .search, placement: .bottomBar)
-        ToolbarSpacer(.fixed, placement: .bottomBar)
+        if layout.isCompact {
+            DefaultToolbarItem(kind: .search, placement: .bottomBar)
+            ToolbarSpacer(.fixed, placement: .bottomBar)
+        }
         ToolbarItem(placement: .bottomBar) {
             DeskMenu(
                 rowLines: $rowLines, canChooseLines: layout.density.canUseOneLine,
@@ -255,18 +259,18 @@ private struct ListSwitcher: View {
     var body: some View {
         @Bindable var model = model
         Picker("View", selection: $model.mode) {
-            segment("Dashboard", symbol: "rectangle.grid.1x2").tag(AppModel.ListMode.dashboard)
-            segment("Parity", symbol: "equal").tag(AppModel.ListMode.parity)
+            segment("Dashboard", symbol: "square.grid.2x2").tag(AppModel.ListMode.dashboard)
+            segment("Parity", symbol: "arrow.left.arrow.right").tag(AppModel.ListMode.parity)
             segment("Inbox", symbol: "bell").tag(AppModel.ListMode.inbox)
         }
         .pickerStyle(.segmented)
-        .fixedSize()
+        .modifier(SwitcherWidth(isBrief: isBrief))
         // The segments are of one width, so each label is in the middle of a third of the
         // control: a hidden copy of it there gives the badge the label's corner to sit on.
         .overlay {
             HStack(spacing: 0) {
-                badge(0, on: "Dashboard", symbol: "rectangle.grid.1x2")
-                badge(model.parityWaitingCount, on: "Parity", symbol: "equal")
+                badge(0, on: "Dashboard", symbol: "square.grid.2x2")
+                badge(model.parityWaitingCount, on: "Parity", symbol: "arrow.left.arrow.right")
                 badge(model.unreadInboxCount, on: "Inbox", symbol: "bell")
             }
             .allowsHitTesting(false)
@@ -276,10 +280,17 @@ private struct ListSwitcher: View {
     @ViewBuilder
     private func segment(_ name: String, symbol: String) -> some View {
         if isBrief {
-            Image(systemName: symbol).accessibilityLabel(name)
+            // At the size and weight of the bar's own buttons: a segment's image is drawn as
+            // it comes, small and light, whatever font the view is given.
+            Image(uiImage: Self.image(symbol)).accessibilityLabel(name)
         } else {
             Text(name)
         }
+    }
+
+    private static func image(_ symbol: String) -> UIImage {
+        let configuration = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)
+        return UIImage(systemName: symbol, withConfiguration: configuration) ?? UIImage()
     }
 
     private func badge(_ count: Int, on name: String, symbol: String) -> some View {
@@ -296,7 +307,8 @@ private struct ListSwitcher: View {
                             .foregroundStyle(.white)
                             .padding(.horizontal, 4.5)
                             .frame(minWidth: 16, minHeight: 16)
-                            .background(.red, in: .capsule)
+                            // The color of the list's unread dots, not an alarm's red.
+                            .background(Color.accentColor, in: .capsule)
                             .fixedSize()
                             .offset(x: -3, y: 6)
                             .accessibilityLabel("\(count) waiting")
@@ -304,6 +316,20 @@ private struct ListSwitcher: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// Named segments take the width their names need; symbols alone would be cramped, and get a
+/// touch's width each.
+private struct SwitcherWidth: ViewModifier {
+    let isBrief: Bool
+
+    func body(content: Content) -> some View {
+        if isBrief {
+            content.frame(width: 156)
+        } else {
+            content.fixedSize()
+        }
     }
 }
 
