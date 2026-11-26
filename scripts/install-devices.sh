@@ -41,7 +41,7 @@ tuist generate --no-open >/dev/null
 # For any device: the profile Xcode keeps for the team has every device registered with it.
 xcodebuild -workspace PRDesk.xcworkspace -scheme PRDeskMobile -configuration Release \
   -derivedDataPath "$DD" -destination 'generic/platform=iOS' -allowProvisioningUpdates \
-  CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM="$TEAM" PRDESK_COMMIT="$COMMIT" build \
+  CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM="$TEAM" PRDESK_COMMIT="$COMMIT" build 2>&1 \
   | grep -E 'warning:|error:|BUILD (SUCCEEDED|FAILED)' | grep -v appintents | sort -u
 APP="$DD/Build/Products/Release-iphoneos/PRDeskMobile.app"
 
