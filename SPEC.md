@@ -754,7 +754,8 @@ lines or one (•••, two by default):
   phone is never wide enough for a Size column), Turn, Review and CI
 - One line: the Mac's columns under sortable column titles. They give way as the list narrows so
   the title keeps the most room: Author's name under 960 pt (the picture stays), Size under 720,
-  the number, the Comment and the latest event under 640, where tags are also shortened
+  the number, the Comment and the latest event under 640. Tags are shortened ("[RF]") under 960
+  too, so everywhere but a table on an iPad on its side
 - Narrower than 450 pt rows are always two lines, and ••• doesn't offer the choice
 - ••• also sorts (the same keys as the Mac's columns). Pulling down syncs
 - A swipe does one thing, all the way across or by its button. Right: read / unread. Left: the

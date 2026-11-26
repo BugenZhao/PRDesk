@@ -68,6 +68,8 @@ struct RowDensity: Equatable {
     var showsAuthorName: Bool { listWidth >= 960 }
     /// The board's Comment and the latest event in the title's column, where they fit.
     var showsNotes: Bool { listWidth >= 640 }
-    /// Tags in full ("[Rust Frontend]" rather than "[RF]").
-    var showsFullTags: Bool { listWidth >= 640 }
+    /// Tags in full ("[Rust Frontend]" rather than "[RF]"): only where the author's name fits
+    /// too (an iPad on its side, as a table). Narrower, the title needs the room more, an iPad
+    /// mini's upright table included.
+    var showsFullTags: Bool { showsAuthorName }
 }
