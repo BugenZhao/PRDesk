@@ -1,8 +1,8 @@
-# PR Desk — Spec v0.1
+# PR Desk — Spec
 
-A native macOS workbench for vLLM PRs and issues: dense and keyboard-driven. A clean-room
-implementation that doesn't consult the source of any existing tool. It also runs on the iPad and
-iPhone (§9).
+A native workbench for vLLM PRs and issues: dense and keyboard-driven. A clean-room
+implementation that doesn't consult the source of any existing tool. Two apps: the Mac's, which
+§1–§8 describe, and the same desk for the iPad and iPhone (§9), which says only what differs.
 
 ## 1. Scope
 
@@ -19,14 +19,14 @@ iPhone (§9).
 
 | Area | Choice |
 |---|---|
-| System | macOS 26+, follows the system's light / dark appearance |
+| System | macOS 26+ for the Mac app, iOS 27+ for the iPad and iPhone app (§9); both follow the system's light / dark appearance |
 | Language | Swift 6 (strict concurrency) |
-| Project | Tuist (same as MNGA) |
-| UI | SwiftUI for the shell (window, split view, detail, settings); the main list is an AppKit `NSTableView` (through `NSViewRepresentable`) for density, performance and keyboard feel at hundreds of rows |
+| Project | Tuist (same as MNGA). Both apps compile one `Shared/` (sync, store, model, the detail's pages and the views both use: about two thirds of the Swift); each adds its own list, layout and platform parts |
+| UI | SwiftUI for the shell (window, split view, detail, settings); the main list is an AppKit `NSTableView` (through `NSViewRepresentable`) for density, performance and keyboard feel at hundreds of rows. On the iPad and iPhone the list is a SwiftUI `List` in a `NavigationSplitView` (§9) |
 | Body rendering | The whole timeline (event rows, avatars, author badges, collapsing, times, review states and the `bodyHTML` GitHub returns) renders in **one** `WKWebView` page with its own CSS following the system colors, so code blocks, tables, images and `<details>` display correctly. The page stays loaded: switching items only sends new data, which is patched in place by item id, keeping scroll position, expansion state and loaded images; collapsed items don't render their bodies. A table too wide for the pane (a narrow detail pane, a phone) scrolls sideways on its own, laid out at a width it reads well at: its words stay whole, only code breaks. Scrolling, selecting text across comments and find (⌘F) are left to WebKit |
-| Storage | SQLite (GRDB), in `~/Library/Application Support/PR Desk/` |
+| Storage | SQLite (GRDB), in `~/Library/Application Support/PR Desk/`; each device has its own (§9) |
 | Network | Mainly GitHub GraphQL, with REST for the rest (notifications, a few writes) |
-| Auth | A PAT saved in Settings (stored in the Keychain) if there is one, otherwise `gh auth token` |
+| Auth | A PAT saved in Settings (stored in the Keychain) if there is one, otherwise `gh auth token` on the Mac (an iPad has only the PAT) |
 
 ## 3. Data sync
 
@@ -313,15 +313,15 @@ by its id, set in its Settings. In tests, dry-run only logs instead of sending.
 ## 4. Main window
 
 ```
-┌ Toolbar:                 Dashboard | Parity (n) | Inbox (n)  🔍 Filter (/)  ⟳  ▣ │ Conversation | Commits | Files ┐
+┌ Toolbar:                 Dashboard | Parity n | Inbox n     🔍 Filter (/)  ⟳  ▣ │ Conversation | Commits | Files ┐
 ├ List ─────────────────────────────────────────────┬ Detail ────────────────────────────────────────────┤
 │                                                   │ #56492 [Core] Extensible KV cache                  │
-│ ▾ Recently viewed 8                               │ by njhill ◆◆  draft  CI ● 16 failed  conflicts     │
-│ ▾ Pinned 2                                        │ [Triage Desk Tray Shelf Attic]         [H M L –]   │
-│ ▾ Good 1                                          │ [Pin] [Open ↗]   Comment: ...                      │
-│ ▾ Desk 9                                          │ Conversation | Commits | Files                     │
-│ ▾ Triage 180                                      │ ...timeline...                                     │
-│ ▸ Tray 31                                         │                                                    │
+│ ▾ Recently viewed 8                               │ njhill ◆◆  Draft  ● CI 16 failed                   │
+│ ▾ Pinned 2                                        │ opened 3d ago · updated 2h ago · feat/kv → main    │
+│ ▾ Good 1                                          │ labels                                             │
+│ ▾ Desk 9                                          │ [Status ▾] [Priority ▾] [Pin] [Draft]  [>_] [⟳] [↗]│
+│ ▾ Triage 180                                      │ ☐ Show automated · 12 comments  Expand / Collapse  │
+│ ▸ Tray 31                                         │ ...timeline...                                     │
 │                                                   │ ┌ Comment box ──────────── Comment / Approve … ┐  │
 ├───────────────────────────────────────────────────┴────────────────────────────────────────────────────┤
 └ Status bar: j/k move · w/b/s/m … (shortcut hints)   BugenZhao · vllm-project/vllm · Board #56 · 403 items · Synced 12s ago · API quota 4,821 left ┘
@@ -334,7 +334,7 @@ straight back, and the error still shows in an alert. This covers board Status /
 Grok Bots, comments / reviews, Close, Ready / Draft and Park / Resume; with several at once, the
 newest shows.
 
-After a relaunch the window comes back as it was: Dashboard / Inbox, the selected item (only
+After a relaunch the window comes back as it was: Dashboard / Parity / Inbox, the selected item (only
 selected, not opened: not marked read and not added to Recently viewed), and whether the detail
 pane is shown.
 
@@ -441,12 +441,13 @@ well
 | `1` / `2` / `3` / `0` | Set Priority to H / M / L / clear |
 | `p` | Pin / unpin |
 | `n` | Mark read; on a read item, mark unread until opened again or `n` is pressed, even if its notification was read (local only, GitHub notifications unchanged); opening it then shows the latest activity by others as new |
-| `o` / `↩`, `⌘O` | Open in the browser (`⌘O` works with any focus, on the current selection) |
+| `o` / `↩`, `⌘O` | Open on GitHub, in the browser (`⌘O` works with any focus, on the current selection) |
 | `u`, `⇧⌘O` | Open the author's GitHub profile (also in the row's context menu; `⇧⌘O` works with any focus) |
 | `⇧⌘C`, `⌘C` | Copy GitHub links, one per line (`⇧⌘C` works with any focus: all selected items when the list is focused, otherwise the item in the detail; `⌘C` only in the list). Rows can also be dragged out sideways, as links with titles |
 | `e` / `f` / `d` / `r` | Send to a Grok Bot: 👀 Investigate / 🔥 Track / 🫴 Adopt / 🚀 Merge (§3.3; 🚀 and re-sends open the send panel first); with `⌥`, open the panel first to write a note |
 | `t` | Open the agent session (the board's Session field, the newest one; in the desktop app when there is one; §3.3) |
 | `l` | Go to the linked PR: the other end of a parity pair (§3.2), whichever tab it is in: a staging PR's adopted or promoted upstream PR, or an upstream PR's staging PR (also Go to Linked PR in the row's context menu) |
+| `a` | Add to Desk: keep an item opened from a link (§6), in Triage |
 | `c` | Focus the comment box |
 | `⌘R` | Sync now |
 | `⌘1` / `⌘2` / `⌘3` | Switch to Dashboard / Parity / Inbox |
@@ -455,6 +456,13 @@ well
 | `⌃⌥⌘D` | Global: open the issue / PR of Yab's current tab in the desk (§6, back to the desk from the browser) |
 | `⌘V` | With the list focused, open the issue / PR the link on the clipboard points to |
 | `⌥↑` / `⌥↓` | Move along the selected PR's stack to the next level (toward the base / the top, §6) |
+
+A row's context menu has the commands that take an item, each with its key beside it, in groups:
+where else the item is (Open on GitHub, Open Agent Session, Copy Link); what I make of it (read,
+pin, then the four Statuses, then the Priorities); the item itself (Go to Linked PR, the author's
+profile and affiliation, §5); the Grok Bot requests (§3.3). Status, Priority and the requests
+already sent are checked (a dash when only some of the selection has them), and what doesn't
+apply is dimmed. The iPad's menu has the same groups (§9).
 
 ## 5. Org badges
 
@@ -537,6 +545,10 @@ daily.
 Filtering: `org:vllm` matches both tiers, `org:committer` only committers, `org:member` only the
 gray tier.
 
+Only the Mac works badges out. Settings → Affiliations names a private repository it publishes
+what they come from to (the lists, the profiles, the manual settings, the threshold of §5.1), for
+the iPad to read rather than work out again (§9, Badges).
+
 ## 5.1 Contributor marks
 
 - Counts each author's merged PRs in vllm (GitHub search, 40 people per batch, refreshed weekly;
@@ -553,7 +565,8 @@ gray tier.
 ## 6. Detail pane
 
 - **Header**: title, author and badges, state (draft / open / merged / closed), CI summary,
-  mergeable / conflicts, labels, created and updated times
+  mergeable / conflicts, created and updated times, a PR's branches (head → base, once its detail
+  is in), labels
   - Double-clicking the title renames the item in place, as in Finder: the title becomes a field
     in the same font and place with its text selected; Return or clicking away renames it on
     GitHub, Escape leaves it as it was (an empty or unchanged title does nothing; line breaks
@@ -575,9 +588,11 @@ gray tier.
   an open PR still on the branch, or still carrying the commits, of a merged or closed PR. The current PR is bold and highlighted;
   clicking another row opens it in the app. `⌥↑` / `⌥↓` (with the list or conversation focused)
   move along the stack toward the base / the top. The timeline shows stack join / leave events
-- **Actions**: Status (Triage / Desk / Tray / Shelf / Attic), Priority (H / M / L / –), Pin,
-  Open ↗; open PRs also get Ready for Review (a draft) or Convert to Draft. Parity staging PRs get
-  only Park / Resume, the same switch under the agent's names (§3.2)
+- **Actions**: Status (Triage / Desk / Tray / Shelf / Attic) and Priority (High / Medium / Low /
+  none) as pop-up menus, Add to Desk on an item opened from a link, Pin; open PRs also get Ready
+  for Review (a draft) or Convert to Draft. At the trailing end: the agent session where the board
+  has one (§3.3), Refresh, and Open ↗. Parity staging PRs get
+  only Park / Resume, the same switch under the agent's names (§3.2), and none of the board's controls
 - **Conversation**:
   - The timeline includes comments, reviews (with summaries and diff hunks of inline comments),
     pushes, labels and state changes
@@ -596,7 +611,7 @@ gray tier.
     who); clicking one adds or removes mine; a smiley button on card and inline comment headers
     (shown on hover) offers all 8. Clicks take effect locally first and revert if the write fails
   - New content since the last view is highlighted, and the page scrolls to the first new item
-- **Commits** (Mac only): the PR's latest 100 commits, newest first, above a diff of what is
+- **Commits**: the PR's latest 100 commits, newest first, above a diff of what is
   chosen. Each row: the commit's CI as a dot, the author's avatar, the short sha, the headline (tags
   dimmed, and shortened in every row once one doesn't fit, as in the stack),
   "new" for commits since the viewer last opened the PR, and the age (hover for the author and
@@ -661,17 +676,21 @@ gray tier.
 
 ## 7. Local state (SQLite)
 
-- `items`: PR / issue snapshot fields + the raw JSON, with the repository (numbers are only unique
+- `item`: PR / issue snapshot fields + the raw JSON, with the repository (numbers are only unique
   within one)
-- `item_state`: viewed_at, seen_at, marked_unread_at, when its notification was last read on
-  GitHub, the last send time and note of each kind of Grok Bot request (keyed by the item's node id)
-- `board_item`: the cache of board items (item id, Status and when it was set, Priority, Comment,
+- `itemState`: when the item was viewed and seen, marked unread, when its notification was last
+  read on GitHub, the last send time and note of each kind of Grok Bot request (keyed by the
+  item's node id)
+- `boardItem`: the cache of board items (item id, Status and when it was set, Priority, Comment,
   Session, Pinned)
-- `users`: login, avatar, company, orgs, email domains, committer areas, sources, fetched_at
-- `org_overrides`: the manual mappings
-- `timeline_cache`: the detail cache (with the item's updated time, which prefetching uses to judge
-  staleness)
-- `sync_meta`: sync metadata
+- `userInfo`: login, company, orgs, email domains, bio, merged count, when fetched
+- `orgOverride`: the manual affiliations
+- `detailCache`: the detail cache (with the item's updated time, which prefetching uses to judge
+  staleness). Never emptied by a migration: every copy would fetch every detail again
+- `meta`: sync metadata and the lists the badges come from (committers, members and so on)
+
+Migrations are append-only. Each device has its own database; nothing syncs between them but
+through GitHub (§9).
 
 ## 8. Turn rules (`me` / `them`)
 
@@ -711,21 +730,36 @@ server and nothing syncs between the devices. The Mac alone follows the board wi
 writes what I do on it, and the Mac follows up as it would after an edit on the web. It keeps its
 own database and its own token (a PAT in Settings, in the Keychain; there is no `gh`).
 
+**Setting up.** Settings takes the token, how often to sync, each bot's webhook and id (§3.3) and
+the badges repository (below). From the Mac, `scripts/setup-device.sh` does it in one go for a
+device attached to it: it builds and installs the app and sends the Mac's token, webhooks, ids
+and repository in one file, which the app takes into its Keychain and preferences when it next
+starts, and deletes.
+
+**While it is open.** The app syncs on its timer while it is open, and when the list is pulled or
+⌘R asks. It doesn't sync in the background and sends no notifications, so the unread count is on
+the Inbox's symbol in the app, not on the app's icon (which takes the permission to notify).
+
 **Layout.** A pure function of the window (its width and size class), my choices and the
 selection, so rotation, multitasking and a resized window always land on the layout the new size
 calls for. The desk is always a split view (a `NavigationSplitView`, laid out as the system lays
 one out, with its own button, edge swipe and animation), the list its sidebar:
 
 ```
-900 pt and wider: the list beside the detail          narrower: the list floats over the detail
-┌ Dashboard | Parity n | Inbox n  ◧ ┬───────── ↗ ••• ┐   ┌ ◧   #n title (once scrolled)   ↗ ••• ┐
-├ List (400–480 pt)        │ #69856 [RF] Count …   │   ├ Detail (the whole width) ───────────────┤
-│ ▾ Good 5                 │ author · Open · CI    │   │ #69856 [RF] Count …                     │
-│  title              7h   │ [Triage Desk …] [HML–]│   │ author · Open · CI                      │
-│  author · event    me ✓● │ Conversation|Commits|…│   │ (◧ brings the list over it; picking a   │
-│ ⟳                  🔍 ••• │ …                   ✎ │   │  row puts the list away again)          │
-└──────────────────────────┴───────────────────────┘   └─────────────────────────────────────────┘
+900 pt and wider: the list beside the detail           narrower: the list floats over the detail
+┌ ▦  ≡8  ♢      ⌕  ⤢  ◧    ┬──────────── >_ ↗  ••• ┐   ┌ ◧  ⑂ [RF] Count …                >_ ↗  ••• ┐
+├ List (400–480 pt)        │ #69856 [RF] Count …   │   │    #69856 author · +90 −14  (once scrolled) │
+│ ▾ Good 5                 │ author · Open · CI    │   ├ Detail (the whole width) ───────────────────┤
+│  title              7h   │ opened 2d · x → main  │   │ #69856 [RF] Count …                         │
+│  #n author · event me ✓● │ [Triage Desk …] [HML–]│   │ author · Open · CI                          │
+│                          │ Conversation|Commits|…│   │ (◧ brings the list over it; picking a row   │
+│ ⟳                   •••  │ …                   ✎ │   │  puts the list away again)                ✎ │
+└──────────────────────────┴───────────────────────┘   └─────────────────────────────────────────────┘
 ```
+
+▦ ≡ ♢ are Dashboard, Parity and Inbox as symbols, with a badge for what waits; ⌕ the filter,
+⤢ Full-Width List and ◧ the sidebar; `>_` the agent session and ↗ GitHub; ⟳ the sync status;
+✎ the composer.
 
 - Beside the detail, ◧ (⌘B) puts the list away and the detail has the window. Floating, the list
   is out while nothing is selected. Whether it is out is the viewer's choice alone:
@@ -742,14 +776,15 @@ one out, with its own button, edge swipe and animation), the list its sidebar:
   bar's head the same across it
 - The list keeps the desk's own white ground as a sidebar, not a sidebar's tint: the rows' colors
   say things
-- The bar over the list holds the lists, the filter, ⤢ and ◧, the last two (about where the
-  list is) side by side. The lists are the system's own tab bar: a capsule of glass with the
+- The bar over the list holds the lists and, on an iPad, the filter, ⤢ and ◧, the last two
+  (about where the list is) side by side. The lists are the system's own tab bar: a capsule of glass with the
   system's selection (the lens that follows a finger across it), the chosen one tinted and its
   symbol filled, and badges in the system's manner for what waits in Parity and the Inbox, in
   the blue of the unread dots. A grid for Dashboard, an equals sign in a circle for Parity, a bell for the
   Inbox: symbols alone, everywhere, each in the middle of its button, a badge on its symbol's
   corner. As tall as the bar's buttons;
-  at its foot are the sync status button, the filter and ••• (rows, sorting, Settings)
+  at its foot are the sync status button and ••• (rows, sorting, Settings), and on a phone,
+  whose top bar has no room for it, the filter
 - Going from one to the other keeps the selection, the detail's tab, its pages (scroll position,
   loaded diffs) and a comment being written. Nothing remembers which layout came before
 
@@ -780,7 +815,8 @@ lines or one (•••, two by default):
   requests, again as a row of buttons under their emoji. What doesn't apply to the item isn't in
   the menu at all (the Mac's shows it dimmed). The Mac's row menu has the same groups in the same
   order, as one flat list with each command's key beside it, and the author's affiliation
-- The filter (§4.4) is the system's search field, a button at the list's foot
+- The filter (§4.4) is the system's search field, behind a button: in the bar over the list on
+  an iPad, at the list's foot on a phone
 - At the list's foot, one button stands for the Mac's status bar. Its symbol says how things
   stand at a glance: two arrows (turning while syncing, orange when the quota runs low), an arrow
   up while a write goes out and a green check once it has, a red mark for a failed sync, an
@@ -857,8 +893,8 @@ would show two answers. The Mac publishes what its badges come from instead, and
   had, so both show the same badges by the same rules. While it reads the Mac's it sets none by
   hand; without a repository it shows only those it sets by hand, as before
 
-Not there yet: several selected rows at once, undo, more than one window, find in a page, and
-anything of Yab's.
+Not there yet: several selected rows at once, undo, more than one window, find in a page,
+notifications and syncing in the background, and anything of Yab's.
 
 ## 10. Milestones
 
@@ -868,3 +904,6 @@ anything of Yab's.
 4. Detail: header, Conversation (native timeline + WebView bodies), checks
 5. Writes: comments, reviews, closing; Inbox
 6. Polish: Files diff, unread counts in the menu bar and Dock, performance
+7. The iPad and iPhone (§9): what both apps use moved into `Shared/`, the desk as a split view
+   with the list as its sidebar, a page or a table the window wide, the detail's pages under a
+   header that scrolls away with them, writes, the Mac's badges read from a shared file

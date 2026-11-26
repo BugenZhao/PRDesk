@@ -1,7 +1,8 @@
 # PR Desk
 
 A native macOS dashboard for the pull requests and issues I work on in
-[vllm-project/vllm](https://github.com/vllm-project/vllm).
+[vllm-project/vllm](https://github.com/vllm-project/vllm), with the same desk for the iPad and
+iPhone.
 
 ![PR Desk](docs/screenshot.webp)
 
@@ -34,6 +35,10 @@ open .build/DerivedData/Build/Products/Debug/PRDesk.app
 ```
 
 `scripts/install.sh` builds a Release copy and installs it to `/Applications`.
+
+The iPad and iPhone app is the `PRDeskMobile` scheme of the same workspace (iOS 27); it shares
+most of its code with the Mac app (`Shared/`). `AGENTS.md` has how to run it in a simulator and
+`scripts/setup-device.sh` installs it on a device.
 
 ## Third-party
 
