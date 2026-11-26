@@ -722,7 +722,7 @@ one out, with its own button, edge swipe and animation), the list its sidebar:
 │ ▾ Good 5                 │ author · Open · CI    │   │ #69856 [RF] Count …                     │
 │  title              7h   │ [Triage Desk …] [HML–]│   │ author · Open · CI                      │
 │  author · event    me ✓● │ Conversation|Commits|…│   │ (◧ brings the list over it; picking a   │
-│ 582 items · 12s    🔍 ••• │ …                   ✎ │   │  row puts the list away again)          │
+│ ⟳                  🔍 ••• │ …                   ✎ │   │  row puts the list away again)          │
 └──────────────────────────┴───────────────────────┘   └─────────────────────────────────────────┘
 ```
 
