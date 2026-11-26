@@ -82,8 +82,8 @@ struct ComposerView: View {
                         if text.isEmpty {
                             Text(placeholder)
                                 .foregroundStyle(.tertiary)
-                                .padding(.horizontal, 9)
-                                .padding(.vertical, 4)
+                                .padding(.leading, 4 + Self.textInsets.leading)
+                                .padding(.top, 4 + Self.textInsets.top)
                                 .allowsHitTesting(false)
                         }
                     }
@@ -95,16 +95,19 @@ struct ComposerView: View {
                     if let onDismiss {
                         Button("Hide Composer", systemImage: "chevron.down", action: onDismiss)
                             .labelStyle(.iconOnly)
+                            .buttonBorderShape(.circle)
                     }
-                #endif
-                Toggle("Preview", systemImage: "eye", isOn: $isPreviewing)
-                    .toggleStyle(.button)
-                    #if os(iOS)
+                    // A glass button like its neighbors; the symbol says whether it is on.
+                    Button("Preview", systemImage: isPreviewing ? "eye.fill" : "eye") { isPreviewing.toggle() }
                         .labelStyle(.iconOnly)
-                    #else
+                        .buttonBorderShape(.circle)
+                        .disabled(trimmed.isEmpty)
+                #else
+                    Toggle("Preview", systemImage: "eye", isOn: $isPreviewing)
+                        .toggleStyle(.button)
                         .labelStyle(.titleOnly)
-                    #endif
-                    .disabled(trimmed.isEmpty)
+                        .disabled(trimmed.isEmpty)
+                #endif
                 draftedCommentButton
                 if let error {
                     Text(error)
@@ -127,6 +130,7 @@ struct ComposerView: View {
                             closeButton
                         }
                         .labelStyle(.iconOnly)
+                        .buttonBorderShape(.circle)
                         .disabled(isBusy)
                     }
                 #else
@@ -141,29 +145,28 @@ struct ComposerView: View {
                 #endif
                 if item.kind == .pullRequest, item.isOpen, !isAuthor {
                     Button("Approve") { send(.approve) }
-                        #if os(iOS)
-                            .buttonStyle(.bordered)
-                        #endif
                         .disabled(isBusy)
                         .help("Submit an approving review, with the text as its comment")
                 }
                 Button("Comment") { send(.comment) }
                     .keyboardShortcut(.return, modifiers: .command)
-                    .buttonStyle(.borderedProminent)
+                    #if os(iOS)
+                        .buttonStyle(.glassProminent)
+                    #else
+                        .buttonStyle(.borderedProminent)
+                    #endif
                     .disabled(trimmed.isEmpty || isBusy)
             }
             #if os(iOS)
-                // On the card of glass: plain shapes, a capsule each, none of them glass.
-                .buttonBorderShape(.capsule)
-                .padding(.horizontal, 4)
+                // The system's own glass buttons, with the labels it gives them: each a piece
+                // of glass over the page, beside the field's, never on another sheet of it.
+                .buttonStyle(.glass)
             #else
                 .controlSize(.small)
             #endif
         }
         #if os(iOS)
-            .padding(.horizontal, 10)
-            .padding(.top, 8)
-            .padding(.bottom, 10)
+            .composerGlass()
         #else
             .padding(8)
         #endif
@@ -324,14 +327,20 @@ struct ComposerView: View {
 }
 
 private extension View {
-    /// What the text is written on: a bordered field on the Mac. On the iPad the composer is a
-    /// card of glass and the text lies on it directly.
+    /// What the text is written on: a bordered field on the Mac, a sheet of glass on the iPad.
     @ViewBuilder func editorGround(focused: Bool) -> some View {
         #if os(macOS)
             background(Color.textBackground, in: RoundedRectangle(cornerRadius: 6))
                 .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(focused ? Color.accentColor.opacity(0.6) : Color.separator, lineWidth: 1))
         #else
-            self
+            glassEffect(.regular, in: .rect(cornerRadius: 22))
         #endif
     }
+
+    #if os(iOS)
+        /// The field and the buttons are glass side by side, drawn together.
+        func composerGlass() -> some View {
+            GlassEffectContainer(spacing: 8) { self }
+        }
+    #endif
 }

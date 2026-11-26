@@ -4,3 +4,5 @@ Derived/
 .build/
 DerivedData/
 .DS_Store
+# Xcode's agent skills, exported for reading (xcrun agent skills export).
+.agents/

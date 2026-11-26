@@ -100,7 +100,9 @@ SIMCTL_CHILD_PRDESK_GITHUB_TOKEN="$(gh auth token)" xcrun simctl launch --termin
   skill's `resize start|set|stop`, screenshots with `simctl io <udid> screenshot
   --display=resizable`). Also try the keyboard up on the iPad on its side, the shortest the detail
   gets.
-- Xcode's own skills are worth reading before SwiftUI work here (`xcrun agent skills export`):
+- Xcode's own skills are worth reading before SwiftUI work here. Export them into the project
+  (`xcrun agent skills export --output-dir "$PWD/.agents/skills"`, an absolute path; the folder
+  is ignored by git, being Apple's text in a public repository) and read:
   `swiftui-whats-new-27` (swipe actions outside lists, toolbar overflow), `swiftui-specialist`
   (list rows with one root view, observation) and `app-resizability` (no `UIScreen.main`,
   interface orientation or idiom to lay out by; the window's size instead).
@@ -192,10 +194,16 @@ are used off the main actor); no glass on content (cards, chips, rows).
   width it liked, over the bar's buttons): the detail sets `navigationTitle`, empty until the
   header's own title has scrolled under the bar. The header is an overlay clipped at the bar's
   edge, or it shows through the bar's buttons.
-- A foreground style set around a view takes over the labels of the buttons and menus inside it:
-  a tinted button's blue and a prominent one's white come out black, a bar's `Menu` all but
-  vanishes. `macTextStrength` (darker `.secondary` / `.tertiary` on iOS) goes only around text:
-  a list row, a section's title, the header's title.
+- Liquid Glass (read `SwiftUI-Implementing-Liquid-Glass-Design.md` first; the exported skills
+  don't cover it): controls over content are the system's glass buttons (`.buttonStyle(.glass)`,
+  `.glassProminent` for the one that matters) with the labels the system gives them, which are
+  the label color, not the tint. Don't tint them blue and don't draw bordered buttons on a card.
+  Several pieces of glass go in a `GlassEffectContainer`; none goes on another sheet of glass.
+  Where they float over running text, fade the page out underneath rather than adding a backing.
+- A foreground style set around a view takes over the labels of the buttons and menus inside it
+  (a prominent button's white comes out black, a bar's `Menu` all but vanishes).
+  `macTextStrength` (darker `.secondary` / `.tertiary` on iOS) goes only around text: a list row,
+  a section's title, the header's lines.
 - Views in a `ScrollView` can't reach under the bars with `ignoresSafeArea`, and a
   `safeAreaInset` on the scroll view pushes its content down. The detail's pager (`DetailPager`)
   gives each page negative padding to the window's edges and `safeAreaPadding` back, and the

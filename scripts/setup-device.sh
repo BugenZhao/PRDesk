@@ -4,7 +4,9 @@
 # one file over the cable into the app's own container, which the app imports at its next launch
 # and deletes (SetupImport). Nothing is printed.
 #
-#   scripts/setup-device.sh <device name or udid> [--secrets-only]
+#   scripts/setup-device.sh <device name or udid> [--secrets-only | --app-only]
+#
+# --app-only installs a new build and leaves the device's secrets as they are (an update).
 #
 # Reading the webhooks may ask for the login keychain's password.
 set -euo pipefail
@@ -27,6 +29,12 @@ if [[ "${2:-}" != "--secrets-only" ]]; then
     CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM="$TEAM" build \
     | grep -E 'warning:|error:|BUILD (SUCCEEDED|FAILED)' | grep -v appintents | sort -u
   xcrun devicectl device install app --device "$DEVICE" "$DD/Build/Products/Release-iphoneos/PRDeskMobile.app" | tail -2
+fi
+
+if [[ "${2:-}" == "--app-only" ]]; then
+  xcrun devicectl device process launch --device "$DEVICE" --terminate-existing "$BUNDLE" >/dev/null
+  echo "Installed and relaunched."
+  exit 0
 fi
 
 DIR=$(mktemp -d)
