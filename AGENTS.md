@@ -145,7 +145,7 @@ Both apps compile `Shared/`; each adds its own views and platform parts. Put new
   fills with JSON from `TimelineDocument` / `FilesDocument` and `detail.js` patches in place by
   block id), `WebResources`, `AvatarSchemeHandler`
 - `Shared/Sources/UI` — SwiftUI views both apps use: the composer, checks, header components, the
-  Commits and Files tabs, the stack panel and rail, the bot send sheet, alerts; `PlatformStyles`
+  Commits tab, the stack panel and rail, the bot send sheet, alerts; `PlatformStyles`
   for what differs (fonts to measure with, checkboxes, link buttons, row heights)
 - `Shared/Resources` — the web pages' styles and scripts (`Web/`, with highlight.js), the asset
   catalog, the app icon

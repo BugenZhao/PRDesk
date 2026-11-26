@@ -318,7 +318,7 @@ by its id, set in its Settings. In tests, dry-run only logs instead of sending.
 ## 4. Main window
 
 ```
-┌ Toolbar:                 Dashboard | Parity n | Inbox n     🔍 Filter (/)  ⟳  ▣ │ Conversation | Commits | Files ┐
+┌ Toolbar:                 Dashboard | Parity n | Inbox n     🔍 Filter (/)  ⟳  ▣ │    Conversation | Commits     ┐
 ├ List ─────────────────────────────────────────────┬ Detail ────────────────────────────────────────────┤
 │                                                   │ #56492 [Core] Extensible KV cache                  │
 │ ▾ Recently viewed 8                               │ njhill ◆◆  Draft  ● CI 16 failed                   │
@@ -456,7 +456,7 @@ well
 | `c` | Focus the comment box |
 | `⌘R` | Sync now |
 | `⌘1` / `⌘2` / `⌘3` | Switch to Dashboard / Parity / Inbox |
-| `⌥⌘1` / `⌥⌘2` / `⌥⌘3` | Switch a PR's detail to Conversation / Commits / Files |
+| `⌥⌘1` / `⌥⌘2` | Switch a PR's detail to Conversation / Commits |
 | `⌘B` | Show / hide the detail pane (kept across relaunches) |
 | `⌃⌥⌘D` | Global: open the issue / PR of Yab's current tab in the desk (§6, back to the desk from the browser) |
 | `⌘V` | With the list focused, open the issue / PR the link on the clipboard points to |
@@ -616,40 +616,44 @@ the iPad to read rather than work out again (§9, Badges).
     who); clicking one adds or removes mine; a smiley button on card and inline comment headers
     (shown on hover) offers all 8. Clicks take effect locally first and revert if the write fails
   - New content since the last view is highlighted, and the page scrolls to the first new item
-- **Commits**: the PR's latest 100 commits, newest first, above a diff of what is
-  chosen. Each row: the commit's CI as a dot, the author's avatar, the short sha, the headline (tags
-  dimmed, and shortened in every row once one doesn't fit, as in the stack),
-  "new" for commits since the viewer last opened the PR, and the age (hover for the author and
-  size; right-click to open it on GitHub or copy the sha). Force pushes sit between the commits,
-  above the head they left, in orange. Merges (more than one parent) show a merge icon instead of
-  the CI dot and a gray headline; selected alone, a merge's diff (everything it brought in) isn't
-  loaded: a note offers Show Diff Anyway and Open on GitHub
-  - The diff is the Files page (highlighting, wrap, expand / collapse all), without Viewed boxes;
-    a diff of up to 10 files and 600 changed lines starts expanded. A menu over it picks the range:
-    **Since your last review** (from the commit of the viewer's latest review to the head),
-    **Since you last looked** (from the head stored when the viewer last opened the PR), or **All
-    changes**; it opens on the first of these that has anything. Selecting a commit shows just it;
-    selecting several (shift / ⌘-click) shows from the oldest to the newest of them; selecting a
-    force push shows what it changed. A range starting from a commit no longer on the branch gets
-    a warning that a rebase onto the base branch shows up in it too
-  - Opening a PR stores its head as seen once its detail is in. Single commits come from REST
-    `commits/<sha>`, ranges from `compare/<base>...<head>` (REST quota, not GraphQL), kept for the
-    run
+- **Commits**: the PR's changes, as one `WKWebView` page of files and their diffs, under a bar
+  saying what they are (the range, files, +/−, how many are viewed), and the PR's latest 100
+  commits, newest first, folded away above it (a chevron with the commit count in the bar shows
+  or hides them, remembered). Each row: the commit's CI as a dot, the author's avatar, the short
+  sha, the headline (tags dimmed, and shortened in every row once one doesn't fit, as in the
+  stack), "new" for commits since the viewer last opened the PR, and the age (hover for the
+  author and size; right-click to open it on GitHub or copy the sha). Force pushes sit between
+  the commits, above the head they left, in orange. Merges (more than one parent) show a merge
+  icon instead of the CI dot and a gray headline; selected alone, a merge's diff (everything it
+  brought in) isn't loaded: a note offers Show Diff Anyway and Open on GitHub
+  - The diff: each file collapsed by default, long file names drop the directory part, file
+    headers stick while scrolling; syntax highlighting by extension (highlight.js, the old and
+    new sides highlighted separately); copying leaves out line numbers and +/-; soft wrap can be
+    toggled, and all files expanded or collapsed; an expanded file's diff is generated only when
+    it nears the screen, and filled in before ⌘F finds
+  - It opens on **All changes**, the PR's files. A menu in the bar picks another range: **Since
+    your last review** (from the commit of the viewer's latest review to the head) or **Since
+    you last looked** (from the head stored when the viewer last opened the PR), offered when
+    they have anything. Selecting a commit shows just it; selecting several (shift / ⌘-click)
+    shows from the oldest to the newest of them; selecting a force push shows what it changed.
+    Any of these but All changes starts expanded when it is up to 10 files and 600 changed lines.
+    A range starting from a commit no longer on the branch gets a warning that a rebase onto the
+    base branch shows up in it too
+  - All changes has GitHub's Viewed checkbox on the file headers (just the box, no text; also in
+    the file header's context menu), synced with the GitHub website: checking collapses the
+    file, unchecking expands it again; a file changed by a new push since it was checked gets an
+    orange box; the bar shows how many are viewed. Clicks take effect locally first and revert if
+    the write fails; without the marks, no checkboxes show. Other ranges have none: GitHub keeps
+    the marks for the PR's files as a whole
+  - Opening a PR stores its head as seen once its detail is in. All changes come from REST
+    `pulls/<n>/files`, kept until the PR is updated; single commits from REST `commits/<sha>`,
+    ranges from `compare/<base>...<head>` (REST quota, not GraphQL), kept for the run; the
+    Viewed marks from GraphQL, again after each update
 - **Checks**: no tab of their own. Clicking the CI status in the header opens a popover (a sheet
   on the phone, half height, pulled up for more) with the check runs and statuses grouped by state,
   failures on top; failed and pending groups start expanded, or the passed one when there are
   neither; clicking a check opens its log URL and leaves the popover open; "Open on GitHub" opens
   the PR's checks page
-- **Files**: the changed files and their diffs, also one `WKWebView` page; each file collapsed by
-  default, long file names drop the directory part, file headers stick while scrolling; syntax
-  highlighting by extension (highlight.js, the old and new sides highlighted separately); copying
-  leaves out line numbers and +/-; soft wrap can be toggled; an expanded file's diff is generated
-  only when it nears the screen, and filled in before ⌘F finds
-  - File headers have GitHub's Viewed checkbox (just the box, no text; also in the file header's
-    context menu), synced with the GitHub website: checking collapses the file, unchecking expands
-    it again; a file changed by a new push since it was checked gets an orange box; the toolbar
-    shows how many are viewed. Clicks take effect locally first and revert if the write fails;
-    without the marks, no checkboxes show
 - **Links within the repo**: links in the detail to issues / PRs in this repository open in the
   app: ones already in the list are jumped to (expanding their group and clearing the filter if
   needed); others are fetched on the spot into an **Opened from links** group at the top of the
@@ -658,7 +662,7 @@ the iPad to read rather than work out again (§9, Badges).
   item expands and scrolls to that comment. ⌘-click and the ↗ button still open the browser
 - **Handoff**: the item being looked at is offered on my other devices (the Mac's Dock, the
   iPad's, the phone's app switcher), and picking it there opens the same item on the same tab
-  (Conversation, Commits or Files), by the rules for links below (also when it starts the app:
+  (Conversation or Commits), by the rules for links below (also when it starts the app:
   the link waits for the stored items to be read). The activity is the item's
   page on GitHub, so a device without the app opens it in a browser. Between the Mac, the iPad
   and the iPhone alike; it is the system's Handoff, which needs the apps signed by one team and
@@ -668,8 +672,8 @@ the iPad to read rather than work out again (§9, Badges).
   tab (`yab exec`, read-only), brings the window forward, and opens the issue / PR it points to by
   the rules for links above: selected if in the list; expanded / filter cleared and then selected
   if on the desk but hidden; otherwise fetched into **Opened from links**. This counts as opening
-  (marked read, added to Recently viewed). `/files` (or `/changes`) in the link switches to the
-  Files tab, `/commits` to Commits (`/commits/<sha>` and `/changes/<sha>` with that commit selected),
+  (marked read, added to Recently viewed). `/files`, `/changes` or `/commits` in the link switches to
+  Commits on All changes (`/commits/<sha>` and `/changes/<sha>` with that commit selected),
   and `/checks` opens the checks popover; `#issuecomment-…`, `#discussion_r…`, `#pullrequestreview-…` and the like scroll
   to that comment once it appears in the conversation (if the cache doesn't have it yet, once the
   live detail arrives). If the tab isn't an issue / PR of these two repositories, an alert says so.
@@ -684,7 +688,7 @@ the iPad to read rather than work out again (§9, Badges).
   shortcut
   - PRs: Comment / Approve / Request changes, submitted as a whole review with a body
   - Issues: Comment only
-  - Inline code comments are for v2, in Files
+  - Inline code comments are for v2, in Commits
 
 ## 7. Local state (SQLite)
 
@@ -866,8 +870,8 @@ Commits a tap picks one commit (again for the preset) and a row's menu extends t
 A diff's options (Wrap Lines, Expand All, Collapse All) are behind ••• at the end of its bar, which
 has to fit a phone.
 
-A pull request's Conversation, Commits and Files are pages side by side: a swipe turns them, as do
-the tabs, and each keeps its own place. Commits and Files load when first shown or swiped towards.
+A pull request's Conversation and Commits are pages side by side: a swipe turns them, as do the
+tabs, and each keeps its own place. Commits loads when first shown or swiped towards.
 
 The page gets the whole pane:
 

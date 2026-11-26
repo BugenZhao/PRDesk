@@ -101,12 +101,12 @@ final class AppModel {
     /// Whether anything is selected. Observed apart from `selection`, so views that only care
     /// about this (the menu commands) aren't rebuilt each time the selection moves.
     private(set) var hasSelection = false
-    /// Whether the selection is a PR, which has the Commits and Files tabs; observed apart from it
+    /// Whether the selection is a PR, which has the Commits tab; observed apart from it
     /// for the same reason.
     private(set) var selectionIsPullRequest = false
 
     enum DetailTab: Hashable {
-        case conversation, commits, files
+        case conversation, commits
     }
 
     /// The detail pane's tab. Here rather than in the pane, for the View menu's commands.
@@ -870,12 +870,11 @@ final class AppModel {
         }
         switch link.page {
         case .conversation: detailTab = .conversation
-        case .commits: detailTab = .commits
+        case .commits, .files: detailTab = .commits
         case .checks: detailTab = .conversation
-        case .files: detailTab = .files
         }
         checksShownFor = link.page == .checks ? link.key : nil
-        linkedCommit = link.commit == nil ? nil : link
+        linkedCommit = [.commits, .files].contains(link.page) ? link : nil
         linkedComment = link.anchor == nil ? nil : link
         openItem(repo: link.repo, number: link.number)
         requestTableFocus()
@@ -895,8 +894,8 @@ final class AppModel {
     /// The last opened link that points to a comment, until the selection moves to another item;
     /// the conversation scrolls to it once it shows the comment.
     private(set) var linkedComment: ItemLink?
-    /// The last opened link to one of a PR's commits, until the selection moves to another item;
-    /// the Commits tab selects that commit.
+    /// The last opened link to a PR's commits or files, until the selection moves to another item;
+    /// the Commits tab selects the commit it names, or shows all changes.
     private(set) var linkedCommit: ItemLink?
 
     /// Brings up the window, set by the views that can open it.

@@ -41,9 +41,6 @@ struct DeskCommands: Commands {
             Button("Commits") { model.detailTab = .commits }
                 .keyboardShortcut("2", modifiers: [.command, .option])
                 .disabled(!model.selectionIsPullRequest)
-            Button("Files") { model.detailTab = .files }
-                .keyboardShortcut("3", modifiers: [.command, .option])
-                .disabled(!model.selectionIsPullRequest)
         }
 
         CommandMenu("Go") {

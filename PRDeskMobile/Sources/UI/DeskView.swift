@@ -5,9 +5,8 @@ import SwiftUI
 @MainActor
 final class DetailPages {
     let timeline = WebDocument(kind: .timeline)
-    let files = WebDocument(kind: .files)
     let commits = WebDocument(kind: .files)
-    var all: [WebDocument] { [timeline, files, commits] }
+    var all: [WebDocument] { [timeline, commits] }
 }
 
 /// The desk, always a split view: the list is the detail's sidebar, beside it or floating over

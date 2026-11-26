@@ -172,7 +172,6 @@ struct DetailPane: View {
         let page = switch item.kind == .issue ? .conversation : model.detailTab {
         case .conversation: pages.timeline
         case .commits: pages.commits
-        case .files: pages.files
         }
         page.run("scrollTo({ top: 0, behavior: 'smooth' })")
     }
@@ -296,25 +295,23 @@ private struct BarTitle: View {
 private final class PaneScrolls {
     let conversation = PageScroll()
     let commits = PageScroll()
-    let files = PageScroll()
     private let headerID = UUID()
 
     subscript(tab: AppModel.DetailTab) -> PageScroll {
         switch tab {
         case .conversation: conversation
         case .commits: commits
-        case .files: files
         }
     }
 
     /// The pane's header lies over all of them.
     func setHeader(height: CGFloat) {
-        for scroll in [conversation, commits, files] { scroll.setChrome(headerID, height: height) }
+        for scroll in [conversation, commits] { scroll.setChrome(headerID, height: height) }
     }
 
     /// How far down the header its title ends: scrolled that far, the bar names the item.
     func setTitleExtent(_ extent: CGFloat) {
-        for scroll in [conversation, commits, files] { scroll.setTitleExtent(extent) }
+        for scroll in [conversation, commits] { scroll.setTitleExtent(extent) }
     }
 }
 
@@ -333,7 +330,7 @@ private struct ActivePage<Content: View>: View {
     }
 }
 
-/// Conversation, Commits and Files as segments. Picking one slides to it.
+/// Conversation and Commits as segments. Picking one slides to it.
 private struct DetailTabs: View {
     @Environment(AppModel.self) private var model
 
@@ -344,13 +341,12 @@ private struct DetailTabs: View {
         )) {
             Text("Conversation").tag(AppModel.DetailTab.conversation)
             Text("Commits").tag(AppModel.DetailTab.commits)
-            Text("Files").tag(AppModel.DetailTab.files)
         }
         .pickerStyle(.segmented)
     }
 }
 
-/// A pull request's three pages side by side, turned like pages: by a swipe, or by the tabs.
+/// A pull request's two pages side by side, turned like pages: by a swipe, or by the tabs.
 private struct DetailPager<Conversation: View>: View {
     @Environment(AppModel.self) private var model
     let item: Item
@@ -371,7 +367,6 @@ private struct DetailPager<Conversation: View>: View {
                 page(.conversation) { conversation }
                 // Its own per item, so the selection and the chosen range don't carry over.
                 page(.commits) { CommitsView(item: item, detail: detail, page: pages.commits).id(item.id) }
-                page(.files) { FilesView(item: item, page: pages.files) }
             }
             .scrollTargetLayout()
             .background(FirstPageEdgeYield())
@@ -406,7 +401,7 @@ private struct DetailPager<Conversation: View>: View {
         .onScrollPhaseChange { old, phase, context in
             let width = context.geometry.containerSize.width
             guard phase == .idle, old != .idle, old != .animating, width > 0 else { return }
-            let tabs: [AppModel.DetailTab] = [.conversation, .commits, .files]
+            let tabs: [AppModel.DetailTab] = [.conversation, .commits]
             let index = Int((context.geometry.contentOffset.x / width).rounded())
             let tab = tabs[min(max(index, 0), tabs.count - 1)]
             if tab != model.detailTab { model.detailTab = tab }

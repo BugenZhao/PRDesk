@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// A PR's commits above the diff of what is chosen: since the viewer's last review, since they last
-/// looked, everything, one commit, a stretch of commits, or a force push.
+/// A PR's changes: everything (with GitHub's Viewed boxes), since the viewer's last review, since
+/// they last looked, one commit, a stretch of commits, or a force push, picked from the commits
+/// listed above the diff (folded away unless asked for).
 struct CommitsView: View {
     @Environment(AppModel.self) private var model
     let item: Item
@@ -19,6 +20,8 @@ struct CommitsView: View {
     /// The commit list's width, for whether titles' tags are shortened.
     @State private var listWidth: CGFloat = 0
     @AppStorage("wrapDiffLines") private var wrapLines = true
+    /// Whether the commits are listed over the diff; folded, the bar alone says what it shows.
+    @AppStorage("showsCommitList") private var showsList = false
 
     private struct Loaded {
         var range: CommitRange
@@ -56,9 +59,11 @@ struct CommitsView: View {
                     }
                 }
                 .pageBar {
-                    list(history)
-                        .frame(height: min(CGFloat(history.rows.count) * RowMetrics.commitRowHeight + 10, 200))
-                    Divider()
+                    if showsList {
+                        list(history)
+                            .frame(height: min(CGFloat(history.rows.count) * RowMetrics.commitRowHeight + 10, 200))
+                        Divider()
+                    }
                     toolbar(history, range: range)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
@@ -68,8 +73,26 @@ struct CommitsView: View {
         .task(id: [range.key, merge?.oid]) {
             if merge == nil { await load(range) }
         }
+        // The marks come on their own, so the diff doesn't wait for them; again after each push.
+        .task(id: "\(item.id)-\(item.updatedAt.timeIntervalSince1970)") { await model.loadViewedFiles(for: item) }
         .onChange(of: wrapLines, initial: true) { page.setting("wrap", "PRDesk.setWrap(\(wrapLines))") }
-        .onChange(of: model.linkedCommit?.commit, initial: true) { selectLinkedCommit(history) }
+        .onChange(of: model.viewedFiles[item.id], initial: true) { sendViewed() }
+        .onChange(of: item.id, initial: true) {
+            page.setFileViewed = { [model, itemID = item.id] path, viewed in model.setFileViewed(viewed, path: path, in: itemID) }
+        }
+        .onChange(of: model.linkedCommit, initial: true) { selectLinkedCommit(history) }
+    }
+
+    /// The page's key for the whole PR's diff, the one the Viewed boxes go on: GitHub keeps them
+    /// for the PR's files as a whole, which a commit's or a stretch's diff isn't.
+    private var allKey: String { "\(item.id)#\(CommitRange.all.key)" }
+
+    /// The item's Viewed marks, for the page to show on the files' headers of the whole diff.
+    private func sendViewed() {
+        let states = model.viewedFiles[item.id]?.mapValues(\.rawValue)
+        let key = WebDocument.jsonLiteral(allKey) ?? "null"
+        let json = states.flatMap { WebDocument.jsonLiteral($0) } ?? "null"
+        page.setting("viewed", "PRDesk.setViewedFiles(\(key), \(json))")
     }
 
     /// A merge selected alone, whose diff (everything it brought in, often thousands of files)
@@ -95,12 +118,19 @@ struct CommitsView: View {
 
     private func range(in history: CommitHistory) -> CommitRange {
         if !selection.isEmpty, let range = history.range(selecting: selection) { return range }
-        return history.range(preset ?? history.defaultPreset) ?? .all
+        return history.range(preset ?? .all) ?? .all
     }
 
+    /// A link to one of the PR's commits selects it; one to its changes as a whole goes back to
+    /// everything.
     private func selectLinkedCommit(_ history: CommitHistory) {
-        guard let link = model.linkedCommit, link.key == item.repoNumber,
-              let sha = link.commit, let commit = history.commit(matching: sha) else { return }
+        guard let link = model.linkedCommit, link.key == item.repoNumber else { return }
+        guard let sha = link.commit else {
+            selection = []
+            preset = nil
+            return
+        }
+        guard let commit = history.commit(matching: sha) else { return }
         selection = [commit.oid]
     }
 
@@ -185,6 +215,20 @@ struct CommitsView: View {
 
     private func toolbar(_ history: CommitHistory, range: CommitRange) -> some View {
         HStack(spacing: 6) {
+            Button {
+                withAnimation(.snappy(duration: 0.2)) { showsList.toggle() }
+            } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: "chevron.right")
+                        .font(.caption2.weight(.semibold))
+                        .rotationEffect(.degrees(showsList ? 90 : 0))
+                    Text("\(history.commits.count) commit\(history.commits.count == 1 ? "" : "s")")
+                }
+                .foregroundStyle(.secondaryText)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(showsList ? "Hide the commits" : "Show the commits")
             Menu {
                 ForEach(CommitHistory.Preset.allCases, id: \.self) { option in
                     Button(option.title) {
@@ -210,6 +254,12 @@ struct CommitsView: View {
                     .padding(.leading, 4)
                 Text("+\(loaded.files.reduce(0) { $0 + $1.additions })").foregroundStyle(.green)
                 Text("−\(loaded.files.reduce(0) { $0 + $1.deletions })").foregroundStyle(.red)
+                if range == .all, let viewed = model.viewedFiles[item.id] {
+                    let count = loaded.files.count { viewed[$0.filename] == .viewed }
+                    Text("\(count) / \(loaded.files.count) viewed")
+                        .foregroundStyle(.secondaryText)
+                        .padding(.leading, 4)
+                }
             }
             Spacer(minLength: 0)
             DiffOptions(wrapLines: $wrapLines, page: page)
@@ -221,7 +271,7 @@ struct CommitsView: View {
 
     /// What the diff shows: the preset, or what the selection covers.
     private func title(_ history: CommitHistory, range: CommitRange) -> String {
-        guard !selection.isEmpty else { return (preset ?? history.defaultPreset).title }
+        guard !selection.isEmpty else { return (preset ?? .all).title }
         switch range {
         case let .commit(sha):
             return "Commit \(history.commit(matching: sha)?.shortOid ?? String(sha.prefix(7)))"

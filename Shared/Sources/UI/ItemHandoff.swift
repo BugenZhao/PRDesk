@@ -23,8 +23,8 @@ struct ItemHandoff: View {
         guard let item = model.selectedItem else { return nil }
         let page = switch item.kind == .pullRequest ? model.detailTab : .conversation {
         case .conversation: ""
-        case .commits: "/commits"
-        case .files: "/files"
+        // The tab opens on all changes, which a browser shows as the files.
+        case .commits: "/files"
         }
         guard let url = URL(string: item.url + page) else { return nil }
         return Target(title: "#\(item.number) \(item.title)", url: url)

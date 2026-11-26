@@ -2,7 +2,7 @@ import Foundation
 
 /// What the Commits tab diffs: the whole PR, one commit, or from one commit to another.
 enum CommitRange: Hashable, Sendable {
-    /// Everything, as the Files tab shows it.
+    /// Everything: the PR's own files, with their Viewed boxes.
     case all
     /// One commit against its first parent.
     case commit(String)
@@ -43,9 +43,9 @@ struct CommitHistory: Sendable {
         static let pushPrefix = "push:"
     }
 
-    /// The ranges the tab opens with, in the order the menu lists them.
+    /// The ranges the menu offers, in its order; the tab opens on everything.
     enum Preset: CaseIterable, Sendable {
-        case sinceReview, sinceViewed, all
+        case all, sinceReview, sinceViewed
 
         var title: String {
             switch self {
@@ -114,11 +114,6 @@ struct CommitHistory: Sendable {
         case .all:
             return .all
         }
-    }
-
-    /// Since the viewer's last review, else since they last looked, else everything.
-    var defaultPreset: Preset {
-        Preset.allCases.first { range($0) != nil } ?? .all
     }
 
     /// The range the selected rows cover: one commit, the stretch from the oldest selected to the
