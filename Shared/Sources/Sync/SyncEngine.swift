@@ -36,6 +36,11 @@ actor SyncEngine {
     private static let boardSyncInterval: TimeInterval = 3 * 60
     private static let lastSyncKey = "lastSyncStartedAt"
     private static let viewerKey = "viewer"
+    /// When the board was last read and its items refreshed, kept so that a launch (on iOS, after
+    /// every stop) waits out the same intervals instead of refetching every open board item.
+    private static let boardSyncedKey = "boardSyncedAt"
+    private static let boardRefreshedKey = "boardRefreshedAt"
+    private static let boardFullyRefreshedKey = "boardFullyRefreshedAt"
     private static let windowLength: TimeInterval = 10 * 24 * 3600
     private static let maxConcurrentFetches = 6
 
@@ -46,6 +51,7 @@ actor SyncEngine {
     private var boardRefreshedAt: Date?
     private var boardFullyRefreshedAt: Date?
     private var boardSyncedAt: Date?
+    private var boardTimesLoaded = false
     /// Ids needed to write to the board, from the latest board sync.
     var boardSchema: BoardQuery.Schema?
     /// When the app last wrote each board item, so a sync that read the board just before
@@ -69,6 +75,12 @@ actor SyncEngine {
 
         let startedAt = Date()
         let viewer = try await viewer()
+        if !boardTimesLoaded {
+            boardSyncedAt = try await db.meta(Self.boardSyncedKey).flatMap(Self.parse)
+            boardRefreshedAt = try await db.meta(Self.boardRefreshedKey).flatMap(Self.parse)
+            boardFullyRefreshedAt = try await db.meta(Self.boardFullyRefreshedKey).flatMap(Self.parse)
+            boardTimesLoaded = true
+        }
         let since: Date = if let last = try await db.meta(Self.lastSyncKey).flatMap(Self.parse) {
             last.addingTimeInterval(-Self.indexSlack)
         } else {
@@ -97,6 +109,7 @@ actor SyncEngine {
         if let contentIDs = try await board {
             fetched += try await refreshBoardItems(contentIDs)
             boardSyncedAt = startedAt
+            try await db.setMeta(Self.boardSyncedKey, Self.format(startedAt))
             if DeviceRole.current.runsRules { await followApprovals(viewer: viewer, readAt: startedAt) }
         }
 
@@ -249,7 +262,11 @@ actor SyncEngine {
             let count = try await refresh(ids: ids) + probe(ids: probed)
             if refreshOpen {
                 boardRefreshedAt = now
-                if fully { boardFullyRefreshedAt = now }
+                try await db.setMeta(Self.boardRefreshedKey, Self.format(now))
+                if fully {
+                    boardFullyRefreshedAt = now
+                    try await db.setMeta(Self.boardFullyRefreshedKey, Self.format(now))
+                }
             }
             return count
         } catch {
