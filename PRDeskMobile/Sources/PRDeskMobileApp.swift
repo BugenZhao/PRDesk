@@ -7,6 +7,7 @@ struct PRDeskMobileApp: App {
     @State private var model: AppModel
 
     init() {
+        SetupImport.run()
         do {
             _model = State(initialValue: try AppModel(db: .openDefault()))
         } catch {

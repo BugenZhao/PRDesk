@@ -84,6 +84,12 @@ SIMCTL_CHILD_PRDESK_GITHUB_TOKEN="$(gh auth token)" xcrun simctl launch --termin
   ```
 
   It is a copy: what the simulator marks read or sets stays in it.
+- A real device: `scripts/setup-device.sh <name or udid>` builds Release for it (automatic
+  signing with this Mac's development team, which needs an account in Xcode › Settings ›
+  Accounts to register a new device), installs it with `devicectl`, and sends this Mac's token,
+  bot webhooks and ids and badges repository as one file into the app's Documents, which the app
+  imports at launch and deletes (`SetupImport`). A Release build reads no environment and writes
+  to GitHub for real.
 - Check both an iPad mini (on its side: list beside detail; upright: list alone) and an iPhone,
   and window sizes in between: `DeskLayout` is a pure function of the width, so every size must
   come out right whatever came before. An iPad simulator only rotates; an iPhone simulator's app
