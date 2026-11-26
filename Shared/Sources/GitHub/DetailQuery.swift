@@ -6,6 +6,10 @@ enum DetailQuery {
     private static let actor = "{ __typename login }"
     /// Only the first few reactors, for the tooltip; the groups come back for every kind, even unused.
     private static let reactions = "reactionGroups { content viewerHasReacted reactors(first: 10) { totalCount nodes { ... on User { login } ... on Bot { login } ... on Organization { login } ... on Mannequin { login } } } }"
+    /// Counts alone, for a review's inline comments: GitHub prices a connection by the pages it could
+    /// return, so names there (100 timeline items × 50 comments × 10 reactors) cost about 50 of a
+    /// page's 52 points, used or not. Their reactions show who only as "3 people".
+    private static let reactionCounts = "reactionGroups { content viewerHasReacted reactors { totalCount } }"
 
     private static let timelineFragment = """
     fragment TimelineFields on PullRequestTimelineItems {
@@ -13,7 +17,7 @@ enum DetailQuery {
       ... on IssueComment { id author \(actor) createdAt bodyHTML bodyText url \(reactions) }
       ... on PullRequestReview {
         id author \(actor) state submittedAt createdAt bodyHTML bodyText url \(reactions) reviewCommit: commit { oid }
-        comments(first: 50) { nodes { id path line originalLine diffHunk bodyHTML outdated url \(reactions) } }
+        comments(first: 50) { nodes { id path line originalLine diffHunk bodyHTML outdated url \(reactionCounts) } }
       }
       ... on PullRequestCommit { id url commit { abbreviatedOid messageHeadline committedDate author { user { login } name } } }
       ... on HeadRefForcePushedEvent { id actor \(actor) createdAt beforeCommit { oid } afterCommit { oid abbreviatedOid } }
