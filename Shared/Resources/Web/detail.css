@@ -15,7 +15,8 @@ html { overflow-anchor: auto; }
 html, body { margin: 0; padding: 0; background: transparent; }
 body { font: 13px -apple-system, system-ui, sans-serif; color: var(--label); -webkit-font-smoothing: auto; }
 /* The phone: no text autosizing (it enlarges paragraphs but not one-line events), everything a
-   size up instead. */
+   size up instead. The app then sets the zoom itself, by the device and the viewer's text size
+   (`PRDesk.setTextScale`); this is what shows until it has. */
 html[data-platform="phone"] { -webkit-text-size-adjust: 100%; zoom: 1.2; }
 /* Secondary and tertiary text as strong as they read on the Mac: iOS's own label colors are a
    shade lighter and its text isn't smoothed heavier (the same values as `Color.secondaryText`). */

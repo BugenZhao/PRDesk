@@ -183,6 +183,12 @@ final class WebDocument: NSObject {
         let configuration = WKWebViewConfiguration()
         configuration.userContentController = controller
         configuration.setURLSchemeHandler(AvatarSchemeHandler.shared, forURLScheme: AvatarSchemeHandler.scheme)
+        #if os(iOS)
+            // An iPad takes pages as a desktop would by default, and then sizes their text by
+            // rules of its own: the page's zoom moved its boxes and left the text as small as
+            // it was. As a phone's, the text follows the zoom.
+            configuration.defaultWebpagePreferences.preferredContentMode = .mobile
+        #endif
         let webView = DocumentWebView(frame: .zero, configuration: configuration)
         webView.underPageBackgroundColor = .clear
         webView.allowsBackForwardNavigationGestures = false

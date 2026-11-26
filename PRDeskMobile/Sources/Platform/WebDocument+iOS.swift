@@ -30,11 +30,21 @@ struct WebDocumentView: View {
     let key: String
     let payload: String
     @Environment(PageScroll.self) private var scroll: PageScroll?
+    /// A hundred points as the viewer's text size scales body text: how much larger than the
+    /// default it is, in hundredths (a metric of 1 comes back rounded to 1 at every size).
+    @ScaledMetric(relativeTo: .body) private var scaledHundred: CGFloat = 100
+
+    /// The page's zoom over its 13 px base: a size up, as the stylesheet has it, times the
+    /// viewer's text size, which scales the pages as it does the rest of the app, within what
+    /// their layout can take.
+    private var zoom: CGFloat {
+        min(1.2 * scaledHundred / 100, 2.2)
+    }
 
     var body: some View {
         WebDocumentHost(
             document: document, key: key, payload: payload, scroll: scroll,
-            chromeHeight: scroll?.chromeHeight ?? 0, bottomRoom: scroll?.bottomRoom ?? 0
+            chromeHeight: scroll?.chromeHeight ?? 0, bottomRoom: scroll?.bottomRoom ?? 0, zoom: zoom
         )
         // To the window's foot too, under the home indicator.
         .ignoresSafeArea(.container, edges: [.top, .bottom])
@@ -51,6 +61,8 @@ private struct WebDocumentHost: UIViewRepresentable {
     let chromeHeight: CGFloat
     /// Room to leave under the page's end beyond the system's own.
     let bottomRoom: CGFloat
+    /// The page's zoom (`WebDocumentView.zoom`).
+    let zoom: CGFloat
 
     @MainActor
     final class Coordinator {
@@ -112,6 +124,7 @@ private struct WebDocumentHost: UIViewRepresentable {
             document.setting("insets", "PRDesk.setInsets(\(insets.joined(separator: ", ")))")
         }
         container.applyInsets(force: true)
+        document.setting("textScale", "PRDesk.setTextScale(\(String(format: "%.3f", zoom)))")
         document.render(key: key, payload: payload)
         context.coordinator.scroll = scroll
         context.coordinator.observe(webView.scrollView)

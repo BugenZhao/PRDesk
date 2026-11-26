@@ -793,7 +793,9 @@ The page gets the whole pane:
 
 **Text.** Secondary and tertiary text (authors, events, ages, a card's "commented 6d ago") are
 set a little darker than iOS's own label colors, in the list and in the pages, to read as they do
-on the Mac.
+on the Mac. The pages' text is the size of the list's titles (their 13 px base a size
+up) and follows the viewer's text size (Dynamic Type) as the rest of the app does, while it is
+running too.
 
 **Menus in the pages.** The smiley on a card offers the reactions in a row, mine marked (picking
 one of those takes it back). Holding a person offers their profile, their name to copy and,

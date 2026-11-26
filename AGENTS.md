@@ -197,6 +197,10 @@ are used off the main actor); no glass on content (cards, chips, rows).
 - In the background the system lays the window out at other sizes for its snapshots, and the
   split view writes `columnVisibility` for those: the binding takes writes only while the scene
   is active. What must survive the app being stopped in the background is `@SceneStorage`.
+- The pages' web views are `.mobile` content mode on iOS: an iPad's default (desktop) sizes text
+  by rules of its own, and CSS `zoom` on the root then moved the boxes and left the text at
+  13 px. The zoom is set from Swift (`PRDesk.setTextScale`: 1.2 times the Dynamic Type factor).
+  `@ScaledMetric` of 1 comes back rounded to 1 at every size; scale 100 and divide.
 - Liquid Glass (read `SwiftUI-Implementing-Liquid-Glass-Design.md` first; the exported skills
   don't cover it): buttons are the system's glass ones (`.buttonStyle(.glass)`, `.glassProminent`
   for the one that matters) with the labels the system gives them, which are the label color,

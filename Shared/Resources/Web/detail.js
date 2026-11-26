@@ -52,6 +52,15 @@ const PRDesk = (() => {
   // How much of the page's top lies under bars drawn over it (on iOS, where the page scrolls
   // beneath the navigation bar): what is scrolled to lands below them. See `setInsets`.
   let topInset = 0;
+  // The insets last asked for, in points, to lay out again when the page's zoom changes.
+  let insets = null;
+
+  function applyInsets() {
+    if (!insets) return;
+    const zoom = parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
+    document.body.style.paddingTop = `${insets.total / zoom}px`;
+    document.body.style.paddingBottom = `${insets.bottom / zoom}px`;
+  }
 
   function scrollToElement(element) {
     const top = element.getBoundingClientRect().top + scrollY - 10 - topInset;
@@ -649,9 +658,14 @@ const PRDesk = (() => {
     // what lies over the window's foot (in points; the page may be zoomed).
     setInsets(bars, total, bottom) {
       topInset = bars;
-      const zoom = parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
-      document.body.style.paddingTop = `${total / zoom}px`;
-      document.body.style.paddingBottom = `${bottom / zoom}px`;
+      insets = { total, bottom };
+      applyInsets();
+    },
+    // The page's size as a whole, which the app sets from the device and the viewer's text size
+    // (iOS; the stylesheet's own zoom is only where it starts).
+    setTextScale(scale) {
+      document.documentElement.style.zoom = scale;
+      applyInsets();
     },
   };
 })();
