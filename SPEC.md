@@ -775,10 +775,11 @@ lines or one (•••, two by default):
   is Desk too), and in Triage, where that choice is made, Desk with Shelf beside it. Nothing for
   a PR Merger is merging. Tray, Attic and the pin are in the row's menu and the detail
 - Holding a row opens the Mac's row menu, in this order: where else the item is, as a row of
-  buttons at its head (GitHub, the agent session, Copy Link); what I make of it (read, Status,
-  Priority, pin, add to Desk); the item itself (linked PR, author, ready / draft); the Grok Bot
+  buttons at its head (GitHub, the agent session, Copy Link); what I make of it (read, pin,
+  Status, Priority, add to Desk); the item itself (linked PR, author, ready / draft); the Grok Bot
   requests, again as a row of buttons under their emoji. What doesn't apply to the item isn't in
-  the menu at all (the Mac's shows it dimmed)
+  the menu at all (the Mac's shows it dimmed). The Mac's row menu has the same groups in the same
+  order, as one flat list with each command's key beside it, and the author's affiliation
 - The filter (§4.4) is the system's search field, a button at the list's foot
 - At the list's foot, one button stands for the Mac's status bar. Its symbol says how things
   stand at a glance: two arrows (turning while syncing, orange when the quota runs low), an arrow

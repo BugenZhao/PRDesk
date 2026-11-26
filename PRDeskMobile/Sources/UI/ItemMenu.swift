@@ -4,8 +4,8 @@ import SwiftUI
 /// The same actions as the Mac's keys and row menu, through `AppModel.perform`.
 ///
 /// In this order: where else the item is (a row of buttons at the menu's head: GitHub, its agent
-/// session, its link to copy), what I make of it (read, and the board's Status, Priority and
-/// pin), the item itself (its linked PR, its author, draft or ready, its title), then the bots,
+/// session, its link to copy), what I make of it (read, and the board's pin, Status and
+/// Priority), the item itself (its linked PR, its author, draft or ready, its title), then the bots,
 /// again as a row of buttons. What doesn't apply to the item isn't there: a menu under a finger
 /// has no room for what can't be chosen (the Mac's shows it dimmed, where its key is learned).
 struct ItemMenu: View {
@@ -47,6 +47,10 @@ struct ItemMenu: View {
                 model.perform(.toggleRead, on: item.id)
             }
             if Self.isOnBoard(item, model: model) {
+                let isPinned = board?.isPinned == true
+                Button(isPinned ? "Unpin" : "Pin", systemImage: isPinned ? "pin.slash" : "pin") {
+                    model.perform(.togglePin, on: item.id)
+                }
                 let triage = model.triage(for: item)
                 Menu("Status", systemImage: "square.stack") {
                     Toggle("Triage", isOn: Binding(
@@ -75,10 +79,6 @@ struct ItemMenu: View {
                         get: { board?.priorityValue == nil },
                         set: { _ in if board?.priorityValue != nil { model.perform(.priority(nil), on: item.id) } }
                     ))
-                }
-                let isPinned = board?.isPinned == true
-                Button(isPinned ? "Unpin" : "Pin", systemImage: isPinned ? "pin.slash" : "pin") {
-                    model.perform(.togglePin, on: item.id)
                 }
                 if model.canAddToDesk(item) {
                     Button("Add to Desk", systemImage: "plus") { model.perform(.addToDesk, on: item.id) }

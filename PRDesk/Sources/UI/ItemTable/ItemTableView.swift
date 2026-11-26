@@ -513,9 +513,13 @@ struct ItemTableView: NSViewRepresentable {
             var isAlternate = false
         }
 
+        /// In the order of the iPad's menu (`ItemMenu`): where else the item is, what I make of
+        /// it, the item itself, the bots.
         private static let menuActions: [MenuAction] = [
-            MenuAction(title: "Open in Browser", action: .openInBrowser, symbol: "safari", key: "o"),
-            MenuAction(title: "Open Author's Profile", action: .openAuthorProfile, symbol: "person.crop.circle", key: "u"),
+            MenuAction(title: "Open on GitHub", action: .openInBrowser, symbol: "arrow.up.right", key: "o"),
+            MenuAction(title: "Open Agent Session", action: .openSession, symbol: "terminal", key: "t"),
+            MenuAction(title: "Mark as Read / Unread", action: .toggleRead, symbol: "envelope.open", key: "n"),
+            MenuAction(title: "Pin / Unpin", action: .togglePin, symbol: "pin", key: "p"),
             MenuAction(title: "Desk", action: .triage(.working), symbol: "hammer", key: "w"),
             MenuAction(title: "Tray", action: .triage(.backlog), symbol: "tray", key: "b"),
             MenuAction(title: "Shelf", action: .triage(.skipped), symbol: "books.vertical", key: "s"),
@@ -524,8 +528,8 @@ struct ItemTableView: NSViewRepresentable {
             MenuAction(title: "Medium Priority", action: .priority(.medium), symbol: Priority.medium.symbol, key: "2"),
             MenuAction(title: "Low Priority", action: .priority(.low), symbol: Priority.low.symbol, key: "3"),
             MenuAction(title: "Clear Priority", action: .priority(nil), symbol: "xmark", key: "0"),
-            MenuAction(title: "Pin / Unpin", action: .togglePin, symbol: "pin", key: "p"),
-            MenuAction(title: "Mark as Read / Unread", action: .toggleRead, symbol: "envelope.open", key: "n"),
+            MenuAction(title: "Go to Linked PR", action: .openLinked, symbol: "arrow.left.arrow.right", key: "l"),
+            MenuAction(title: "Open Author's Profile", action: .openAuthorProfile, symbol: "person.crop.circle", key: "u"),
             MenuAction(title: "👀 Investigate", action: .sendToBot(.investigate), key: "e"),
             MenuAction(title: "👀 Investigate…", action: .sendToBot(.investigate, withNote: true), key: "e", isAlternate: true),
             MenuAction(title: "🔥 Track", action: .sendToBot(.track), key: "f"),
@@ -533,13 +537,14 @@ struct ItemTableView: NSViewRepresentable {
             MenuAction(title: "🫴 Adopt", action: .sendToBot(.adopt), key: "d"),
             MenuAction(title: "🫴 Adopt…", action: .sendToBot(.adopt, withNote: true), key: "d", isAlternate: true),
             MenuAction(title: "🚀 Merge…", action: .sendToBot(.merge), key: "r"),
-            MenuAction(title: "Open Agent Session", action: .openSession, symbol: "terminal", key: "t"),
-            MenuAction(title: "Go to Linked PR", action: .openLinked, symbol: "link", key: "l"),
         ]
         /// Indices of `menuActions` after which a separator goes.
-        private static let menuSeparatorsAfter: Set = [1, 5, 9, 11]
+        private static let menuSeparatorsAfter: Set = [1, 3, 7, 11, 13]
+        /// Index of `menuActions` after which Copy Link goes (an item of its own: its key has
+        /// modifiers, and it goes through the table's Copy).
+        private static let copyLinkAfter = 1
         /// Index of `menuActions` after which the author's affiliation submenu goes.
-        private static let affiliationAfter = 1
+        private static let affiliationAfter = 13
         /// Its submenu is made when the menu opens, for the authors right-clicked.
         private let affiliationItem: NSMenuItem = {
             let item = NSMenuItem(title: "Author's Affiliation", action: nil, keyEquivalent: "")
@@ -558,15 +563,16 @@ struct ItemTableView: NSViewRepresentable {
                 item.tag = index
                 item.target = self
                 menu.addItem(item)
+                if index == Self.copyLinkAfter {
+                    let copy = NSMenuItem(title: "Copy Link", action: #selector(copyClickedLinks), keyEquivalent: "c")
+                    copy.keyEquivalentModifierMask = [.command, .shift]
+                    copy.image = NSImage(systemSymbolName: "link", accessibilityDescription: nil)
+                    copy.target = self
+                    menu.addItem(copy)
+                }
                 if index == Self.affiliationAfter { menu.addItem(affiliationItem) }
                 if Self.menuSeparatorsAfter.contains(index) { menu.addItem(.separator()) }
             }
-            menu.addItem(.separator())
-            let copy = NSMenuItem(title: "Copy Link", action: #selector(copyClickedLinks), keyEquivalent: "c")
-            copy.keyEquivalentModifierMask = [.command, .shift]
-            copy.image = NSImage(systemSymbolName: "link", accessibilityDescription: nil)
-            copy.target = self
-            menu.addItem(copy)
             menu.delegate = self
             // Merge is disabled for rows it doesn't apply to; see `menuNeedsUpdate`.
             menu.autoenablesItems = false
