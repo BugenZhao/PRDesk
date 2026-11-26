@@ -65,7 +65,7 @@ struct FilesView: View {
             if let viewed = model.viewedFiles[item.id] {
                 let count = files.count { viewed[$0.filename] == .viewed }
                 Text("\(count) / \(files.count) viewed")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.secondaryText)
                     .padding(.leading, 4)
             }
             Spacer(minLength: 0)

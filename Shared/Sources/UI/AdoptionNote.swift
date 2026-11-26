@@ -44,7 +44,7 @@ struct AdoptionNote: View {
         }
         .buttonStyle(.plain)
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(.secondaryText)
         .help(help)
     }
 }

@@ -67,11 +67,11 @@ struct ChecksView: View {
                                     .frame(width: 10)
                                 Text(state.title)
                                 Text(String(group.count)).monospacedDigit()
-                                    .foregroundStyle(.tertiary)
+                                    .foregroundStyle(.tertiaryText)
                                 Spacer(minLength: 0)
                             }
                             .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.secondaryText)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .contentShape(Rectangle())
@@ -103,14 +103,14 @@ private struct CheckRow: View {
                     .foregroundStyle(check.state.color)
                 Text(check.name).lineLimit(1).truncationMode(.middle)
                 if let app = check.app {
-                    Text(app).foregroundStyle(.tertiary).lineLimit(1)
+                    Text(app).foregroundStyle(.tertiaryText).lineLimit(1)
                 }
                 Spacer(minLength: 4)
                 if let duration {
-                    Text(duration).foregroundStyle(.secondary).monospacedDigit()
+                    Text(duration).foregroundStyle(.secondaryText).monospacedDigit()
                 }
                 if check.url != nil {
-                    Image(systemName: "arrow.up.right").foregroundStyle(.tertiary)
+                    Image(systemName: "arrow.up.right").foregroundStyle(.tertiaryText)
                 }
             }
             .font(.callout)
@@ -146,7 +146,7 @@ struct CISummary: View {
     var body: some View {
         HStack(spacing: 4) {
             Circle().fill(color).frame(width: 7, height: 7)
-            Text(text).foregroundStyle(ci.failed > 0 ? .red : .secondary)
+            Text(text).foregroundStyle(ci.failed > 0 ? AnyShapeStyle(.red) : .secondaryText)
         }
     }
 
@@ -192,7 +192,7 @@ private extension Check.State {
         case .failed: .red
         case .pending: .yellow
         case .passed: .green
-        case .skipped: .secondary
+        case .skipped: .secondaryText
         }
     }
 }

@@ -11,14 +11,6 @@ extension Color {
         #endif
     }
 
-    static var tertiaryLabel: Color {
-        #if os(macOS)
-            Color(nsColor: .tertiaryLabelColor)
-        #else
-            .tertiaryText
-        #endif
-    }
-
     static var separator: Color {
         #if os(macOS)
             Color(nsColor: .separatorColor)
@@ -28,26 +20,51 @@ extension Color {
     }
 }
 
-#if os(iOS)
-    extension Color {
-        /// Secondary and tertiary text as strong as they read on the Mac. iOS's own label colors
-        /// are a shade lighter, and its text isn't smoothed heavier as the Mac's is, so these
-        /// are a little darker than the Mac's nominal values (50% and 26% black).
-        static let secondaryText = Color(uiColor: UIColor { traits in
-            traits.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.6) : UIColor(white: 0, alpha: 0.56)
-        })
-        static let tertiaryText = Color(uiColor: UIColor { traits in
-            traits.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.36) : UIColor(white: 0, alpha: 0.36)
-        })
+/// Gray text, by name rather than by the hierarchical styles (`.secondary`, `.tertiary`).
+///
+/// On the Mac these are the system's own. iOS's label grays are a shade lighter than the Mac's,
+/// and its text isn't smoothed heavier as the Mac's is (measured: a line of text gets 17% more
+/// ink there in light mode, a third more in dark), so the Mac's grays (50% and 26% black, 55%
+/// and 25% white) are made up for here. Use these for every gray text and symbol in a view an
+/// iPad shows: a hierarchical style on a `Text` came out as iOS's own, a level lighter again
+/// inside a view that was gray already, whatever styles were set around it.
+extension Color {
+    static var secondaryText: Color {
+        #if os(macOS)
+            .secondary
+        #else
+            Color(uiColor: UIColor { traits in
+                UIColor(white: traits.userInterfaceStyle == .dark ? 1 : 0, alpha: traits.userInterfaceStyle == .dark ? 0.72 : 0.6)
+            })
+        #endif
     }
 
-    extension View {
-        /// Makes them the hierarchical styles (`.secondary`, `.tertiary`) of the text within.
-        /// Only around text: any foreground style set from outside also takes over the labels of
-        /// the buttons and menus inside, which then lose their own color (a tinted button's blue,
-        /// a prominent one's white) and come out black.
-        func macTextStrength() -> some View {
-            foregroundStyle(.foreground, Color.secondaryText, Color.tertiaryText)
-        }
+    static var tertiaryText: Color {
+        #if os(macOS)
+            Color(nsColor: .tertiaryLabelColor)
+        #else
+            Color(uiColor: UIColor { traits in
+                UIColor(white: traits.userInterfaceStyle == .dark ? 1 : 0, alpha: traits.userInterfaceStyle == .dark ? 0.42 : 0.38)
+            })
+        #endif
     }
-#endif
+}
+
+extension ShapeStyle where Self == AnyShapeStyle {
+    /// On the Mac the hierarchical style itself, which follows what it is drawn in.
+    static var secondaryText: AnyShapeStyle {
+        #if os(macOS)
+            AnyShapeStyle(.secondary)
+        #else
+            AnyShapeStyle(Color.secondaryText)
+        #endif
+    }
+
+    static var tertiaryText: AnyShapeStyle {
+        #if os(macOS)
+            AnyShapeStyle(.tertiary)
+        #else
+            AnyShapeStyle(Color.tertiaryText)
+        #endif
+    }
+}

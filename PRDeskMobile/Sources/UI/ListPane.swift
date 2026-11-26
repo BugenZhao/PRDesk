@@ -138,22 +138,21 @@ private struct SectionHeader: View {
             HStack(spacing: 6) {
                 Image(systemName: "chevron.right")
                     .font(.caption2.weight(.bold))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.tertiaryText)
                     .rotationEffect(.degrees(group.collapsed ? 0 : 90))
                     .frame(width: 14)
                 Text(group.section.title)
                     .foregroundStyle(Color.primary)
                 Text(String(group.count))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.secondaryText)
                     .monospacedDigit()
                 if group.inParity > 0 {
-                    Text("+\(group.inParity) in Parity").foregroundStyle(.tertiary)
+                    Text("+\(group.inParity) in Parity").foregroundStyle(.tertiaryText)
                 }
                 Spacer(minLength: 0)
             }
             .font(.footnote.weight(.semibold))
             .textCase(nil)
-            .macTextStrength()
             .padding(.horizontal, 10)
             .frame(height: 30)
             .contentShape(Rectangle())
@@ -260,7 +259,7 @@ private struct ColumnTitles: View {
             title("Upd", .updated, width: widths.updated, alignment: .trailing)
         }
         .font(.caption2.weight(.medium))
-        .foregroundStyle(.secondary)
+        .foregroundStyle(.secondaryText)
         .padding(.trailing, RowColumns.trailingInset)
         .frame(height: 24)
         .background(.bar)

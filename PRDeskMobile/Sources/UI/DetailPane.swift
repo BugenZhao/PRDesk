@@ -209,7 +209,7 @@ private struct BarTitle: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 5) {
                     StateIconView(item: item, size: 13, isMerging: model.isMerging(item))
-                    Text(itemTitle: item.title, shortenedTags: true, codeFont: .footnote.monospaced())
+                    Text(itemTitle: item.title, shortenedTags: true, codeFont: .footnote.monospaced(), tagStyle: .secondaryText)
                 }
                 .font(.subheadline.weight(.semibold))
                 HStack(spacing: 4) {
@@ -225,7 +225,7 @@ private struct BarTitle: View {
                 }
                 .font(.caption)
                 .monospacedDigit()
-                .foregroundStyle(Color.secondaryText)
+                .foregroundStyle(.secondaryText)
             }
             .lineLimit(1)
             // The bar centers its title at the width the title asks for. Asking for more than
@@ -406,7 +406,7 @@ private struct GlassMenuLabel: View {
             Text(text).font(.subheadline.weight(.medium))
             Image(systemName: "chevron.up.chevron.down")
                 .font(.caption2.weight(.semibold))
-                .foregroundStyle(Color.secondaryText)
+                .foregroundStyle(.secondaryText)
         }
         .padding(.horizontal, 13)
         .frame(height: RoundGlassIcon.size)
@@ -470,7 +470,6 @@ private struct DetailHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             title
-                .macTextStrength()
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { onTitleExtent($0 + 10) }
             people
             if isExpanded { more }
@@ -483,7 +482,7 @@ private struct DetailHeader: View {
 
     private var title: some View {
         // One text, so a title that wraps continues under its number.
-        Text("\(Text("#\(String(item.number))").foregroundStyle(.secondary).monospacedDigit()) \(titleText)")
+        Text("\(Text("#\(String(item.number))").foregroundStyle(.secondaryText).monospacedDigit()) \(titleText)")
             .lineLimit(3)
             .fixedSize(horizontal: false, vertical: true)
             .textSelection(.enabled)
@@ -495,7 +494,7 @@ private struct DetailHeader: View {
         TitleMarkup.pieces(item.title).reduce(Text(verbatim: "")) { text, piece in
             var part = Text(verbatim: piece.text)
             if piece.isCode { part = part.font(.system(.title3, design: .monospaced).weight(.semibold)) }
-            if piece.isPrefix { part = part.foregroundStyle(.secondary) }
+            if piece.isPrefix { part = part.foregroundStyle(.secondaryText) }
             return Text("\(text)\(part)")
         }
     }
@@ -536,12 +535,10 @@ private struct DetailHeader: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(.secondaryText)
             .accessibilityLabel(isExpanded ? "Show Less" : "Show More")
         }
         .font(.callout)
-        // Its buttons are plain (the CI status, the chevron), with no color of their own to lose.
-        .macTextStrength()
     }
 
     /// What folds away: dates and branches, the adoption, the stack, the labels and the board's
@@ -559,7 +556,7 @@ private struct DetailHeader: View {
             }
         }
         .font(.caption)
-        .foregroundStyle(Color.secondaryText)
+        .foregroundStyle(.secondaryText)
 
         AdoptionNote(item: item)
 
@@ -576,7 +573,7 @@ private struct DetailHeader: View {
         if let board = model.board(for: item), !board.isArchived, let comment = board.comment, !comment.isEmpty {
             Label(comment, systemImage: "text.bubble")
                 .font(.caption)
-                .foregroundStyle(Color.secondaryText)
+                .foregroundStyle(.secondaryText)
         }
     }
 

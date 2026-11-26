@@ -20,7 +20,7 @@ struct BotSendSheet: View {
                     Text(verbatim: "#\(item.number) \(item.title)").lineLimit(1).truncationMode(.tail)
                 }
                 if pending.items.count > Self.listedItems {
-                    Text("and \(pending.items.count - Self.listedItems) more").foregroundStyle(.secondary)
+                    Text("and \(pending.items.count - Self.listedItems) more").foregroundStyle(.secondaryText)
                 }
             }
             .font(.callout)
@@ -34,7 +34,7 @@ struct BotSendSheet: View {
                 .overlay(alignment: .topLeading) {
                     if note.isEmpty {
                         Text("Note for \(pending.request.botName) (optional)")
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(.tertiaryText)
                             .padding(.horizontal, 9)
                             .padding(.vertical, 4)
                             .allowsHitTesting(false)

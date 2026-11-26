@@ -34,7 +34,7 @@ struct DiffOptions: View {
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.body.weight(.medium))
-                    .foregroundStyle(Color.secondary)
+                    .foregroundStyle(.secondaryText)
                     .frame(width: 36, height: 26)
                     .contentShape(Rectangle())
             }
@@ -80,11 +80,11 @@ struct BadgeShareStatus: View {
     var body: some View {
         switch state {
         case .none:
-            Text("Not yet").foregroundStyle(.secondary)
+            Text("Not yet").foregroundStyle(.secondaryText)
         case let .done(date):
             TimelineView(.periodic(from: .now, by: 30)) { _ in
                 let age = date.compactAge()
-                Text(age == "now" ? "\(verb) just now" : "\(verb) \(age) ago").foregroundStyle(.secondary)
+                Text(age == "now" ? "\(verb) just now" : "\(verb) \(age) ago").foregroundStyle(.secondaryText)
             }
         case let .failed(message):
             Text(message).foregroundStyle(.red).lineLimit(2)

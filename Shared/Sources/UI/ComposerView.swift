@@ -98,7 +98,7 @@ struct ComposerView: View {
                     .overlay(alignment: .topLeading) {
                         if text.isEmpty {
                             Text(placeholder)
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(.tertiaryText)
                                 .padding(.leading, 4 + Self.textInsets.leading)
                                 .padding(.top, 4 + Self.textInsets.top)
                                 .allowsHitTesting(false)

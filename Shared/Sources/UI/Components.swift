@@ -87,7 +87,7 @@ struct BadgeIcons: View {
                     if let image = badge.image {
                         Image(platformImage: image).resizable().scaledToFit()
                     } else {
-                        BadgeTile(text: badge.org.shortLabel, color: Color.tertiaryLabel, size: size)
+                        BadgeTile(text: badge.org.shortLabel, color: Color.tertiaryText, size: size)
                     }
                 }
                 .frame(width: size, height: size)
@@ -117,7 +117,7 @@ struct BadgeTile: View {
 /// A small rounded tag.
 struct Chip: View {
     let text: String
-    var color: Color = .secondary
+    var color: Color = .secondaryText
 
     var body: some View {
         Text(text)
@@ -135,7 +135,7 @@ struct LabelChip: View {
     let hex: String
 
     var body: some View {
-        let color = Color(hex: hex) ?? .secondary
+        let color = Color(hex: hex) ?? .secondaryText
         Text(name)
             .font(.system(size: 10, weight: .medium))
             .padding(.horizontal, 6)
@@ -211,15 +211,18 @@ extension Color {
 extension Text {
     /// A PR or commit title with its leading tags dimmed, and shortened ("[RF][Fix] ") when
     /// `shortenedTags`; `code` spans in `codeFont`.
-    init(itemTitle title: String, shortenedTags: Bool, codeFont: Font = .callout.monospaced()) {
+    init(
+        itemTitle title: String, shortenedTags: Bool, codeFont: Font = .callout.monospaced(),
+        tagStyle: AnyShapeStyle = .tertiaryText
+    ) {
         let pieces = TitleMarkup.pieces(title)
         let short = shortenedTags ? TitlePrefix.abbreviate(TitlePrefix.split(title).prefix) : nil
-        let start = short.map { Text(verbatim: $0).foregroundStyle(.tertiary) } ?? Text(verbatim: "")
+        let start = short.map { Text(verbatim: $0).foregroundStyle(tagStyle) } ?? Text(verbatim: "")
         self = pieces.reduce(start) { text, piece in
             if piece.isPrefix, short != nil { return text }
             var part = Text(verbatim: piece.text)
             if piece.isCode { part = part.font(codeFont) }
-            if piece.isPrefix { part = part.foregroundStyle(.tertiary) }
+            if piece.isPrefix { part = part.foregroundStyle(tagStyle) }
             return Text("\(text)\(part)")
         }
     }

@@ -295,7 +295,7 @@ private struct CommitRow: View {
             if commit.isMerge {
                 Image(systemName: "arrow.triangle.merge")
                     .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.secondaryText)
                     .frame(width: 7, height: 7)
             } else {
                 Circle()
@@ -305,10 +305,10 @@ private struct CommitRow: View {
             AvatarView(login: commit.author, size: 16)
             Text(commit.shortOid)
                 .font(.callout.monospaced())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.secondaryText)
             // Merges in gray: they are rarely what a review is about.
             Text(itemTitle: commit.headline, shortenedTags: shortensTags)
-                .foregroundStyle(commit.isMerge ? .secondary : .primary)
+                .foregroundStyle(commit.isMerge ? .secondaryText : AnyShapeStyle(.primary))
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: 4)
@@ -320,7 +320,7 @@ private struct CommitRow: View {
                     .background(.tint.opacity(0.15), in: .capsule)
             }
             Text(commit.committedAt.compactAge())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.secondaryText)
                 .monospacedDigit()
         }
         .font(.callout)

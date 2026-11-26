@@ -260,8 +260,13 @@ are used off the main actor); no glass on content (cards, chips, rows).
   out as circles of two sizes.
 - A foreground style set around a view takes over the labels of the buttons and menus inside it
   (a prominent button's white comes out black, a bar's `Menu` all but vanishes).
-  `macTextStrength` (darker `.secondary` / `.tertiary` on iOS) goes only around text: a list row,
-  a section's title, the header's lines.
+- Gray text and symbols in a view an iPad shows take `.secondaryText` / `.tertiaryText`
+  (`PlatformColors`: the hierarchical styles on the Mac, colors of our own on iOS, in
+  `detail.css` too), never `.secondary` / `.tertiary`. iOS's grays are lighter than the Mac's
+  and its text isn't smoothed heavier, and setting darker ones around a view
+  (`foregroundStyle(_:_:_:)`) didn't reach a `Text` styled itself: tags came out as iOS's
+  tertiary, the latest event (tertiary in a secondary line) as its quaternary. Check a gray by
+  its pixels in a simulator screenshot (60% black on white is 102).
 - Views in a `ScrollView` can't reach under the bars with `ignoresSafeArea`, and a
   `safeAreaInset` on the scroll view pushes its content down. The detail's pager (`DetailPager`)
   gives each page negative padding to the window's edges and `safeAreaPadding` back, and the

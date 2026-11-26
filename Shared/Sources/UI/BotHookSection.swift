@@ -14,7 +14,7 @@ struct BotHookSection: View {
             } footer: {
                 if role == BotRole.allCases.last {
                     Text("The URL and secret of the bot's webhook routine, as `notify-bot` keeps them in `~/.config/grokbot-hooks/` (the secret bare or as its `Authorization: Bearer …` line). Kept in this device's Keychain. \(fallback)")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.secondaryText)
                         .textSelection(.enabled)
                 }
             }

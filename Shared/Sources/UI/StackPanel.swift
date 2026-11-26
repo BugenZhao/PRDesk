@@ -18,7 +18,7 @@ struct StackPanel: View {
                 Color.clear.frame(width: StackRailShape.width)
                 Text(baseBranch)
                     .font(.caption.monospaced())
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.tertiaryText)
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
@@ -53,12 +53,12 @@ struct StackPanel: View {
             Spacer(minLength: 0)
             #if os(macOS)
                 Text("⌥↑ ⌥↓")
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.tertiaryText)
                     .help("Move along the stack")
             #endif
         }
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(.secondaryText)
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
     }
@@ -88,7 +88,7 @@ struct StackPanel: View {
                 StackRailView(rail: rung.rail, height: Self.rowHeight, color: rung.upstream?.state == .merged || isMerging ? .purple : entry.stateColor, hollow: entry.state == .open && entry.isDraft)
                     .help(isMerging ? "\(entry.stateDescription), being merged by Merger" : entry.stateDescription)
                 Text("#\(String(entry.number))")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.secondaryText)
                     .monospacedDigit()
                 Text(itemTitle: entry.title, shortenedTags: shortensTags)
                     .lineLimit(1)
@@ -116,11 +116,11 @@ struct StackPanel: View {
             row {
                 StackRailView(rail: rail, height: Self.rowHeight, color: .purple, hollow: false)
                 Text("\(rungs.count) merged together" + (at.map { " · \($0.compactAge()) ago" } ?? ""))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.secondaryText)
                 Spacer(minLength: 8)
                 Image(systemName: isOpen ? "chevron.down" : "chevron.right")
                     .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.tertiaryText)
             }
         }
         .buttonStyle(.plain)
@@ -139,13 +139,13 @@ struct StackPanel: View {
                 Text(text ?? "")
                     .monospacedDigit()
             }
-            .foregroundStyle(.secondary)
+            .foregroundStyle(.secondaryText)
             .font(.caption)
             .help("Promoted as \(upstream.repo)#\(upstream.number): \(upstream.stateDescription(isMerging: model.isMerging(upstream)))")
         } else if let text {
             Text(text)
                 .font(.caption)
-                .foregroundStyle(entry.state == .open ? AnyShapeStyle(.orange) : AnyShapeStyle(.tertiary))
+                .foregroundStyle(entry.state == .open ? AnyShapeStyle(.orange) : .tertiaryText)
                 .help(entry.state == .open ? staleHelp(rung) : "")
         }
     }
@@ -220,7 +220,7 @@ private extension PRStack.Entry {
     /// As `Item.stateColor`, without mergeability to show conflicts with.
     var stateColor: Color {
         switch state {
-        case .open: isDraft ? .secondary : .green
+        case .open: isDraft ? .secondaryText : .green
         case .merged: .purple
         case .closed: .red
         }

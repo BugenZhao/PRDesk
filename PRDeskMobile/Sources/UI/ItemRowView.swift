@@ -57,7 +57,6 @@ struct ItemRowView: View {
         .padding(.trailing, RowColumns.trailingInset)
         .frame(minHeight: columns.height)
         .contentShape(Rectangle())
-        .macTextStrength()
     }
 
     // MARK: Layouts
@@ -67,7 +66,7 @@ struct ItemRowView: View {
         if density.showsNumber {
             Text(String(item.number))
                 .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.secondaryText)
                 .frame(width: columns.number, alignment: .leading)
         }
         // The Comment and the latest event show only where the whole title fits beside them.
@@ -132,7 +131,7 @@ struct ItemRowView: View {
                 BadgeIcons(login: item.author, size: 12 * scale)
                 if isParity { link }
                 if let text = secondLineNote {
-                    Text(text).foregroundStyle(.tertiary).lineLimit(1)
+                    Text(text).foregroundStyle(.tertiaryText).lineLimit(1)
                 }
                 Spacer(minLength: 0)
                 // Whose turn, then the two marks side by side in their columns.
@@ -144,7 +143,7 @@ struct ItemRowView: View {
                 ci.column(columns.ci)
             }
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(.secondaryText)
         }
         .padding(.vertical, 6)
     }
@@ -165,7 +164,7 @@ struct ItemRowView: View {
         let isUnread = row.showsUnread
         if let rail = row.rail {
             StackRailView(
-                rail: rail, color: isUnread ? .accentColor : .secondary,
+                rail: rail, color: isUnread ? .accentColor : .secondaryText,
                 hollow: !isUnread && item.isOpen && item.isDraft
             )
             .padding(.leading, 6)
@@ -182,7 +181,7 @@ struct ItemRowView: View {
     /// The title with its tags dimmed, shortened beside the detail and on a phone, where room is
     /// short.
     private var title: some View {
-        Text(itemTitle: item.title, shortenedTags: !density.showsFullTags, codeFont: .footnote.monospaced())
+        Text(itemTitle: item.title, shortenedTags: !density.showsFullTags, codeFont: .footnote.monospaced(), tagStyle: .secondaryText)
             .font(.subheadline)
             .fontWeight(row.insight.isUnread ? .semibold : .regular)
             .lineLimit(1)
@@ -194,10 +193,10 @@ struct ItemRowView: View {
     /// Inbox, why a Shelf item woke.
     @ViewBuilder private var tags: some View {
         if row.board?.sessionLinks.isEmpty == false {
-            Image(systemName: "terminal").font(.caption2).foregroundStyle(.secondary)
+            Image(systemName: "terminal").font(.caption2).foregroundStyle(.secondaryText)
         }
         if row.adoption != nil {
-            Image(systemName: "link").font(.caption2).foregroundStyle(.secondary)
+            Image(systemName: "link").font(.caption2).foregroundStyle(.secondaryText)
         }
         if let note = row.note {
             Chip(text: note.reasonLabel, color: .accentColor).fixedSize()
@@ -213,10 +212,10 @@ struct ItemRowView: View {
     /// The board's Comment.
     @ViewBuilder private var comment: some View {
         if let comment = row.comment {
-            Image(systemName: "text.bubble").font(.caption2).foregroundStyle(.tertiary)
+            Image(systemName: "text.bubble").font(.caption2).foregroundStyle(.tertiaryText)
             Text(comment)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.secondaryText)
                 .lineLimit(1)
                 .frame(maxWidth: 220, alignment: .leading)
                 .fixedSize()
@@ -228,7 +227,7 @@ struct ItemRowView: View {
         if let summary = row.insight.summary, let at = row.insight.summaryAt {
             Text("\(summary) \(at.compactAge())")
                 .font(.caption)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.tertiaryText)
                 .lineLimit(1)
                 .frame(maxWidth: 190, alignment: .trailing)
                 .fixedSize()
@@ -258,7 +257,7 @@ struct ItemRowView: View {
                 StateIconView(item: paired, size: 13 * scale, isMerging: row.pairedIsMerging)
                 Text("#\(String(paired.number))")
                     .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.secondaryText)
                     .lineLimit(1)
             }
         }
@@ -281,7 +280,7 @@ struct ItemRowView: View {
                 .font(.caption)
                 .fontWeight(mark.isMine ? .bold : .regular)
                 // The label color itself: `.primary` would follow a dimmed container.
-                .foregroundStyle(mark.isMine ? Color.primary : Color.tertiaryLabel)
+                .foregroundStyle(mark.isMine ? Color.primary : Color.tertiaryText)
                 .lineLimit(1)
         }
     }
@@ -317,7 +316,7 @@ struct ItemRowView: View {
     private var updated: some View {
         Text(item.updatedAt.compactAge())
             .font(.caption.monospacedDigit())
-            .foregroundStyle(.secondary)
+            .foregroundStyle(.secondaryText)
             .lineLimit(1)
             .fixedSize()
             .layoutPriority(2)

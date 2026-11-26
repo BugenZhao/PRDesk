@@ -82,7 +82,7 @@ struct PageMenuView: View {
                 Divider()
                 Text("Affiliation")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.secondaryText)
                     .padding(.horizontal, 14)
                     .padding(.top, 8)
                     .padding(.bottom, 2)
@@ -113,7 +113,7 @@ struct PageMenuView: View {
         VStack(alignment: .leading, spacing: 0) {
             Text(path)
                 .font(.caption.monospaced())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.secondaryText)
                 .lineLimit(2)
                 .truncationMode(.middle)
                 .padding(.horizontal, 14)
@@ -164,7 +164,7 @@ private struct MenuRow: View {
             HStack(spacing: 10) {
                 Image(systemName: isOn == nil ? (systemImage ?? "circle") : "checkmark")
                     .font(.body.weight(isOn == nil ? .regular : .semibold))
-                    .foregroundStyle(isOn == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tint))
+                    .foregroundStyle(isOn == nil ? .secondaryText : AnyShapeStyle(.tint))
                     .opacity(isOn == false ? 0 : 1)
                     .frame(width: 22)
                 Text(title).foregroundStyle(Color.primary)

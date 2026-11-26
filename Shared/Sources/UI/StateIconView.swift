@@ -4,7 +4,7 @@ extension StateTint {
     var color: Color {
         switch self {
         case .green: .green
-        case .gray: .secondary
+        case .gray: .secondaryText
         case .yellow: .yellow
         case .purple: .purple
         case .red: .red
