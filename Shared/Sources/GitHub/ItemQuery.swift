@@ -123,12 +123,13 @@ enum ItemQuery {
     """
 
     /// What can change about an item without moving its `updatedAt`: a PR's mergeability (its base
-    /// branch moves) and CI (checks finish). Everything else is only worth fetching again once
-    /// `updatedAt` moves, `reviewDecision` above all: GitHub spends about 0.12 s per vllm PR on it.
+    /// branch moves), CI (checks finish) and review decision (branch rules or code owners change).
+    /// Everything else is only worth fetching again once `updatedAt` moves. `reviewDecision` costs
+    /// GitHub about 0.12 s per vllm PR, some 3 s a batch, well inside its time limit.
     static let probe = """
     query($ids: [ID!]!) {
       nodes(ids: $ids) {
-        ... on PullRequest { id updatedAt mergeable \(ci) }
+        ... on PullRequest { id updatedAt mergeable reviewDecision \(ci) }
         ... on Issue { id updatedAt }
       }
     }
@@ -196,6 +197,7 @@ enum ItemQuery {
             let id: String
             let updatedAt: Date
             let mergeable: String?
+            let reviewDecision: String?
             let commits: Nodes<Commit>?
 
             var ci: Item.CIStatus? { commits?.values.last?.commit.statusCheckRollup?.status }

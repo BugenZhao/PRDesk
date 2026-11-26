@@ -28,9 +28,11 @@ actor SyncEngine {
     static let name = "vllm"
     static let repo = "\(owner)/\(name)"
     private static let indexSlack: TimeInterval = 5 * 60
-    /// Open board items are probed this often (see `probe(ids:)`), and fully refetched hourly.
+    /// Open board items are probed this often (see `probe(ids:)`), and fully refetched daily: the
+    /// probe covers what changes without moving `updatedAt`, so the full refetch only catches what
+    /// it might miss (an item it found unchanged that GitHub changed some other way).
     private static let boardRefreshInterval: TimeInterval = 5 * 60
-    private static let boardFullRefreshInterval: TimeInterval = 3600
+    private static let boardFullRefreshInterval: TimeInterval = 24 * 3600
     /// The board is read every few minutes rather than every round; the app's own writes show
     /// at once anyway, so this only delays edits made on the web.
     private static let boardSyncInterval: TimeInterval = 3 * 60
@@ -216,8 +218,7 @@ actor SyncEngine {
 
     /// Brings the given stored items up to date like `refresh(ids:)`, at a fraction of GitHub's
     /// time: items whose `updatedAt` moved are fetched again, and the rest only get their
-    /// mergeability and CI, the parts that change without moving it. It misses a `reviewDecision`
-    /// changed by new branch rules or code owners alone, until the next full refresh.
+    /// mergeability, CI and review decision, the parts that change without moving it.
     private func probe(ids: [String]) async throws -> Int {
         guard !ids.isEmpty else { return 0 }
         let probes = try await Self.concurrently(ids.chunked(ItemQuery.probePageSize)) { chunk in
@@ -233,9 +234,11 @@ actor SyncEngine {
                 moved.append(probe.id)
                 continue
             }
-            guard item.mergeable != probe.mergeable || item.ci != probe.ci else { continue }
+            guard item.mergeable != probe.mergeable || item.ci != probe.ci || item.reviewDecision != probe.reviewDecision
+            else { continue }
             item.mergeable = probe.mergeable
             item.ci = probe.ci
+            item.reviewDecision = probe.reviewDecision
             item.fetchedAt = now
             patched.append(item)
         }
