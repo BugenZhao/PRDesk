@@ -22,7 +22,9 @@ struct RowColumns {
     var ci: CGFloat { 12 * scale }
     /// Fits "+8888" and "−8888".
     var size: CGFloat { 86 * scale }
-    var updated: CGFloat { 30 * scale }
+    /// A time. A little wider where there are two of them side by side, so the arrow of the
+    /// one sorted by, which hangs before its name, stays clear of the other's.
+    var updated: CGFloat { (density.showsAge ? 36 : 30) * scale }
     var height: CGFloat { (density.usesTwoLines ? 50 : 36) * scale }
 }
 
@@ -101,6 +103,13 @@ struct ItemRowView: View {
         turn.column(columns.turn, alignment: .leading)
         ci.column(columns.ci)
         if density.showsSize { size.column(columns.size) }
+        if density.showsAge {
+            Text(item.createdAt.compactAge())
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondaryText)
+                .lineLimit(1)
+                .frame(width: columns.updated, alignment: .trailing)
+        }
         time(saysTurn: false).frame(width: columns.updated, alignment: .trailing)
     }
 
@@ -331,7 +340,8 @@ struct ItemRowView: View {
     }
 
     /// The row's one time: when the item was last updated, or how long ago it was opened while
-    /// the list is sorted by that (the Mac's Age and Upd columns in the room for one).
+    /// the list is sorted by that (the Mac's Age and Upd columns in the room for one). Where a
+    /// one-line row has an Age column of its own (`RowDensity.showsAge`), always the update.
     ///
     /// `saysTurn`: in a two-line row it stands for the Turn column too, by its weight alone:
     /// the label color and a little heavier when the move is mine (a review asked of me
@@ -339,7 +349,7 @@ struct ItemRowView: View {
     private func time(saysTurn: Bool) -> some View {
         let mark = saysTurn ? row.turnMark : nil
         let isMine = mark?.isMine == true
-        let showsAge = model.sort.key == .age
+        let showsAge = model.sort.key == .age && (density.usesTwoLines || !density.showsAge)
         let isQuiet = mark != nil && !isMine && !showsAge && Date().timeIntervalSince(item.updatedAt) >= 7 * 86400
         return Text((showsAge ? item.createdAt : item.updatedAt).compactAge())
             .font(.caption.monospacedDigit().weight(isMine ? .medium : .regular))

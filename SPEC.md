@@ -810,14 +810,15 @@ lines or one (•••, two by default):
   author's name: `pushed 9d`), then the size (+n −n, at any width: a sidebar or a
   phone is never wide enough for a Size column), Review and CI
 - One line: the Mac's columns under sortable column titles. They give way as the list narrows so
-  the title keeps the most room: Author's name under 960 pt (the picture stays), Size under 720,
+  the title keeps the most room: Author's name under 960 pt (the picture stays), Age under 800,
+  Size under 720,
   the number, the Comment and the latest event under 640. Tags are shortened ("[RF]") under 960
   too, so everywhere but a table on an iPad on its side
 - Narrower than 450 pt rows are always two lines, and ••• doesn't offer the choice
 - ••• also sorts (the same keys as the Mac's columns). Pulling down syncs
 - A row has room for one time, at its end: when the item was last updated (the Mac's Upd), or
   how long ago it was opened (Age) while the list is sorted by that. The other is in the
-  detail's header
+  detail's header. A one-line table 800 pt and wider has both, as the Mac's Age and Upd columns
 - A swipe does one thing, all the way across or by its button. Right: read / unread. Left: the
   item's next place on the board, by the Status it has (not the section the row is in, since an
   item is in several): onto the Desk from Tray, Shelf or Attic, off the Desk to the Shelf (Good

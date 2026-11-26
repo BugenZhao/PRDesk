@@ -63,6 +63,9 @@ struct RowDensity: Equatable {
     var canUseOneLine: Bool { listWidth >= 450 }
     var showsNumber: Bool { listWidth >= 640 }
     var showsSize: Bool { listWidth >= 720 }
+    /// A column for when the item was opened, beside the one for when it was last updated.
+    /// Narrower, and in two-line rows, one column is whichever the list is sorted by.
+    var showsAge: Bool { listWidth >= 800 }
     /// The author's login and marks beside the picture.
     var showsAuthorName: Bool { listWidth >= 960 }
     /// The board's Comment and the latest event in the title's column, where they fit.

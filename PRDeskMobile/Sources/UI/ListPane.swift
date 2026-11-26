@@ -256,8 +256,12 @@ private struct ColumnTitles: View {
             title("Turn", .turn, width: widths.turn, alignment: .leading)
             title("CI", .ci, width: widths.ci, alignment: .center)
             if density.showsSize { title("Size", .size, width: widths.size, alignment: .trailing) }
-            // One column for the Mac's two: Age while sorted by it, Upd otherwise.
-            if sort.key == .age {
+            // The Mac's two where both fit; else one for both: Age while sorted by it, Upd
+            // otherwise.
+            if density.showsAge {
+                title("Age", .age, width: widths.updated, alignment: .trailing)
+                title("Upd", .updated, width: widths.updated, alignment: .trailing)
+            } else if sort.key == .age {
                 title("Age", .age, width: widths.updated, alignment: .trailing)
             } else {
                 title("Upd", .updated, width: widths.updated, alignment: .trailing)
