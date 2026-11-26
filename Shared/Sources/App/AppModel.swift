@@ -1402,10 +1402,15 @@ final class AppModel {
             }
             self?.detailState = .loading
             do {
-                let fresh = try await engine.fetchDetail(of: item)
+                let (fresh, freshItem) = try await engine.fetchDetail(of: item)
                 try? await db.saveDetail(fresh)
                 guard !Task.isCancelled, let self else { return }
                 detail = fresh
+                // A stored item's row follows from the database; one only opened from a link is here.
+                if let freshItem, let index = openedItems.firstIndex(where: { $0.id == freshItem.id }), isOpenedOnly(freshItem) {
+                    openedItems[index] = freshItem
+                    rebuild()
+                }
                 detailState = .idle
                 recordSeenHead()
                 let actors = Set(fresh.entries.compactMap(\.actor))
@@ -1462,7 +1467,7 @@ final class AppModel {
                 var isRateLimited = false
                 let fetch = { @Sendable (item: Item) async -> Set<String>? in
                     do {
-                        let detail = try await engine.fetchDetail(of: item)
+                        let detail = try await engine.fetchDetail(of: item).detail
                         try await db.saveDetail(detail)
                         return Set(detail.entries.compactMap(\.actor))
                     } catch GraphQLClientError.rateLimited {

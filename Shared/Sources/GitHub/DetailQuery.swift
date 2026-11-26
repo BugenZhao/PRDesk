@@ -40,9 +40,12 @@ enum DetailQuery {
     private static let prTypes = "[ISSUE_COMMENT, PULL_REQUEST_REVIEW, PULL_REQUEST_COMMIT, HEAD_REF_FORCE_PUSHED_EVENT, MERGED_EVENT, CLOSED_EVENT, REOPENED_EVENT, READY_FOR_REVIEW_EVENT, CONVERT_TO_DRAFT_EVENT, REVIEW_REQUESTED_EVENT, REVIEW_DISMISSED_EVENT, LABELED_EVENT, UNLABELED_EVENT, CROSS_REFERENCED_EVENT, ASSIGNED_EVENT, RENAMED_TITLE_EVENT, ADDED_TO_STACK_EVENT, REMOVED_FROM_STACK_EVENT]"
     private static let issueTypes = "[ISSUE_COMMENT, CLOSED_EVENT, REOPENED_EVENT, LABELED_EVENT, UNLABELED_EVENT, CROSS_REFERENCED_EVENT, ASSIGNED_EVENT, RENAMED_TITLE_EVENT]"
 
+    /// A page of the timeline. The first page also brings the item as the lists store it (`item`,
+    /// the list's own fields), so opening an item brings its row up to date with what it shows.
     static let text = """
-    query($owner: String!, $name: String!, $number: Int!, $after: String) {
+    query($owner: String!, $name: String!, $number: Int!, $after: String, $withItem: Boolean!) {
       repository(owner: $owner, name: $name) {
+        item: issueOrPullRequest(number: $number) @include(if: $withItem) { __typename ...PRFields ...IssueFields }
         issueOrPullRequest(number: $number) {
           __typename
           ... on PullRequest {
@@ -69,6 +72,7 @@ enum DetailQuery {
       }
     }
     \(timelineFragment)
+    \(ItemQuery.fragments)
     """
 
     private static let contextFragment = """
@@ -177,9 +181,19 @@ enum DetailQuery {
         var after: String?
     }
 
+    struct TimelineVariables: Encodable, Sendable {
+        var owner: String
+        var name: String
+        var number: Int
+        var after: String?
+        var withItem: Bool
+    }
+
     struct Response: Decodable, Sendable {
         struct Repository: Decodable, Sendable {
             let issueOrPullRequest: Subject?
+            /// Only on the first page.
+            let item: ItemQuery.Node?
         }
 
         let repository: Repository?
@@ -480,8 +494,9 @@ enum DetailQuery {
 
 extension SyncEngine {
     /// Fetches the full detail of one item, following timeline pages. A PR's checks are fetched
-    /// alongside the timeline rather than after it.
-    func fetchDetail(of item: Item) async throws -> ItemDetail {
+    /// alongside the timeline rather than after it. The item comes along as the lists see it, and
+    /// is stored if it is already (`AppDatabase.refreshStored`): `nil` if GitHub gave none.
+    func fetchDetail(of item: Item) async throws -> (detail: ItemDetail, item: Item?) {
         let (owner, name) = Self.split(item.repo)
         let number = item.number
         async let checks = item.kind == .pullRequest ? fetchChecks(owner: owner, name: name, number: number) : []
@@ -489,20 +504,23 @@ extension SyncEngine {
         var after: String?
         var entries: [TimelineEntry] = []
         var first: DetailQuery.Subject?
+        var fresh: Item?
         repeat {
             let response = try await client.query(
                 DetailQuery.text,
-                variables: DetailQuery.Variables(owner: owner, name: name, number: number, after: after),
+                variables: DetailQuery.TimelineVariables(owner: owner, name: name, number: number, after: after, withItem: first == nil),
                 as: DetailQuery.Response.self
             )
             guard let subject = response.repository?.issueOrPullRequest else { throw SyncError.notFound(repo: item.repo, number: number) }
+            if first == nil { fresh = response.repository?.item?.item(fetchedAt: Date()) }
             first = first ?? subject
             entries += subject.timelineItems.nodes.compactMap { $0?.entry }
             after = subject.timelineItems.pageInfo.hasNextPage ? subject.timelineItems.pageInfo.endCursor : nil
         } while after != nil && entries.count < 2000
 
         let subject = first!
-        return try await ItemDetail(
+        if let fresh { try await db.refreshStored(fresh) }
+        let detail = try await ItemDetail(
             number: number,
             id: subject.id,
             bodyHTML: subject.bodyHTML,
@@ -517,6 +535,7 @@ extension SyncEngine {
             itemUpdatedAt: subject.updatedAt,
             fetchedAt: Date()
         )
+        return (detail, fresh)
     }
 
     /// A PR's latest 100 commits, oldest first.

@@ -350,12 +350,25 @@ extension AppDatabase {
     func upsert(_ items: [Item]) async throws {
         guard !items.isEmpty else { return }
         try await writer.write { db in
-            for item in items {
-                // The commits a stack is worked out from are fetched apart; keep them.
-                _ = try item.upsertAndFetch(db) { _ in
-                    [Column("commitOids").noOverwrite, Column("commitsHead").noOverwrite, Column("commitAuthors").noOverwrite]
-                }
-            }
+            for item in items { try Self.store(item, in: db) }
+        }
+    }
+
+    private static func store(_ item: Item, in db: Database) throws {
+        // The commits a stack is worked out from are fetched apart; keep them.
+        _ = try item.upsertAndFetch(db) { _ in
+            [Column("commitOids").noOverwrite, Column("commitsHead").noOverwrite, Column("commitAuthors").noOverwrite]
+        }
+    }
+
+    /// Stores an item fetched apart from the syncs (with its detail) if it is stored already and
+    /// isn't older than what is: an item only opened from a link stays unstored, and a sync that
+    /// landed meanwhile isn't undone.
+    func refreshStored(_ item: Item) async throws {
+        try await writer.write { db in
+            guard let stored = try Date.fetchOne(db, sql: "SELECT updatedAt FROM item WHERE id = ?", arguments: [item.id]),
+                  stored <= item.updatedAt else { return }
+            try Self.store(item, in: db)
         }
     }
 
