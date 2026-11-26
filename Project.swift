@@ -60,6 +60,8 @@ let project = Project(
                 ],
                 // Sends to Grok Bots open its app with a draft.
                 "LSApplicationQueriesSchemes": ["grokbot"],
+                // Handoff of the item being looked at (`ItemHandoff`), as in the Mac's Info.plist.
+                "NSUserActivityTypes": ["com.bugenzhao.PRDesk.item"],
             ]),
             sources: ["PRDeskMobile/Sources/**", "Shared/Sources/**"],
             resources: ["Shared/Resources/AppIcon.icon", "Shared/Resources/Assets.xcassets", "Shared/Resources/Web/**"],

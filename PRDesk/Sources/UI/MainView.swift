@@ -25,6 +25,7 @@ struct MainView: View {
             StatusBar()
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+        .background(ItemHandoff())
     }
 
     private var content: some View {

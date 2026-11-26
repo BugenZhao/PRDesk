@@ -656,6 +656,12 @@ the iPad to read rather than work out again (§9, Badges).
   list (kept only for this run, not stored), where they can be added with Add to Desk (`a`, into
   Triage), and setting Status / Priority / Pin adds them as well. A link to a comment on the current
   item expands and scrolls to that comment. ⌘-click and the ↗ button still open the browser
+- **Handoff**: the item being looked at is offered on my other devices (the Mac's Dock, the
+  iPad's, the phone's app switcher), and picking it there opens the same item on the same tab
+  (Conversation, Commits or Files), by the rules for links below. The activity is the item's
+  page on GitHub, so a device without the app opens it in a browser. Between the Mac, the iPad
+  and the iPhone alike; it is the system's Handoff, which needs the apps signed by one team and
+  the devices on one iCloud account (not a copy signed ad hoc)
 - **Back to the desk from the browser**: `⌃⌥⌘D` (a global shortcut, a Carbon hot key that needs no
   Accessibility permission; also in the Go menu and the menu bar icon's menu) reads Yab's frontmost
   tab (`yab exec`, read-only), brings the window forward, and opens the issue / PR it points to by

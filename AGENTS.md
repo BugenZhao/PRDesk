@@ -289,6 +289,11 @@ are used off the main actor); no glass on content (cards, chips, rows).
   cards didn't fold and files didn't open on the iPad. `detail.js` listens on `document`, and
   `detail.css` gives the page's own controls a pointer cursor on iOS; give a new tappable
   element one too.
+- Handoff (`ItemHandoff`, a view of no size in each app's root background) can't be tried in a
+  simulator or a test copy: the system hands off only between apps signed by one team on
+  devices of one iCloud account. `install.sh` signs the Mac's with the development certificate;
+  both apps declare the type in `NSUserActivityTypes` (the Mac's `Info.plist`, `Project.swift`
+  for iOS), and a new type needs both.
 - A popover's `attachmentAnchor: .rect(.rect(…))` is in the space of the view the popover is
   on, not the window's. A page gives its menus' points in the window (`webView.convert(_:to:
   nil)`), and the desk begins below the status bar on a phone, so the pages' popovers pointed
