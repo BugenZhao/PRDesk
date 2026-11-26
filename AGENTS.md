@@ -18,7 +18,9 @@ Debug builds accept `-PRDeskAppearance dark|light` to force an appearance, `-PRD
 to skip syncing on their own (no searches, board, inbox or prefetched details; only what is opened,
 and ⌘R), and
 `-PRDeskDryRunWrites YES` to log writes to GitHub (comments, reviews, marking notifications read,
-board fields, subscriptions, files marked viewed, messages to Grok Bots) instead of sending them — use it whenever a test could trigger a write. Both flags are
+board fields, subscriptions, files marked viewed, the badges file, messages to Grok Bots) instead of sending them — use it whenever a test could trigger a write.
+`-PRDeskBadgesFile <path>` shares badges through that local file instead of the repository in
+Settings (the Mac writes it at launch, a simulator reads it), with no request. These flags are
 compiled out of Release builds: a Release test copy writes to GitHub for real, so only measure with
 one (benchmarks, profiling) and never press keys, click rows or select items in it.
 Local data lives in `~/Library/Application Support/PR Desk/` (SQLite via GRDB, avatar cache).
@@ -101,7 +103,8 @@ Both apps compile `Shared/`; each adds its own views and platform parts. Put new
 
 - `Shared/Sources/GitHub` — `GitHubClient` (GraphQL + REST, retries), queries and mutations
 - `Shared/Sources/Sync` — `SyncEngine` (tracked items, details, inbox, the triage board),
-  `AffiliationEngine` (badges)
+  `AffiliationEngine` (badges), `BadgeShare` (the Mac publishes what its badges come from to a
+  private repository, the iPad imports it, SPEC §9)
 - `Shared/Sources/Store` — GRDB records and migrations (`AppDatabase`); migrations are append-only
 - `Shared/Sources/Model` — pure logic: `ItemInsight` (Turn, unread, review-request classification),
   `RowMarks` (what the Turn, Review and CI columns show, for both lists), filter parsing, sections

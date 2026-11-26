@@ -336,7 +336,7 @@ actor SyncEngine {
         date.formatted(.iso8601)
     }
 
-    private static func parse(_ string: String) -> Date? {
+    static func parse(_ string: String) -> Date? {
         try? Date(string, strategy: .iso8601)
     }
 }

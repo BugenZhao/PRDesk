@@ -262,27 +262,68 @@ extension AppDatabase {
 
     func observeAffiliations() -> AsyncValueObservation<Affiliations> {
         ValueObservation
-            .tracking { db in
-                let decoder = JSONDecoder()
-                func meta<T: Decodable>(_ key: String) throws -> T? {
-                    try String.fetchOne(db, sql: "SELECT value FROM meta WHERE key = ?", arguments: [key])
-                        .flatMap { try? decoder.decode(T.self, from: Data($0.utf8)) }
-                }
-                let members: [String: [String]] = try meta(Affiliations.membersKey) ?? [:]
-                return try Affiliations(
-                    committers: meta(Affiliations.committersKey) ?? [:],
-                    codeOwners: meta(Affiliations.codeOwnersKey) ?? [:],
-                    members: Dictionary(uniqueKeysWithValues: members.compactMap { key, logins in
-                        Org(rawValue: key).map { ($0, Set(logins)) }
-                    }),
-                    collaborators: meta(Affiliations.collaboratorsKey) ?? [:],
-                    llmdMaintainers: meta(Affiliations.llmdMaintainersKey) ?? [:],
-                    users: Dictionary(uniqueKeysWithValues: UserInfo.fetchAll(db).map { ($0.login, $0) }),
-                    overrides: OrgOverride.order(Column("login")).fetchAll(db)
-                )
-            }
+            .tracking(Self.fetchAffiliations)
             .removeDuplicates()
             .values(in: reader)
+    }
+
+    /// Everything known about affiliations, as it is now.
+    func affiliations() async throws -> Affiliations {
+        try await reader.read(Self.fetchAffiliations)
+    }
+
+    private static func fetchAffiliations(_ db: Database) throws -> Affiliations {
+        let decoder = JSONDecoder()
+        func meta<T: Decodable>(_ key: String) throws -> T? {
+            try String.fetchOne(db, sql: "SELECT value FROM meta WHERE key = ?", arguments: [key])
+                .flatMap { try? decoder.decode(T.self, from: Data($0.utf8)) }
+        }
+        let members: [String: [String]] = try meta(Affiliations.membersKey) ?? [:]
+        return try Affiliations(
+            committers: meta(Affiliations.committersKey) ?? [:],
+            codeOwners: meta(Affiliations.codeOwnersKey) ?? [:],
+            members: Dictionary(uniqueKeysWithValues: members.compactMap { key, logins in
+                Org(rawValue: key).map { ($0, Set(logins)) }
+            }),
+            collaborators: meta(Affiliations.collaboratorsKey) ?? [:],
+            llmdMaintainers: meta(Affiliations.llmdMaintainersKey) ?? [:],
+            users: Dictionary(uniqueKeysWithValues: UserInfo.fetchAll(db).map { ($0.login, $0) }),
+            overrides: OrgOverride.order(Column("login")).fetchAll(db)
+        )
+    }
+
+    /// Puts another device's affiliations in place of this one's, all at once (`BadgeShare`):
+    /// what this device had worked out or set by hand goes.
+    func replaceAffiliations(with snapshot: AffiliationSnapshot) async throws {
+        let now = Date()
+        try await writer.write { db in
+            let encoder = JSONEncoder()
+            func setMeta(_ key: String, _ value: some Encodable) throws {
+                try db.execute(
+                    sql: "INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                    arguments: [key, String(decoding: encoder.encode(value), as: UTF8.self)]
+                )
+            }
+            try setMeta(Affiliations.committersKey, snapshot.committers)
+            try setMeta(Affiliations.codeOwnersKey, snapshot.codeOwners)
+            try setMeta(Affiliations.membersKey, snapshot.members)
+            try setMeta(Affiliations.collaboratorsKey, snapshot.collaborators)
+            try setMeta(Affiliations.llmdMaintainersKey, snapshot.llmdMaintainers)
+            try UserInfo.deleteAll(db)
+            for user in snapshot.users {
+                try UserInfo(
+                    login: user.login, company: user.company, orgs: user.orgs, emailDomains: user.emailDomains,
+                    profileEmailDomain: user.profileEmailDomain, bio: user.bio, fetchedAt: now,
+                    mergedCount: user.mergedCount, mergedFetchedAt: user.mergedCount == nil ? nil : now
+                ).insert(db)
+            }
+            try OrgOverride.deleteAll(db)
+            for override in snapshot.overrides {
+                // An org this build doesn't know yet has no badge to show here.
+                guard let org = Org(rawValue: override.org) else { continue }
+                try OrgOverride(login: override.login, org: org, include: override.include).insert(db)
+            }
+        }
     }
 
     func userInfos() async throws -> [String: UserInfo] {
@@ -297,14 +338,6 @@ extension AppDatabase {
                 try user.upsert(db)
             }
         }
-    }
-
-    func save(_ override: OrgOverride) async throws {
-        try await writer.write { db in try override.upsert(db) }
-    }
-
-    func delete(_ override: OrgOverride) async throws {
-        _ = try await writer.write { db in try override.delete(db) }
     }
 
     /// Saves and deletes manual affiliations in one transaction, so the badges change at once.

@@ -8,6 +8,7 @@ struct SettingsView: View {
     @State private var hasSavedToken = false
     @AppStorage(GrokBot.assistantBotKey) private var assistantBot = ""
     @AppStorage(GrokBot.mergeBotKey) private var mergeBot = ""
+    @AppStorage(BadgeShare.repositoryKey) private var badgesRepository = ""
 
     private var trimmedToken: String { token.trimmingCharacters(in: .whitespacesAndNewlines) }
 
@@ -71,6 +72,21 @@ struct SettingsView: View {
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .font(.callout.monospaced())
+
+                Section {
+                    TextField("owner/name", text: $badgesRepository)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .font(.callout.monospaced())
+                        .onSubmit { Task { await model.shareBadges(soon: true) } }
+                    LabeledContent("Badges") {
+                        BadgeShareStatus(state: model.badgeShareState, verb: "Read")
+                    }
+                } header: {
+                    Text("Badges")
+                } footer: {
+                    Text("The private repository your Mac publishes its badges to (Settings › Affiliations there). They are read from it at each sync, the ones set by hand included; the token above must be able to read it. Without one, badges are only what you set by hand here.")
+                }
 
                 BotHookSection(fallback: "With one set, sends go out from here.")
             }

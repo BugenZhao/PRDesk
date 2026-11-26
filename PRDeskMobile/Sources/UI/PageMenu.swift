@@ -77,29 +77,32 @@ struct PageMenuView: View {
                 Platform.copy(login)
                 dismiss()
             }
-            Divider()
-            Text("Affiliation")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 14)
-                .padding(.top, 8)
-                .padding(.bottom, 2)
-            ScrollView {
-                VStack(spacing: 0) {
-                    ForEach(Org.allCases) { org in
-                        MenuRow(org.displayName, isOn: affiliations.hasFullBadge(org: org, for: login)) {
-                            model.toggleAffiliation(org, for: [login])
+            // Read from the Mac, badges aren't set here: its next file would undo it.
+            if model.canEditAffiliations {
+                Divider()
+                Text("Affiliation")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 14)
+                    .padding(.top, 8)
+                    .padding(.bottom, 2)
+                ScrollView {
+                    VStack(spacing: 0) {
+                        ForEach(Org.allCases) { org in
+                            MenuRow(org.displayName, isOn: affiliations.hasFullBadge(org: org, for: login)) {
+                                model.toggleAffiliation(org, for: [login])
+                            }
                         }
-                    }
-                    if affiliations.overrides.contains(where: { $0.login == login.lowercased() }) {
-                        Divider()
-                        MenuRow("Clear Manual Affiliations", systemImage: "arrow.uturn.backward") {
-                            model.clearManualAffiliations(for: [login])
+                        if affiliations.overrides.contains(where: { $0.login == login.lowercased() }) {
+                            Divider()
+                            MenuRow("Clear Manual Affiliations", systemImage: "arrow.uturn.backward") {
+                                model.clearManualAffiliations(for: [login])
+                            }
                         }
                     }
                 }
+                .frame(maxHeight: 260)
             }
-            .frame(maxHeight: 260)
         }
         .frame(width: 290)
     }

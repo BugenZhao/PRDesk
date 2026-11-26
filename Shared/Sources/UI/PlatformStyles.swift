@@ -59,3 +59,23 @@ struct DelayedProgressView: View {
             }
     }
 }
+
+/// How sharing badges between the devices last went, in a word or two (`BadgeShare`).
+struct BadgeShareStatus: View {
+    let state: AppModel.BadgeShareState
+    /// What a success is called here: "Published" on the Mac, "Read" on the iPad.
+    let verb: String
+
+    var body: some View {
+        switch state {
+        case .none:
+            Text("Not yet").foregroundStyle(.secondary)
+        case let .done(date):
+            TimelineView(.periodic(from: .now, by: 30)) { _ in
+                Text("\(verb) \(date.compactAge()) ago").foregroundStyle(.secondary)
+            }
+        case let .failed(message):
+            Text(message).foregroundStyle(.red).lineLimit(2)
+        }
+    }
+}

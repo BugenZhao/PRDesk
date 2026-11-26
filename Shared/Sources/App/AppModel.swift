@@ -309,6 +309,7 @@ final class AppModel {
     @ObservationIgnored let db: AppDatabase
     @ObservationIgnored let engine: SyncEngine
     @ObservationIgnored let affiliationEngine: AffiliationEngine
+    @ObservationIgnored private let badgeShare: BadgeShare
     @ObservationIgnored private var tasks: [Task<Void, Never>] = []
     @ObservationIgnored private var detailTask: Task<Void, Never>?
     /// Cached details older than this are refreshed when shown, even if the item looks unchanged.
@@ -320,6 +321,7 @@ final class AppModel {
         let client = GitHubClient()
         engine = SyncEngine(client: client, db: db)
         affiliationEngine = AffiliationEngine(client: client, db: db)
+        badgeShare = BadgeShare(client: client, db: db)
         sort = Defaults.get(.sort) ?? ItemSort()
         collapsed = Self.loadCollapsed()
     }
@@ -478,7 +480,11 @@ final class AppModel {
             // no searches, board, inbox or prefetched details, only what is opened (and ⌘R). A
             // copy that syncs is a second client spending the same hourly GraphQL quota.
             #if DEBUG
-                if UserDefaults.standard.bool(forKey: "PRDeskNoSync") { return }
+                if UserDefaults.standard.bool(forKey: "PRDeskNoSync") {
+                    // A test's badges file is local: sharing it is no request.
+                    if BadgeShare.isLocal { await self?.shareBadges(soon: true) }
+                    return
+                }
             #endif
             while !Task.isCancelled {
                 guard let self else { return }
@@ -1241,9 +1247,45 @@ final class AppModel {
         for number in numbers { pendingBoardWrites[number] = task }
     }
 
+    /// How sharing badges between the devices last went (`BadgeShare`), for Settings.
+    enum BadgeShareState: Equatable {
+        case none
+        case done(Date)
+        case failed(String)
+    }
+
+    private(set) var badgeShareState = BadgeShareState.none
+
+    /// Badges are set by hand here: on the Mac, and on a device that doesn't read the Mac's
+    /// (whose next file would put its own entries in their place).
+    var canEditAffiliations: Bool { DeviceRole.current.computesAffiliations || BadgeShare.place == nil }
+
+    /// The Mac publishes what its badges come from where that changed; the iPad reads it.
+    func shareBadges(soon: Bool = false) async {
+        do {
+            let outcome = if DeviceRole.current.computesAffiliations {
+                try await badgeShare.publish(mergedThreshold: mergedThreshold, soon: soon)
+            } else {
+                try await badgeShare.read(force: soon)
+            }
+            switch outcome {
+            case .published:
+                badgeShareState = .done(Date())
+            case let .read(threshold):
+                if let threshold, threshold != mergedThreshold { mergedThreshold = threshold }
+                badgeShareState = .done(Date())
+            case .waiting, nil:
+                break
+            }
+        } catch {
+            logger.error("Sharing badges failed: \(String(describing: error), privacy: .public)")
+            badgeShareState = .failed(error.localizedDescription)
+        }
+    }
+
     /// Updates affiliation data for everyone who appears in the list.
     func refreshAffiliations(force: Bool = false) async {
-        guard DeviceRole.current.computesAffiliations else { return }
+        guard DeviceRole.current.computesAffiliations else { return await shareBadges(soon: force) }
         let authors = Set(snapshot.items.compactMap(\.author))
         let logins = authors.union(snapshot.items.flatMap { $0.events.compactMap(\.actor) })
         do {
@@ -1251,14 +1293,15 @@ final class AppModel {
         } catch {
             logger.error("Affiliation refresh failed: \(String(describing: error), privacy: .public)")
         }
+        await shareBadges(soon: force)
     }
 
     func setOverride(_ override: OrgOverride) {
-        Task { try? await db.save(override) }
+        updateOverrides(saving: [override], deleting: [])
     }
 
     func removeOverride(_ override: OrgOverride) {
-        Task { try? await db.delete(override) }
+        updateOverrides(saving: [], deleting: [override])
     }
 
     /// Gives `logins` the org's badge, or takes it away when they all have it (SPEC §5).
@@ -1281,6 +1324,8 @@ final class AppModel {
             } catch {
                 logger.error("Failed to set affiliations: \(error)")
             }
+            // A badge set by hand reaches the other devices without waiting its turn.
+            await shareBadges(soon: true)
         }
     }
 

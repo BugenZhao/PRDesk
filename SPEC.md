@@ -775,8 +775,8 @@ The page gets the whole pane:
 - The page runs to the window's foot, under the home indicator, with room left under its end
 
 **Menus in the pages.** The smiley on a card offers the reactions in a row, mine marked (picking
-one of those takes it back). Holding a person offers their profile, their name to copy and the
-orgs to tie them to by hand (§5); holding a file's header offers Viewed, its path and its page on
+one of those takes it back). Holding a person offers their profile, their name to copy and,
+unless the Mac's badges are read (below), the orgs to tie them to by hand (§5); holding a file's header offers Viewed, its path and its page on
 GitHub.
 
 **Keys.** With a keyboard attached the Mac's keys work (§4.5), and the iPad's menu bar lists them:
@@ -785,11 +785,21 @@ GitHub.
 ⌘[ / ⌘], ⇧⌘C. They act on the selected item and give way to typing in a text field.
 
 **Badges.** The iPad doesn't work out affiliations (§5) or merged counts itself: that takes many
-requests a day, which are the Mac's to spend. It shows the badges set by hand on it; publishing
-the Mac's resolved table for it to read is not built.
+requests a day, which are the Mac's to spend, and two devices with entries set by hand on each
+would show two answers. The Mac publishes what its badges come from instead, and the iPad reads it:
 
-Not there yet: the Mac's badges (above), the settings for affiliation overrides as a list, several
-selected rows at once, undo, more than one window, find in a page, and anything of Yab's.
+- One file, `pr-desk/affiliations.json` in a private repository of mine named in Settings on both
+  (GitHub stays all the devices share): the lists, the profiles, the manual entries and the
+  regular contributor's threshold, with nothing that changes when no badge could
+- The Mac writes it after a refresh that changed it, at most every three hours, and at once after
+  a manual entry or Publish Now. It refuses a repository that isn't private: the file names
+  members of private organizations
+- The iPad looks at each sync (at most every ten minutes) and puts a new file in place of all it
+  had, so both show the same badges by the same rules. While it reads the Mac's it sets none by
+  hand; without a repository it shows only those it sets by hand, as before
+
+Not there yet: several selected rows at once, undo, more than one window, find in a page, and
+anything of Yab's.
 
 ## 10. Milestones
 

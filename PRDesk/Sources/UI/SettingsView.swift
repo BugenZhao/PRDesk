@@ -128,6 +128,7 @@ private struct AffiliationSettingsView: View {
     @State private var include = true
     @State private var selection: OrgOverride.ID?
     @State private var isRefreshing = false
+    @AppStorage(BadgeShare.repositoryKey) private var badgesRepository = ""
 
     var body: some View {
         let affiliations = model.affiliations
@@ -198,6 +199,24 @@ private struct AffiliationSettingsView: View {
                 Text("Inferred from public data")
             } footer: {
                 Text("Also matched: profile company, the first org mentioned in the bio (@mistralai), the public profile email, commit email domains, and username suffixes or prefixes such as -redhat or amd-. Code owners in CODEOWNERS get the full vLLM badge like committers; vLLM members and collaborators (triage access or more) who are neither get a gray one; filter with org:committer, org:member, or org:vllm for both. llm-d's badge comes from its MAINTAINERS.md, OWNERS and CODEOWNERS files and its org members; filter with org:llm-d.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                TextField("Repository", text: $badgesRepository, prompt: Text("owner/name"))
+                    .autocorrectionDisabled()
+                    .onSubmit { Task { await model.shareBadges(soon: true) } }
+                LabeledContent("Published") {
+                    HStack {
+                        BadgeShareStatus(state: model.badgeShareState, verb: "Published")
+                        Button("Publish Now") { Task { await model.shareBadges(soon: true) } }
+                            .disabled(BadgeShare.place == nil)
+                    }
+                }
+            } header: {
+                Text("On the iPad and iPhone")
+            } footer: {
+                Text("A private repository of yours. Everything on this page is written to \(BadgeShare.directory)/\(BadgeShare.fileName) there when it changes, and PR Desk on an iPad or iPhone set to the same repository shows these badges instead of working out its own. The file names members of private organizations, so a public repository is refused.")
                     .foregroundStyle(.secondary)
             }
 
