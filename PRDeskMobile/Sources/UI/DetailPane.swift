@@ -374,6 +374,7 @@ private struct DetailPager<Conversation: View>: View {
                 page(.files) { FilesView(item: item, page: pages.files) }
             }
             .scrollTargetLayout()
+            .background(FirstPageEdgeYield())
         }
         .scrollTargetBehavior(.paging)
         .scrollPosition($position)
@@ -428,6 +429,64 @@ private struct DetailPager<Conversation: View>: View {
         .environment(scrolls[tab])
         .onScrollVisibilityChange(threshold: 0.02) { if $0 { opened.insert(tab) } }
         .id(tab)
+    }
+}
+
+/// Leaves a swipe from the window's leading edge on the first page to the system, which pulls
+/// the list out over the detail (or goes back to it on a phone). The pager's pan took it and
+/// only bounced: the system's edge recognizer gives way to a scroll view's pan once that begins,
+/// whatever the pan then does (bounces off or not, made to wait on another recognizer or not;
+/// tried in a simulator). So a touch that lands in the edge's strip while the first page shows
+/// turns the pan off until it lifts. Anywhere else, and on the other pages, a swipe turns pages.
+///
+/// A view of no size in the pager's content, which finds the pager's scroll view among its
+/// ancestors and gives it a recognizer that only watches touches.
+private struct FirstPageEdgeYield: UIViewRepresentable {
+    func makeUIView(context: Context) -> Probe { Probe() }
+    func updateUIView(_ uiView: Probe, context: Context) {}
+
+    final class Probe: UIView {
+        private let watcher = EdgeTouchWatcher()
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            watcher.view?.removeGestureRecognizer(watcher)
+            guard window != nil else { return }
+            var view = superview
+            while let ancestor = view, !(ancestor is UIScrollView) { view = ancestor.superview }
+            view?.addGestureRecognizer(watcher)
+        }
+    }
+
+    /// Never recognizes and holds nothing up; turns its scroll view's pan off for a touch that
+    /// begins at the window's leading edge while the scroll view is at its start.
+    final class EdgeTouchWatcher: UIGestureRecognizer {
+        /// About the width the system's edge recognizers answer to.
+        private static let strip: CGFloat = 20
+
+        override init(target: Any? = nil, action: Selector? = nil) {
+            super.init(target: target, action: action)
+            cancelsTouchesInView = false
+            delaysTouchesEnded = false
+        }
+
+        private var pan: UIPanGestureRecognizer? { (view as? UIScrollView)?.panGestureRecognizer }
+
+        override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+            guard let scrollView = view as? UIScrollView, let touch = touches.first else { return }
+            let atStart = scrollView.contentOffset.x <= -scrollView.adjustedContentInset.left + 1
+            if atStart, event.allTouches?.count == 1, touch.location(in: nil).x < Self.strip {
+                scrollView.panGestureRecognizer.isEnabled = false
+            }
+        }
+
+        override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) { state = .failed }
+        override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) { state = .failed }
+
+        override func reset() {
+            super.reset()
+            pan?.isEnabled = true
+        }
     }
 }
 

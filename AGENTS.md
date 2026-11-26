@@ -345,6 +345,10 @@ are used off the main actor); no glass on content (cards, chips, rows).
   gives each page negative padding to the window's edges and `safeAreaPadding` back, and the
   header is an overlay. `scrollPosition(id:)` with a hand-made `Binding` scrolled one way only;
   it uses a `ScrollPosition` and two `onChange`s.
+- The split view's edge swipe (the list out over the detail, iPad upright) gives way to any
+  horizontal scroll view's pan under the finger once that pan begins, even one at its start with
+  bounces off, or made to wait on an edge recognizer of our own. The detail's pager turns its pan
+  off for a touch that lands at the window's edge on its first page (`FirstPageEdgeYield`).
 - A view whose body reads the detail's tab re-makes its toolbar items when the tab changes, which
   cuts the segments' animation short: `DetailPane.body` leaves the tab to `ActivePage`,
   `DetailTabs` and `DetailPager`.
