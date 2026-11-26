@@ -299,9 +299,9 @@ private struct ColumnTitles: View {
     }
 }
 
-/// How things stand with GitHub, as one button in the bar at the list's foot: its symbol says it
-/// at a glance (syncing, a write going out or just done, a failure, the budget used up), and its
-/// menu says it in words, with Sync Now.
+/// How things stand with GitHub, as one button in the bar at the list's foot: it says it at a
+/// glance (the system's spinner while a sync or a write is on its way; a symbol for a write just
+/// done, a failure, the budget used up), and its menu says it in words, with Sync Now.
 struct SyncStatusButton: View {
     @Environment(AppModel.self) private var model
 
@@ -332,17 +332,26 @@ struct SyncStatusButton: View {
             }
             .disabled(true)
         } label: {
-            Image(systemName: glyph.name)
-                .symbolEffect(.rotate, options: .repeat(.continuous), isActive: model.syncState == .syncing && !isWriting)
-                .symbolEffect(.pulse, options: .repeat(.continuous), isActive: isWriting)
-                .foregroundStyle(glyph.color ?? Color.primary)
-                .contentTransition(.symbolEffect(.replace))
+            // The system's spinner while something is on its way (a sync, a write), which is
+            // quieter in the corner of the eye than a symbol turning, and can't be left
+            // turning on the symbol that comes next (a write done during a sync had its green
+            // check spin).
+            if isBusy {
+                ProgressView()
+            } else {
+                Image(systemName: glyph.name)
+                    .foregroundStyle(glyph.color ?? Color.primary)
+                    .contentTransition(.symbolEffect(.replace))
+            }
         }
         .accessibilityLabel("Sync Status")
         .accessibilityValue(model.activity?.text ?? syncLine)
     }
 
     private var isWriting: Bool { model.activity.map { !$0.isDone } ?? false }
+
+    /// A write on its way, or a sync with no write just done to show first.
+    private var isBusy: Bool { isWriting || model.activity == nil && model.syncState == .syncing }
 
     /// A write first (it is what the viewer just did), then the sync.
     private var glyph: (name: String, color: Color?) {

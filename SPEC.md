@@ -832,10 +832,11 @@ lines or one (•••, two by default):
   order, as one flat list with each command's key beside it, and the author's affiliation
 - The filter (§4.4) is the system's search field, behind a button: in the bar over the list on
   an iPad, at the list's foot on a phone
-- At the list's foot, one button stands for the Mac's status bar. Its symbol says how things
-  stand at a glance: two arrows (turning while syncing, orange when the quota runs low), an arrow
-  up while a write goes out and a green check once it has, a red mark for a failed sync, an
-  hourglass when rate limited. Its menu says it in words (the write, the last sync or the error,
+- At the list's foot, one button stands for the Mac's status bar. It says how things
+  stand at a glance: the system's spinner while a sync or a write is on its way (nothing turns
+  in the corner of the eye), a green check for a few seconds once a write is through, else two
+  arrows (orange when the quota runs low), a red mark for a failed sync, an hourglass when rate
+  limited. Its menu says it in words (the write, the last sync or the error,
   the item count, the quota and when it resets) and has Sync Now
 
 **Detail.** As §6, with Status and Priority as segmented controls (one touch; Triage and – clear)
