@@ -196,9 +196,16 @@ are used off the main actor); no glass on content (cards, chips, rows).
   system keeps between the bar's buttons (a `principal` item took the width it liked, over them).
   It is always there and fades by opacity once the header's own title has scrolled under the
   bar. The header is an overlay clipped at the bar's edge, or it shows through the bar's buttons.
-- In the background the system lays the window out at other sizes for its snapshots, and the
-  split view writes `columnVisibility` for those: the binding takes writes only while the scene
-  is active. What must survive the app being stopped in the background is `@SceneStorage`.
+- The split view writes `columnVisibility` itself: `.detailOnly` when the window gets narrower
+  or comes out of one column, and in the background (snapshots at other sizes), and it writes
+  *before* the view sees the new width. Don't take a write for the viewer's choice at once, and
+  don't hand it a computed binding (a getter that still says `.all` after the system showed
+  `.detailOnly` moves nothing). `DeskView` keeps real `@State`, records a write as the choice
+  only if no rearrangement follows within 400 ms, and puts the choice back after each
+  rearrangement (`settle`). What must survive the app being stopped is `@SceneStorage`.
+- `xcrun simctl spawn <udid> defaults write <bundle id>` does not reach the app: an app reads
+  the plist in its own container (`Library/Preferences/<bundle id>.plist`). Edit that with
+  `plutil` while the app is stopped. `simctl get_app_container` changes after a reinstall.
 - The pages' web views are `.mobile` content mode on iOS: an iPad's default (desktop) sizes text
   by rules of its own, and CSS `zoom` on the root then moved the boxes and left the text at
   13 px. The zoom is set from Swift (`PRDesk.setTextScale`: 1.2 times the Dynamic Type factor).

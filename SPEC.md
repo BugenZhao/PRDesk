@@ -727,8 +727,10 @@ one out, with its own button, edge swipe and animation), the list its sidebar:
 ```
 
 - Beside the detail, ◧ (⌘B) puts the list away and the detail has the window. Floating, the list
-  is out while nothing is selected. Whether it is out is kept across leaving the app and coming
-  back, also when the system has stopped the app meanwhile. In a compact window (a phone) the split view is one column:
+  is out while nothing is selected. Whether it is out is the viewer's choice alone:
+  it is kept across turning the iPad, resizing the window, leaving the app and coming back (also
+  when the system has stopped the app meanwhile), although the system puts sidebars away by
+  itself at such times. In a compact window (a phone) the split view is one column:
   the list is a page, and a row pushes its detail over it
 - **Full-Width List** (in the list's •••, ⇧⌘B) is a third state on an iPad, for reading the list
   with room for every column: the split view is told its width is compact, so it is the system's

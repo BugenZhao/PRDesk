@@ -25,6 +25,19 @@ struct DeskView: View {
     /// was when the system has put the app away and starts it again.
     @SceneStorage("showsFloatingList") private var showsFloatingList = false
     @Environment(\.scenePhase) private var scenePhase
+    /// What the split view shows of its columns. The system writes it too, when the window
+    /// changes (it puts a sidebar away for a narrower window, or coming out of one column), and
+    /// it does so before the desk sees the window change. So it is real state that both set; a
+    /// write counts as the viewer's choice only if the window stays as it is for a moment after
+    /// it (`columnVisibility`), and after a change the desk puts the viewer's choice back
+    /// (`settle`).
+    @State private var visibility = NavigationSplitViewVisibility.all
+    /// Counts the window's rearrangements, to tell whether one came after a write.
+    @State private var rearrangements = 0
+    /// Set for a moment to have the split view take the compact width again (`settle`).
+    @State private var renewsCompact = false
+    /// The detail's column is on screen.
+    @State private var detailHasAppeared = false
     @State private var width: CGFloat = 0
     /// The list's own width, which as a sidebar the split view decides.
     @State private var listWidth: CGFloat = 0
@@ -33,15 +46,29 @@ struct DeskView: View {
     /// The menu a detail page asked for.
     @State private var pageMenu: PageMenu?
 
-    var body: some View {
-        let layout = DeskLayout(
+    private var layout: DeskLayout {
+        DeskLayout(
             width: width, listWidth: listWidth, isCompact: sizeClass == .compact,
             prefersTable: width >= DeskLayout.wideMinWidth ? tableWhenWide : tableWhenNarrow,
             prefersTwoLines: rowLines == .two
         )
+    }
+
+    /// The ways the desk is arranged, between which the system rearranges the split view.
+    private enum Arrangement: Hashable {
+        case page, floating, beside
+    }
+
+    private var arrangement: Arrangement {
+        let layout = layout
+        return layout.isListPage ? .page : layout.listFloats ? .floating : .beside
+    }
+
+    var body: some View {
+        let layout = layout
         Group {
             if layout.isMeasured {
-                NavigationSplitView(columnVisibility: columnVisibility(layout), preferredCompactColumn: compactColumn(layout)) {
+                NavigationSplitView(columnVisibility: columnVisibility, preferredCompactColumn: compactColumn(layout)) {
                     ListPane(density: layout.density, highlightsSelection: !layout.isListPage, showsSettings: $showsSettings)
                         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { listWidth = $0 }
                         .navigationSplitViewColumnWidth(min: 400, ideal: 460, max: 480)
@@ -49,10 +76,12 @@ struct DeskView: View {
                         .toolbar { toolbar(layout) }
                 } detail: {
                     DetailPane(pages: pages)
+                        .onAppear { detailHasAppeared = true }
+                        .onDisappear { detailHasAppeared = false }
                 }
                 // The split view goes by the size class: told the width is compact, it is the
                 // one column a phone has, with the list the whole window wide (the table).
-                .environment(\.horizontalSizeClass, layout.isTable ? .compact : sizeClass)
+                .environment(\.horizontalSizeClass, layout.isTable && !renewsCompact ? .compact : sizeClass)
             } else {
                 Color.clear
             }
@@ -70,7 +99,12 @@ struct DeskView: View {
         // An item picked from the list floating over the detail: the list has done its part.
         .onChange(of: model.selection) {
             if layout.listFloats, model.selection != nil { showsFloatingList = false }
+            showChosenColumns()
         }
+        // The window is arranged another way (turned, resized), or the app is back in front:
+        // the system has had its say about the columns, and the viewer's choice goes back in.
+        .onChange(of: arrangement, initial: true) { settle() }
+        .onChange(of: scenePhase) { if scenePhase == .active { settle() } }
         .focusedSceneValue(\.deskActions, DeskActions(
             toggleList: { withAnimation { setListShown(!isListShown(layout), layout) } },
             toggleTable: { setTable(!layout.isTable, layout) }
@@ -99,17 +133,56 @@ struct DeskView: View {
     private func setListShown(_ shown: Bool, _ layout: DeskLayout) {
         guard !layout.isListPage else { return }
         if layout.listFloats { showsFloatingList = shown } else { showsList = shown }
+        showChosenColumns()
     }
 
-    /// The split view's own button and gestures change it too.
-    private func columnVisibility(_ layout: DeskLayout) -> Binding<NavigationSplitViewVisibility> {
+    /// Puts the columns as the viewer chose them.
+    private func showChosenColumns() {
+        let layout = layout
+        guard !layout.isListPage else { return }
+        let chosen: NavigationSplitViewVisibility = isListShown(layout) ? .all : .detailOnly
+        if visibility != chosen { visibility = chosen }
+    }
+
+    /// The split view's own button and gestures change it, and that is the viewer's choice:
+    /// kept, unless the window is rearranged right after (the write was the system's, making
+    /// ready for that) or the app isn't in front (the system lays the window out at other sizes
+    /// for its snapshots).
+    private var columnVisibility: Binding<NavigationSplitViewVisibility> {
         Binding(
-            get: { isListShown(layout) ? .all : .detailOnly },
-            // Only while the viewer is here: in the background the system lays the window out
-            // at other sizes for its snapshots, and the split view, putting its sidebar away for
-            // those, would write that back as if the viewer had.
-            set: { if scenePhase == .active { setListShown($0 != .detailOnly, layout) } }
+            get: { visibility },
+            set: { shown in
+                visibility = shown
+                let before = rearrangements
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(400))
+                    let layout = layout
+                    guard rearrangements == before, scenePhase == .active, visibility == shown, !layout.isListPage else { return }
+                    if layout.listFloats { showsFloatingList = shown != .detailOnly } else { showsList = shown != .detailOnly }
+                }
+            }
         )
+    }
+
+    /// After the window was rearranged (turned, resized, back in front): once the split view
+    /// has come to rest, the columns go back to what the viewer chose.
+    ///
+    /// As a page with nothing selected, the list should be what shows. Where the detail shows
+    /// instead, the split view has lost the compact width the page asks for (seen on a device
+    /// turned upright, where UIKit seems to hand the window's own width class down again): the
+    /// width is taken away for a moment and given again.
+    private func settle() {
+        rearrangements += 1
+        showChosenColumns()
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(500))
+            showChosenColumns()
+            if layout.isTable, model.selection == nil, detailHasAppeared {
+                renewsCompact = true
+                try? await Task.sleep(for: .milliseconds(60))
+                renewsCompact = false
+            }
+        }
     }
 
     /// The list as a table the whole window wide, or back as the detail's sidebar: kept for this
