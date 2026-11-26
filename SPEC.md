@@ -771,7 +771,9 @@ lines or one (•••, two by default):
   hourglass when rate limited. Its menu says it in words (the write, the last sync or the error,
   the item count, the quota and when it resets) and has Sync Now
 
-**Detail.** As §6, with Status and Priority as segmented controls (one touch; Triage and – clear),
+**Detail.** As §6, with Status and Priority as segmented controls (one touch; Triage and – clear)
+where the pane is wide enough for both on one row, and as two menus on that row where it isn't (a
+phone), each a glass capsule saying what is set,
 the checks in a popover from the CI status, and a round glass button for the pin. GitHub (↗) and
 the rest (•••) are in the pane's bar: the row menu, rename, refresh,
 back to the previous item, and the conversation's Show Automated / Expand All / Collapse All. In

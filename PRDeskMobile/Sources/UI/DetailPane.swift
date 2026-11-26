@@ -394,6 +394,24 @@ private struct ComposeButton: View {
     }
 }
 
+/// The face of a menu in the header: what is set, on a glass capsule as tall as the round buttons.
+private struct GlassMenuLabel: View {
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Text(text).font(.subheadline.weight(.medium))
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(Color.secondaryText)
+        }
+        .padding(.horizontal, 13)
+        .frame(height: RoundGlassIcon.size)
+        .contentShape(Capsule())
+        .glassEffect(.regular.interactive(), in: .capsule)
+    }
+}
+
 /// The face of a round glass button in the header: one size whatever the symbol, and the same
 /// for a button and a menu.
 private struct RoundGlassIcon: View {
@@ -577,31 +595,51 @@ private struct DetailHeader: View {
 
     // MARK: Controls
 
-    /// Status and Priority one touch away, as segments; side by side where they fit, stacked on
-    /// a phone.
+    /// Status and Priority on one row: as segments, one touch away, where they fit (an iPad);
+    /// as two menus where they don't (a phone), each a glass capsule saying what is set.
     private var controls: some View {
         let onBoard = ItemMenu.isOnBoard(item, model: model)
         return ViewThatFits(in: .horizontal) {
             HStack(spacing: 8) {
                 if onBoard {
-                    statusPicker.fixedSize()
-                    priorityPicker.fixedSize()
+                    statusPicker(spelledOut: false).pickerStyle(.segmented).fixedSize()
+                    priorityPicker(spelledOut: false).pickerStyle(.segmented).fixedSize()
                 }
                 Spacer(minLength: 0)
                 buttons(onBoard: onBoard)
             }
-            VStack(alignment: .leading, spacing: 8) {
-                if onBoard { statusPicker }
-                HStack(spacing: 8) {
-                    if onBoard { priorityPicker.fixedSize() }
-                    Spacer(minLength: 0)
-                    buttons(onBoard: onBoard)
+            HStack(spacing: 8) {
+                if onBoard {
+                    Menu {
+                        statusPicker(spelledOut: true).pickerStyle(.inline)
+                    } label: {
+                        GlassMenuLabel(text: (model.listedTriage(for: item)?.rawValue) ?? "Triage")
+                    }
+                    .accessibilityLabel("Status")
+                    Menu {
+                        priorityPicker(spelledOut: true).pickerStyle(.inline)
+                    } label: {
+                        GlassMenuLabel(text: model.board(for: item)?.priorityValue.map(Self.name) ?? "Priority")
+                    }
+                    .accessibilityLabel("Priority")
                 }
+                Spacer(minLength: 0)
+                buttons(onBoard: onBoard)
             }
+            .buttonStyle(.plain)
         }
     }
 
-    private var statusPicker: some View {
+    private static func name(_ priority: Priority) -> String {
+        switch priority {
+        case .high: "High"
+        case .medium: "Medium"
+        case .low: "Low"
+        }
+    }
+
+    /// `spelledOut`: in a menu, where there is room for words and its title says what it sets.
+    private func statusPicker(spelledOut: Bool) -> some View {
         let triage = model.triage(for: item)
         return Picker("Status", selection: Binding(
             get: { model.listedTriage(for: item) },
@@ -615,16 +653,21 @@ private struct DetailHeader: View {
             }
         )) {
             Text("Triage").tag(TriageStatus?.none)
-            ForEach(TriageStatus.settable, id: \.self) { Text($0.rawValue).tag(Optional($0)) }
+            ForEach(TriageStatus.settable, id: \.self) { status in
+                if spelledOut {
+                    Label(status.rawValue, systemImage: status.symbol).tag(Optional(status))
+                } else {
+                    Text(status.rawValue).tag(Optional(status))
+                }
+            }
             // Merging comes with 🚀 or from Merger; shown while the item has it, never offered.
             if triage == .merging {
                 Text(TriageStatus.merging.rawValue).tag(Optional(TriageStatus.merging))
             }
         }
-        .pickerStyle(.segmented)
     }
 
-    private var priorityPicker: some View {
+    private func priorityPicker(spelledOut: Bool) -> some View {
         Picker("Priority", selection: Binding(
             get: { model.board(for: item)?.priorityValue },
             set: { priority in
@@ -633,10 +676,9 @@ private struct DetailHeader: View {
                 if priority != current { model.perform(.priority(priority ?? current), on: item.id) }
             }
         )) {
-            ForEach(Priority.allCases, id: \.self) { Text($0.letter).tag(Optional($0)) }
-            Text("–").tag(Priority?.none)
+            ForEach(Priority.allCases, id: \.self) { Text(spelledOut ? Self.name($0) : $0.letter).tag(Optional($0)) }
+            Text(spelledOut ? "None" : "–").tag(Priority?.none)
         }
-        .pickerStyle(.segmented)
     }
 
     private func buttons(onBoard: Bool) -> some View {
