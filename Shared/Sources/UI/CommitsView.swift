@@ -171,6 +171,9 @@ struct CommitsView: View {
             }
             .listStyle(.plain)
             .environment(\.defaultMinListRowHeight, RowMetrics.commitRowHeight)
+            // The pager lets its pages draw past their edges, which would reach this list too:
+            // its rows, scrolled, drew over the bar above it.
+            .scrollClipDisabled(false)
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { listWidth = $0 }
         #endif
     }
