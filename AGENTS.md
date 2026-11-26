@@ -231,6 +231,12 @@ are used off the main actor); no glass on content (cards, chips, rows).
   - Measure only in a window. Before, the bar lays out otherwise (three even items, 274 pt),
     and an item reported too wide is dropped from the bar for good, never to be measured again:
     until measured the item is three buttons wide.
+  - Symbols: `SymbolConfiguration(textStyle: .body, scale: .large)` with medium weight is the
+    bar buttons' own (the same magnifying glass measured 42 px in both, at the same height);
+    a point size set by eye was 9% small.
+  - Names come and go by setting the same items' `title` inside one `UIView.animate` with the
+    measuring and the bar's placing (`TabBarHost.change`): the capsule is centered in the bar's
+    wide bounds, so the bar moves under it in the same animation and its leading end stays put.
   - UIKit doesn't fill the chosen item's symbol as a SwiftUI `TabView` does: `selectedImage`.
     Once `standardAppearance` is set, `item.badgeColor` is ignored: set `badgeBackgroundColor`
     on all three layout appearances of a copy of the bar's own appearance.
@@ -238,9 +244,10 @@ are used off the main actor); no glass on content (cards, chips, rows).
     the list doesn't hold up the bar's own selection.
   A segmented `Picker` could not do this either: a segment is text or an image, never both,
   draws an image small and light whatever its font, and takes no badge.
-- A toolbar item is given its new size at once when its content changes size, and whatever is
-  still animating is centered in it. The switcher's names come and go at once, and `DeskView`
-  orders them around the full-width change (names away, then the change; the change, then names).
+- A toolbar item is given its new size at once when its content changes size, and SwiftUI
+  content still animating is centered in it: animate inside UIKit instead (the tab bar's host
+  keeps its capsule at the leading end whatever the item's width). `DeskView` orders the names
+  around the full-width change (names away, then the change; the change, then names).
 - The system's search button joins the capsule of whatever is at the bar's end unless it is
   placed by name (`DefaultToolbarItem(kind: .search, placement: .topBarTrailing)`) with a
   `ToolbarSpacer(.fixed)` on each side; in a compact window it is placed in the bottom bar.

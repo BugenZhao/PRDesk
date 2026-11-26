@@ -739,7 +739,8 @@ one out, with its own button, edge swipe and animation), the list its sidebar:
   Rows of one line or two is a choice of its own (••• too), the same for the table and the sidebar.
   Going between full width and the sidebar, the window dissolves from one to the other, the
   bar's head the same across it: the lists are symbols alone through the change, their names
-  folding away before it and coming after
+  folding into them before it and opening out after, the capsule shrinking and growing from its
+  leading end
 - The list keeps the desk's own white ground as a sidebar, not a sidebar's tint: the rows' colors
   say things
 - The bar over the list holds the lists, the filter, ⤢ and ◧, the last two (about where the
