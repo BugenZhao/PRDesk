@@ -291,77 +291,77 @@ private struct ColumnTitles: View {
     }
 }
 
-/// In the bar at the list's foot: the write under way (or just done), otherwise how many items,
-/// then when the desk last synced and what is left of GitHub's hourly budget.
-struct StatusLine: View {
+/// How things stand with GitHub, as one button in the bar at the list's foot: its symbol says it
+/// at a glance (syncing, a write going out or just done, a failure, the budget used up), and its
+/// menu says it in words, with Sync Now.
+struct SyncStatusButton: View {
     @Environment(AppModel.self) private var model
-    /// On a phone: the write or the sync alone.
-    let isBrief: Bool
 
     var body: some View {
-        HStack(spacing: 6) {
-            ZStack(alignment: .leading) {
+        Menu {
+            Section {
+                Button("Sync Now", systemImage: "arrow.clockwise") {
+                    Task { await model.sync() }
+                }
+                .disabled(model.syncState == .syncing)
+            }
+            // Read when the menu opens: plain lines, nothing to touch.
+            Section {
                 if let activity = model.activity {
-                    HStack(spacing: 5) {
-                        ZStack {
-                            if activity.isDone {
-                                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                            } else {
-                                ProgressView().controlSize(.mini)
-                            }
-                        }
-                        .frame(width: 14)
-                        Text(activity.text)
-                            .foregroundStyle(Color.primary)
-                            .opacity(activity.isDone ? 0.6 : 1)
-                    }
-                    .id(activity.id)
-                    .transition(.opacity)
-                } else if !isBrief {
-                    Text(model.visibleCount == 1 ? "1 item" : "\(model.visibleCount) items")
-                        .transition(.opacity)
+                    Label(activity.text, systemImage: activity.isDone ? "checkmark.circle" : "arrow.up.circle")
+                }
+                Label(syncLine, systemImage: glyph.name)
+                if case let .failed(message) = model.syncState {
+                    Text(message)
+                }
+                Label(model.visibleCount == 1 ? "1 item" : "\(model.visibleCount) items", systemImage: "list.bullet")
+                if let rate = model.rateLimit {
+                    Label(
+                        "\(rate.remaining.formatted()) of \(rate.limit.formatted()) requests left, until \(rate.resetAt.formatted(date: .omitted, time: .shortened))",
+                        systemImage: "gauge.with.dots.needle.33percent"
+                    )
                 }
             }
-            .animation(.easeInOut(duration: 0.25), value: model.activity)
-            if !isBrief || model.activity == nil {
-                if !isBrief { Text("·") }
-                sync
-            }
+            .disabled(true)
+        } label: {
+            Image(systemName: glyph.name)
+                .symbolEffect(.rotate, options: .repeat(.continuous), isActive: model.syncState == .syncing && !isWriting)
+                .symbolEffect(.pulse, options: .repeat(.continuous), isActive: isWriting)
+                .foregroundStyle(glyph.color ?? Color.primary)
+                .contentTransition(.symbolEffect(.replace))
         }
-        .font(.caption)
-        .monospacedDigit()
-        .foregroundStyle(Color.secondaryText)
-        .lineLimit(1)
-        .padding(.horizontal, 6)
+        .accessibilityLabel("Sync Status")
+        .accessibilityValue(model.activity?.text ?? syncLine)
     }
 
-    @ViewBuilder private var sync: some View {
-        switch model.syncState {
-        case .syncing:
-            ProgressView().controlSize(.mini)
-            Text("Syncing…")
-        case .failed:
-            Label("Sync failed", systemImage: "exclamationmark.triangle.fill")
-                .labelStyle(.titleAndIcon)
-                .foregroundStyle(.red)
-        case let .rateLimited(until):
-            Label("Rate limited until \(until.formatted(date: .omitted, time: .shortened))", systemImage: "hourglass")
-                .labelStyle(.titleAndIcon)
-                .foregroundStyle(.orange)
-        case .idle:
-            if let last = model.lastSyncedAt {
-                TimelineView(.periodic(from: .now, by: 5)) { context in
-                    let age = last.compactAge(relativeTo: context.date)
-                    Text(age == "now" ? "Synced just now" : "Synced \(age) ago")
-                }
-            } else {
-                Text("Not synced yet")
-            }
+    private var isWriting: Bool { model.activity.map { !$0.isDone } ?? false }
+
+    /// A write first (it is what the viewer just did), then the sync.
+    private var glyph: (name: String, color: Color?) {
+        if let activity = model.activity {
+            return activity.isDone ? ("checkmark.circle.fill", .green) : ("arrow.up.circle", nil)
         }
-        if !isBrief, let rateLimit = model.rateLimit, !model.syncState.isRateLimited {
-            Text("·")
-            Text("\(rateLimit.remaining.formatted()) left")
-                .foregroundStyle(rateLimit.remaining < 500 ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+        switch model.syncState {
+        case .syncing: return ("arrow.triangle.2.circlepath", nil)
+        case .failed: return ("exclamationmark.arrow.triangle.2.circlepath", .red)
+        case .rateLimited: return ("hourglass", .orange)
+        case .idle:
+            // The budget nearly spent shows before it is.
+            let isLow = model.rateLimit.map { $0.remaining < 500 } ?? false
+            return ("arrow.triangle.2.circlepath", isLow ? .orange : nil)
+        }
+    }
+
+    private var syncLine: String {
+        switch model.syncState {
+        case .syncing: return "Syncing…"
+        case .failed: return "Sync failed"
+        case let .rateLimited(until):
+            return "Rate limited until \(until.formatted(date: .omitted, time: .shortened))"
+        case .idle:
+            guard let last = model.lastSyncedAt else { return "Not synced yet" }
+            let age = last.compactAge()
+            return age == "now" ? "Synced just now" : "Synced \(age) ago"
         }
     }
 }

@@ -113,7 +113,8 @@ struct DeskView: View {
     }
 
     /// Around the list: which list it is at its head (beside the split view's own button for
-    /// putting it away), and at its foot how things stand, the filter and the desk's menu.
+    /// putting it away), and at its foot how things stand with GitHub (a button), the filter and
+    /// the desk's menu.
     @ToolbarContentBuilder
     private func toolbar(_ layout: DeskLayout) -> some ToolbarContent {
         @Bindable var model = model
@@ -128,11 +129,7 @@ struct DeskView: View {
             .fixedSize()
         }
         .sharedBackgroundVisibility(.hidden)
-        // On a phone the status shows only with news: a write, or a sync that isn't idle.
-        let isBrief = !layout.density.canUseOneLine
-        if !isBrief || model.activity != nil || model.syncState != .idle {
-            ToolbarItem(placement: .status) { StatusLine(isBrief: isBrief) }
-        }
+        ToolbarItem(placement: .bottomBar) { SyncStatusButton() }
         ToolbarSpacer(.flexible, placement: .bottomBar)
         DefaultToolbarItem(kind: .search, placement: .bottomBar)
         ToolbarSpacer(.fixed, placement: .bottomBar)
@@ -159,8 +156,7 @@ enum RowLines: Int {
 }
 
 /// The desk's own menu: how the list is shown (the rows' lines, and the order within a section,
-/// which the column titles also set where rows have them), syncing, and the settings. Pulling the
-/// list down syncs too.
+/// which the column titles also set where rows have them), and the settings.
 private struct DeskMenu: View {
     @Environment(AppModel.self) private var model
     @Binding var rowLines: RowLines
@@ -191,10 +187,6 @@ private struct DeskMenu: View {
                 Label("Ascending", systemImage: "arrow.up").tag(true)
             }
             Section {
-                Button("Sync Now", systemImage: "arrow.clockwise") {
-                    Task { await model.sync() }
-                }
-                .disabled(model.syncState == .syncing)
                 Button("Settings", systemImage: "gearshape") { showsSettings = true }
             }
         }

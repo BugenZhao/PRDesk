@@ -733,7 +733,7 @@ one out, with its own button, edge swipe and animation), the list its sidebar:
 - The list keeps the desk's own white ground as a sidebar, not a sidebar's tint: the rows' colors
   say things
 - The bar over the list holds only the lists (the segments are the glass, with none behind
-  them) and ◧; at its foot are the status, the filter and ••• (rows, sorting, Sync Now, Settings)
+  them) and ◧; at its foot are the sync status button, the filter and ••• (rows, sorting, Settings)
 - Going from one to the other keeps the selection, the detail's tab, its pages (scroll position,
   loaded diffs) and a comment being written. Nothing remembers which layout came before
 
@@ -751,7 +751,7 @@ lines or one (•••, two by default):
   the title keeps the most room: Author's name under 960 pt (the picture stays), Size under 720,
   the number, the Comment and the latest event under 640, where tags are also shortened
 - Narrower than 450 pt rows are always two lines, and ••• doesn't offer the choice
-- ••• also sorts (the same keys as the Mac's columns). Pulling down syncs, as does Sync Now there
+- ••• also sorts (the same keys as the Mac's columns). Pulling down syncs
 - A swipe does one thing, all the way across or by its button. Right: read / unread. Left: the
   item's next place on the board, by the Status it has (not the section the row is in, since an
   item is in several): onto the Desk from Tray, Shelf or Attic, off the Desk to the Shelf (Good
@@ -760,8 +760,11 @@ lines or one (•••, two by default):
 - Holding a row opens the Mac's row menu: open, copy link, read, Status, Priority, pin, add to
   Desk, ready / draft, linked PR, agent session, author, Grok Bot
 - The filter (§4.4) is the system's search field, a button at the list's foot
-- The list's foot shows the write under way as the Mac's status bar does, otherwise the item
-  count, the last sync and the quota; on an iPhone only while there is something to say
+- At the list's foot, one button stands for the Mac's status bar. Its symbol says how things
+  stand at a glance: two arrows (turning while syncing, orange when the quota runs low), an arrow
+  up while a write goes out and a green check once it has, a red mark for a failed sync, an
+  hourglass when rate limited. Its menu says it in words (the write, the last sync or the error,
+  the item count, the quota and when it resets) and has Sync Now
 
 **Detail.** As §6, with Status and Priority as segmented controls (one touch; Triage and – clear),
 the checks in a popover from the CI status, and a round glass button for the pin. GitHub (↗) and
