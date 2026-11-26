@@ -802,7 +802,8 @@ lines or one (•••, two by default):
 
 - Two lines: the title with its tags and the age; under it the number, author and marks of trust,
   the latest event (or the board's Comment; purple in place of a woken item's tag when it is
-  what woke it, as on the Mac), then the size (+n −n, at any width: a sidebar or a
+  what woke it, as on the Mac; what the author did goes without "author", right after the
+  author's name: `pushed 9d`), then the size (+n −n, at any width: a sidebar or a
   phone is never wide enough for a Size column), Turn, Review and CI
 - One line: the Mac's columns under sortable column titles. They give way as the list narrows so
   the title keeps the most room: Author's name under 960 pt (the picture stays), Size under 720,

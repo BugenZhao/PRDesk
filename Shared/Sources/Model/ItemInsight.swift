@@ -52,6 +52,9 @@ struct ItemInsight: Hashable, Sendable {
     /// Short description of the latest human event, e.g. "@njhill approved".
     var summary: String?
     var summaryAt: Date?
+    /// The same without its subject ("pushed", "merged"), when the item's author did it: for
+    /// where the event follows the author's name. Nil when someone else did.
+    var summaryByAuthor: String?
     var isReviewRequestedFromMe: Bool
     /// The latest time someone turned to the viewer directly, as far as the recent events tell.
     var directAsk: DirectAsk?
@@ -108,8 +111,13 @@ struct ItemInsight: Hashable, Sendable {
         }
         // The agent's commits carry its `[bot]` login, its PRs the bare one.
         let isAuthor = { (login: String?) in sameLogin(login, item.author) || item.isParityStaging && Parity.isBot(login) }
-        summary = latest.map { Self.describe($0, isMe: isMe($0.actor), isAuthor: isAuthor($0.actor)) }
+        summary = latest.map { event in
+            Self.describe(event, who: isMe(event.actor) ? "you" : isAuthor(event.actor) ? "author" : "@\(event.actor ?? "ghost")")
+        }
         summaryAt = latest?.at
+        summaryByAuthor = latest.flatMap { event in
+            !isMe(event.actor) && isAuthor(event.actor) && event.kind != .mentioned ? Self.describe(event, who: nil) : nil
+        }
 
         isCoAuthor = adoptedSince != nil
         awaitsDraftedComment = adoptedSince.map { since in
@@ -221,20 +229,22 @@ struct ItemInsight: Hashable, Sendable {
     }
 
     /// "you" for the viewer, "author" for the item's author, "@login" for anyone else.
-    private static func describe(_ event: Item.Event, isMe: Bool, isAuthor: Bool) -> String {
-        let who = isMe ? "you" : isAuthor ? "author" : "@\(event.actor ?? "ghost")"
+    /// `who`: the event's subject, or nil to leave it out.
+    private static func describe(_ event: Item.Event, who: String?) -> String {
+        let subject = who.map { "\($0) " } ?? ""
+        let agent = who.map { " by \($0)" } ?? ""
         return switch event.kind {
-        case .comment: "\(who) commented"
-        case .approved: "\(who) approved"
-        case .changesRequested: "\(who) rejected"
-        case .reviewed: "\(who) reviewed"
-        case .commit, .forcePush: "\(who) pushed"
-        case .merged: "merged by \(who)"
-        case .closed: "closed by \(who)"
-        case .reopened: "reopened by \(who)"
-        case .readyForReview: "\(who) marked ready"
+        case .comment: "\(subject)commented"
+        case .approved: "\(subject)approved"
+        case .changesRequested: "\(subject)rejected"
+        case .reviewed: "\(subject)reviewed"
+        case .commit, .forcePush: "\(subject)pushed"
+        case .merged: "merged\(agent)"
+        case .closed: "closed\(agent)"
+        case .reopened: "reopened\(agent)"
+        case .readyForReview: "\(subject)marked ready"
         // Only requests to the viewer are named, and Turn already says `review`.
-        case .reviewRequested: "\(who) requested"
+        case .reviewRequested: "\(subject)requested"
         case .mentioned: "you were mentioned"
         }
     }

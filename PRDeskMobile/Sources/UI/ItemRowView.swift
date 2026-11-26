@@ -161,7 +161,8 @@ struct ItemRowView: View {
     /// room for it.
     private var secondLineNote: String? {
         if !density.showsNotes, let comment = row.comment { return comment }
-        guard let summary = row.insight.summary else { return nil }
+        // Right after the author's name, what the author did needs no "author" before it.
+        guard let summary = row.insight.summaryByAuthor ?? row.insight.summary else { return nil }
         return row.insight.summaryAt.map { "\(summary) \($0.compactAge())" } ?? summary
     }
 
