@@ -8,8 +8,9 @@ size, as far as the square allows:
 
     optical size = sqrt(ink width × ink height) × density ** DENSITY_WEIGHT
 
-where density is how much of that box the ink covers (a solid square looks bigger than an outline
-of the same box). A logo too wide or tall for the target at that size is as big as the square
+where density is how much of that box the ink covers. It is left out (a weight of 0): weighed in
+at 0.25, solid logos (CoreWeave's disc, Microsoft's squares) came out shrunk too far, by the
+user's eye. A logo too wide or tall for the target at that size is as big as the square
 lets it be. An SVG gets a new `viewBox` (its paths untouched); a PNG is redrawn on its canvas.
 A dark variant takes its light logo's measures, so the two stay alike. Running it again changes
 nothing, give or take a rounding.
@@ -30,9 +31,9 @@ from PIL import Image
 
 ASSETS = os.path.join(os.path.dirname(__file__), "..", "Shared", "Resources", "Assets.xcassets")
 # The optical size every logo gets, as a fraction of the square.
-TARGET = 0.72
-# How much the ink's density counts: 0 is the box alone.
-DENSITY_WEIGHT = 0.25
+TARGET = 0.90
+# How much the ink's density counts: 0 is the box alone (see above).
+DENSITY_WEIGHT = 0
 # The ink's box may come this close to the square's edges.
 MAX_EXTENT = 1.0
 MEASURE_SIDE = 512
