@@ -8,14 +8,17 @@ import SwiftUI
 /// `selectionIsPullRequest`), so moving the selection doesn't rebuild the menus.
 struct DeskCommands: Commands {
     let model: AppModel
-    /// The same settings as `DeskView`'s.
-    @AppStorage(DeskLayout.showsListKey) private var showsList = true
+    /// The window's own doings: its layout is its to know.
+    @FocusedValue(\.deskActions) private var desk
+    /// The same setting as `DeskView`'s.
     @AppStorage(RowLines.key) private var rowLines = RowLines.two
 
     var body: some Commands {
         CommandGroup(after: .toolbar) {
-            Button(showsList ? "Hide List" : "Show List") { showsList.toggle() }
+            Button("Show or Hide the List") { desk?.toggleList() }
                 .keyboardShortcut("b")
+            Button("List Alone or Beside the Detail") { desk?.toggleListPage() }
+                .keyboardShortcut("b", modifiers: [.command, .shift])
             Button(rowLines == .two ? "Rows of One Line" : "Rows of Two Lines") {
                 rowLines = rowLines == .two ? .one : .two
             }
