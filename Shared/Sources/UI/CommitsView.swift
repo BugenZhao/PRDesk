@@ -59,14 +59,15 @@ struct CommitsView: View {
                     }
                 }
                 .pageBar {
-                    if showsList {
-                        list(history)
-                            .frame(height: min(CGFloat(history.rows.count) * RowMetrics.commitRowHeight + 10, 200))
-                        Divider()
-                    }
+                    // The bar on top, so the chevron stays where it was when the list opens.
                     toolbar(history, range: range)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
+                    if showsList {
+                        Divider()
+                        list(history)
+                            .frame(height: min(CGFloat(history.rows.count) * RowMetrics.commitRowHeight + 10, 200))
+                    }
                 }
             }
         }
@@ -223,6 +224,7 @@ struct CommitsView: View {
                         .font(.caption2.weight(.semibold))
                         .rotationEffect(.degrees(showsList ? 90 : 0))
                     Text("\(history.commits.count) commit\(history.commits.count == 1 ? "" : "s")")
+                        .fixedSize()
                 }
                 .foregroundStyle(.secondaryText)
                 .contentShape(Rectangle())
@@ -257,6 +259,7 @@ struct CommitsView: View {
                 if range == .all, let viewed = model.viewedFiles[item.id] {
                     let count = loaded.files.count { viewed[$0.filename] == .viewed }
                     Text("\(count) / \(loaded.files.count) viewed")
+                        .fixedSize()
                         .foregroundStyle(.secondaryText)
                         .padding(.leading, 4)
                 }

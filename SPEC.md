@@ -617,9 +617,9 @@ the iPad to read rather than work out again (§9, Badges).
     (shown on hover) offers all 8. Clicks take effect locally first and revert if the write fails
   - New content since the last view is highlighted, and the page scrolls to the first new item
 - **Commits**: the PR's changes, as one `WKWebView` page of files and their diffs, under a bar
-  saying what they are (the range, files, +/−, how many are viewed), and the PR's latest 100
-  commits, newest first, folded away above it (a chevron with the commit count in the bar shows
-  or hides them, remembered). Each row: the commit's CI as a dot, the author's avatar, the short
+  saying what they are (the range, files, +/−, how many are viewed; the diff's options behind
+  a button at its end), and the PR's latest 100 commits, newest first, folded away under the bar
+  (a chevron with the commit count at its start shows or hides them, remembered). Each row: the commit's CI as a dot, the author's avatar, the short
   sha, the headline (tags dimmed, and shortened in every row once one doesn't fit, as in the
   stack), "new" for commits since the viewer last opened the PR, and the age (hover for the
   author and size; right-click to open it on GitHub or copy the sha). Force pushes sit between

@@ -11,21 +11,26 @@ import SwiftUI
     typealias PlatformFont = UIFont
 #endif
 
-/// A diff page's options at the end of its bar: wrapping, and every file open or shut. Spelled
-/// out on the Mac; behind one button on the iPad and iPhone, whose bar can be a phone's width.
+/// A diff page's options at the end of its bar: wrapping, and every file open or shut, behind
+/// one button, so the bar has room for what the diff is.
 struct DiffOptions: View {
     @Binding var wrapLines: Bool
     let page: WebDocument
 
     var body: some View {
         #if os(macOS)
-            Toggle("Wrap lines", isOn: $wrapLines)
-                .toggleStyle(.checkbox)
-            Button("Expand all") { page.run("PRDesk.setAllFiles(true)") }
-                .buttonStyle(.link)
-                .padding(.leading, 4)
-            Button("Collapse all") { page.run("PRDesk.setAllFiles(false)") }
-                .buttonStyle(.link)
+            Menu {
+                Toggle("Wrap Lines", isOn: $wrapLines)
+                Divider()
+                Button("Expand All") { page.run("PRDesk.setAllFiles(true)") }
+                Button("Collapse All") { page.run("PRDesk.setAllFiles(false)") }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Diff Options")
         #else
             Menu {
                 Toggle("Wrap Lines", systemImage: "arrow.turn.down.left", isOn: $wrapLines)
