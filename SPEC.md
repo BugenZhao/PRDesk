@@ -737,15 +737,19 @@ one out, with its own button, edge swipe and animation), the list its sidebar:
   own one column, the list the whole window wide; a row pushes its detail over it, with the way
   back. Kept for wide and for narrower windows apart; turning it off brings the sidebar back.
   Rows of one line or two is a choice of its own (••• too), the same for the table and the sidebar.
-  Going between full width and the sidebar, the window dissolves from one to the other
+  Going between full width and the sidebar, the window dissolves from one to the other, the
+  bar's head the same across it: the lists are symbols alone through the change, their names
+  folding away before it and coming after
 - The list keeps the desk's own white ground as a sidebar, not a sidebar's tint: the rows' colors
   say things
-- The bar over the list holds the lists, the filter, ⤢ and ◧, a round button each, the two about
-  where the list is side by side. The lists are the system's own tab bar: a capsule of glass
-  with the system's selection (the chosen one tinted, its symbol filled) and its badges for what
-  waits in Parity and the Inbox, in the blue of the unread dots. A grid for Dashboard, an equals
-  sign in a circle for Parity, a bell for the Inbox; each with its name beside it at full width
-  and on a phone, the symbols alone as a sidebar, where the bar is short of room;
+- The bar over the list holds the lists, the filter, ⤢ and ◧, the last two (about where the
+  list is) side by side. The lists are one item of the bar, in the bar's own capsule of glass
+  and as tall as its buttons: a grid for Dashboard, an equals sign in a circle for Parity, a
+  bell for the Inbox, the chosen one tinted and filled on a pill that slides to it, and what
+  waits in Parity and the Inbox as a badge on the symbol's corner, in the blue of the unread
+  dots. Each has its name beside it at full width and on a phone (at ordinary text sizes);
+  as a sidebar, where the bar is short of room, the symbols alone. It lays itself out, at any
+  text size;
   at its foot are the sync status button, the filter and ••• (rows, sorting, Settings)
 - Going from one to the other keeps the selection, the detail's tab, its pages (scroll position,
   loaded diffs) and a comment being written. Nothing remembers which layout came before
