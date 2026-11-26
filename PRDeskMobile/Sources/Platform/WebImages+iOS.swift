@@ -50,59 +50,28 @@ enum BadgeImages {
     static func image(for badge: Badge, style: UIUserInterfaceStyle) -> UIImage? {
         let key = "\(badge.org.rawValue)/\(badge.isSecondary)/\(style.rawValue)"
         if let image = cache[key] { return image }
-        let image = colored(badge, style: style).flatMap { badge.isSecondary && badge.org.brandTile == nil ? grayscale($0) : $0 }
+        let image: UIImage?
+        if let tile = badge.org.brandTile {
+            image = brandTile(tile.text, hex: tile.hex)
+        } else if let name = badge.org.logoAsset,
+                  let logo = UIImage(named: name, in: nil, compatibleWith: UITraitCollection(userInterfaceStyle: style)) {
+            image = badge.isSecondary ? grayscale(logo) : logo
+        } else {
+            image = nil
+        }
         cache[key] = image
         return image
     }
 
-    /// The brand tile or the logo in its colors, whether or not the badge is secondary.
-    private static func colored(_ badge: Badge, style: UIUserInterfaceStyle) -> UIImage? {
-        if let tile = badge.org.brandTile { return brandTile(tile.text, hex: tile.hex) }
-        guard let name = badge.org.logoAsset else { return nil }
-        return UIImage(named: name, in: nil, compatibleWith: UITraitCollection(userInterfaceStyle: style))
-    }
-
-    private static var bitmaps: [String: UIImage] = [:]
-
-    /// The badge drawn at the pixels it is shown at. SwiftUI drew a logo (an SVG) at its own
-    /// size and scaled the pixels to the badge's, which left stairs at every edge, and smoother
-    /// scaling or a bitmap a few times larger still blurred them a little: drawn at the size
-    /// shown, the edges are the vector's own.
-    static func bitmap(for badge: Badge, style: UIUserInterfaceStyle, side: CGFloat, scale: CGFloat) -> UIImage? {
-        let pixels = max(1, (side * scale).rounded())
-        let key = "\(badge.org.rawValue)/\(badge.isSecondary)/\(style.rawValue)/\(pixels)/\(scale)"
-        if let image = bitmaps[key] { return image }
-        let square = pixels / scale
-        if let tile = badge.org.brandTile {
-            let image = brandTile(tile.text, hex: tile.hex, side: square, scale: scale)
-            bitmaps[key] = image
-            return image
-        }
-        guard let source = colored(badge, style: style) else { return nil }
-        let fit = min(square / max(source.size.width, 1), square / max(source.size.height, 1))
-        let size = CGSize(width: source.size.width * fit, height: source.size.height * fit)
-        let format = UIGraphicsImageRendererFormat(for: UITraitCollection(userInterfaceStyle: style))
-        format.scale = scale
-        let drawn = UIGraphicsImageRenderer(size: CGSize(width: square, height: square), format: format).image { context in
-            context.cgContext.interpolationQuality = .high
-            source.draw(in: CGRect(x: (square - size.width) / 2, y: (square - size.height) / 2, width: size.width, height: size.height))
-        }
-        let image = badge.isSecondary && badge.org.brandTile == nil ? grayscale(drawn) ?? drawn : drawn
-        bitmaps[key] = image
-        return image
-    }
-
     /// `text` in white on a rounded square of the color `hex`, shrunk to fit.
-    private static func brandTile(_ text: String, hex: String, side: CGFloat = 13, scale: CGFloat? = nil) -> UIImage {
+    private static func brandTile(_ text: String, hex: String) -> UIImage {
         let value = Int(hex, radix: 16) ?? 0
         let color = UIColor(
             red: CGFloat((value >> 16) & 0xFF) / 255, green: CGFloat((value >> 8) & 0xFF) / 255,
             blue: CGFloat(value & 0xFF) / 255, alpha: 1
         )
-        let rect = CGRect(x: 0, y: 0, width: side, height: side)
-        let format = UIGraphicsImageRendererFormat.preferred()
-        if let scale { format.scale = scale }
-        return UIGraphicsImageRenderer(size: rect.size, format: format).image { _ in
+        let rect = CGRect(x: 0, y: 0, width: 13, height: 13)
+        return UIGraphicsImageRenderer(size: rect.size).image { _ in
             color.setFill()
             UIBezierPath(roundedRect: rect, cornerRadius: rect.width * 3 / 13).fill()
             var font = UIFont.systemFont(ofSize: rect.height * 8 / 13, weight: .heavy)

@@ -43,12 +43,3 @@ final class AvatarCache {
     }
 }
 
-extension Badge {
-    /// The org's brand tile or bundled logo, without color for a secondary badge, as a bitmap of
-    /// exactly the pixels of a badge `side` points square at the screen's `scale`
-    /// (`BadgeImages.bitmap`). A bitmap doesn't follow the appearance, so the view says which.
-    @MainActor
-    func image(isDark: Bool, side: CGFloat, scale: CGFloat) -> UIImage? {
-        BadgeImages.bitmap(for: self, style: isDark ? .dark : .light, side: side, scale: scale)
-    }
-}

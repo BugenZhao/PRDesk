@@ -108,9 +108,4 @@ extension Badge {
         guard let key = org.logoAsset, let image = NSImage(named: key) else { return nil }
         return isSecondary ? cache.grayscale(image, key: key) : image
     }
-
-    /// The same, whatever the size: an `NSImage` draws its logo at the size it is drawn at, in
-    /// the appearance it is drawn in.
-    @MainActor
-    func image(isDark _: Bool, side _: CGFloat, scale _: CGFloat) -> NSImage? { image }
 }

@@ -66,8 +66,6 @@ struct LoginText: View {
 /// Affiliation badges for a login, as small org avatars with explanatory tooltips.
 struct BadgeIcons: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.displayScale) private var displayScale
     let login: String?
     var size: CGFloat = 13
 
@@ -86,17 +84,48 @@ struct BadgeIcons: View {
             }
             ForEach(badges, id: \.org) { badge in
                 Group {
-                    if let image = badge.image(isDark: colorScheme == .dark, side: size, scale: displayScale) {
-                        Image(platformImage: image).resizable().interpolation(.high).scaledToFit()
-                    } else {
-                        BadgeTile(text: badge.org.shortLabel, color: Color.tertiaryText, size: size)
-                    }
+                    #if os(iOS)
+                        // Drawn by SwiftUI at the badge's size: the catalog's SVG and a tile of
+                        // text. A `UIImage` of either is drawn at its own size and its pixels
+                        // scaled, which left stairs at every edge (or blurred them, smoothed).
+                        if let tile = badge.org.brandTile {
+                            BrandTile(text: tile.text, color: Color(hex: tile.hex) ?? .gray, size: size)
+                        } else if let name = badge.org.logoAsset {
+                            Image(name).resizable().scaledToFit().saturation(badge.isSecondary ? 0 : 1)
+                        } else {
+                            BadgeTile(text: badge.org.shortLabel, color: Color.tertiaryText, size: size)
+                        }
+                    #else
+                        if let image = badge.image {
+                            Image(platformImage: image).resizable().scaledToFit()
+                        } else {
+                            BadgeTile(text: badge.org.shortLabel, color: Color.tertiaryText, size: size)
+                        }
+                    #endif
                 }
                 .frame(width: size, height: size)
                 .clipShape(RoundedRectangle(cornerRadius: 3))
                 .help("\(badge.name) — \(badge.source)")
             }
         }
+    }
+}
+
+/// An org's brand tile: its short name in white on its color, as heavy as it fits.
+private struct BrandTile: View {
+    let text: String
+    let color: Color
+    let size: CGFloat
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: size * 8 / 13, weight: .heavy))
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
+            .padding(.horizontal, size * 0.06)
+            .frame(width: size, height: size)
+            .background(color, in: RoundedRectangle(cornerRadius: size * 3 / 13))
     }
 }
 
