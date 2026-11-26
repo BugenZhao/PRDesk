@@ -394,6 +394,13 @@ are used off the main actor); no glass on content (cards, chips, rows).
   `pr-closed`) are GitHub Octicons at 16 px (MIT, `Shared/Resources/octicons.LICENSE`). Octicons has no
   conflict glyph: `pr-conflict` is `git-pull-request` with its top-left node swapped for the ✕ and
   stem of `git-pull-request-closed`. The repo is public: don't add assets taken from other apps.
+- Org badge logos (`org-*.imageset`) all have one optical size, the standard for every new one:
+  after adding or replacing a logo (SVG preferred, with its dark variant beside it), run
+  `scripts/normalize-badges.py` (needs `rsvg-convert`), which measures each logo's ink and sets an
+  SVG's `viewBox` (or redraws a PNG) to that size, a dark variant taking its light logo's
+  measures. Don't size a logo by hand or at run time. On iOS a badge is the catalog's image drawn
+  by SwiftUI (`Image(name)`, desaturated for a secondary one), never a `UIImage` of it: SwiftUI
+  draws one of those at its own size and scales the pixels, which left stairs at every edge.
 - The app icon is an Icon Composer bundle (`Shared/Resources/AppIcon.icon`: `icon.json` + SVG layers on a
   1024 canvas). Layers must be filled shapes — strokes render as solid fills. Keep same-colored
   parts in one layer and make pieces overlap rather than abut, or the glass rendering shows
