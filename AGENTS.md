@@ -15,7 +15,11 @@ open .build/DerivedData/Build/Products/Debug/PRDesk.app
 running copy first) — that is the copy for daily use. Keep the build free of warnings.
 The project signs ad hoc; `install.sh` signs the installed copy with this Mac's Apple Development
 certificate where there is one (the team is read from the certificate, never written here: the
-repo is public), so macOS takes each install for the same app. Test copies stay ad hoc.
+repo is public), so macOS takes each install for the same app. It also gives it its identifier and
+team as entitlements (`PRDesk/PRDesk.entitlements`), with the provisioning profile they need,
+which Xcode makes with the account in its settings; without either it signs as before and says
+so. Test copies stay ad hoc, and must not take that entitlements file: without a profile macOS
+won't start an app that has them.
 
 Debug builds accept `-PRDeskAppearance dark|light` to force an appearance, `-PRDeskNoSync YES`
 to skip syncing on their own (no searches, board, inbox or prefetched details; only what is opened,
@@ -291,9 +295,13 @@ are used off the main actor); no glass on content (cards, chips, rows).
   element one too.
 - Handoff (`ItemHandoff`, a view of no size in each app's root background) can't be tried in a
   simulator or a test copy: the system hands off only between apps signed by one team on
-  devices of one iCloud account. `install.sh` signs the Mac's with the development certificate;
-  both apps declare the type in `NSUserActivityTypes` (the Mac's `Info.plist`, `Project.swift`
-  for iOS), and a new type needs both.
+  devices of one iCloud account. Both apps declare the type in `NSUserActivityTypes` (the Mac's
+  `Info.plist`, `Project.swift` for iOS), and a new type needs both. The two directions take
+  the team from different places: an activity is *received* by the team of the app's
+  certificate, but *offered* under the team in its `application-identifier` entitlement
+  (`useractivityd`). The Mac app signed with the certificate alone took activities from the
+  phone, while the phone was offered the Mac's as its web page in Safari: hence the
+  entitlements in `install.sh`.
 - A popover's `attachmentAnchor: .rect(.rect(…))` is in the space of the view the popover is
   on, not the window's. A page gives its menus' points in the window (`webView.convert(_:to:
   nil)`), and the desk begins below the status bar on a phone, so the pages' popovers pointed
