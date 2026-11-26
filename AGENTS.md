@@ -31,7 +31,9 @@ a note: that is how to tell which device has what.
 
 Debug builds accept `-PRDeskAppearance dark|light` to force an appearance, `-PRDeskNoSync YES`
 to skip syncing on their own (no searches, board, inbox or prefetched details; only what is opened,
-and ⌘R), and
+and ⌘R), `-PRDeskCompanion YES` to run the Mac as a companion (a first sync of 14 days, no
+prefetched details, affiliation work or board rules: for a second Mac starting from an empty
+database), and
 `-PRDeskDryRunWrites YES` to log writes to GitHub (comments, reviews, marking notifications read,
 board fields, subscriptions, files marked viewed, the badges file, messages to Grok Bots) instead of sending them — use it whenever a test could trigger a write.
 `-PRDeskBadgesFile <path>` shares badges through that local file instead of the repository in

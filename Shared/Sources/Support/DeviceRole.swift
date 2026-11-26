@@ -13,9 +13,15 @@ enum DeviceRole: Sendable {
 
     static let current: DeviceRole = {
         #if os(macOS)
-            .primary
+            // Debug builds launched with `-PRDeskCompanion YES` run the Mac as a companion: a first
+            // sync of 14 days, no prefetched details, no affiliation work and no board rules. For a
+            // second Mac that starts from an empty database without spending much of the quota.
+            #if DEBUG
+                if UserDefaults.standard.bool(forKey: "PRDeskCompanion") { return .companion }
+            #endif
+            return .primary
         #else
-            .companion
+            return .companion
         #endif
     }()
 
