@@ -40,11 +40,6 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    Picker("Sync Every", selection: $model.syncInterval) {
-                        ForEach(AppModel.syncIntervals, id: \.self) { seconds in
-                            Text(seconds < 120 ? "Minute" : "\(seconds / 60) Minutes").tag(seconds)
-                        }
-                    }
                     LabeledContent("Last Synced", value: model.lastSyncedAt.map { "\($0.compactAge()) ago" } ?? "never")
                     if case let .rateLimited(until) = model.syncState {
                         LabeledContent("API Quota", value: "used up until \(until.formatted(date: .omitted, time: .shortened))")

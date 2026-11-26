@@ -53,10 +53,16 @@ final class AppModel {
         }
     }
 
-    /// Seconds between automatic syncs, set in Settings. Each round costs a few GraphQL points.
-    var syncInterval: Int = Defaults.get(.syncInterval) ?? 300 {
-        didSet { Defaults.set(syncInterval, for: .syncInterval) }
-    }
+    /// Seconds between automatic syncs, set in the Mac's Settings. Each round costs a few GraphQL
+    /// points. iOS has no setting: it syncs only in front, every five minutes, whatever an older
+    /// build stored.
+    #if os(macOS)
+        var syncInterval: Int = Defaults.get(.syncInterval) ?? 300 {
+            didSet { Defaults.set(syncInterval, for: .syncInterval) }
+        }
+    #else
+        let syncInterval = 300
+    #endif
 
     static let syncIntervals = [60, 120, 300, 600, 900]
     /// Rounds are timed from the last attempt, so a failing sync isn't retried every tick.
