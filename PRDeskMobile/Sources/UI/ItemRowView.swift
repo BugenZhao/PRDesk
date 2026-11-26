@@ -39,7 +39,7 @@ struct ItemRowView: View {
     private var columns: RowColumns { RowColumns(density: density, scale: scale) }
 
     /// Closed items and drafts recede, as in the Mac list; the unread dot stays.
-    private var fade: Double { !item.isOpen || item.isDraft ? 0.55 : 1 }
+    private var fade: Double { !item.isOpen ? 0.55 : item.isDraft ? 0.6 : 1 }
 
     var body: some View {
         let columns = columns

@@ -17,8 +17,6 @@ struct DeskCommands: Commands {
         CommandGroup(after: .toolbar) {
             Button("Show or Hide the List") { desk?.toggleList() }
                 .keyboardShortcut("b")
-            Button("List Alone or Beside the Detail") { desk?.toggleListPage() }
-                .keyboardShortcut("b", modifiers: [.command, .shift])
             Button(rowLines == .two ? "Rows of One Line" : "Rows of Two Lines") {
                 rowLines = rowLines == .two ? .one : .two
             }

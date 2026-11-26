@@ -39,8 +39,9 @@ extension View {
         private(set) var offset: CGFloat = 0
         /// All the chrome over the page, top to bottom.
         private(set) var chromeHeight: CGFloat = 0
-        /// The chrome has left with the page: something else has to say what the page is. Set
-        /// only when it flips, so a view reading it isn't redrawn at every step of a scroll.
+        /// The chrome's title has left with the page (or, where it has none, nearly all of the
+        /// chrome): the bar has to say what the page is. Set only when it flips, so a view
+        /// reading it isn't redrawn at every step of a scroll.
         private(set) var isChromeAway = false
         /// Room to leave under the page's end, for what floats over the pane's foot.
         var bottomRoom: CGFloat = 0
@@ -48,6 +49,8 @@ extension View {
         /// The web view host reporting, so one that goes away doesn't reset what its successor set.
         @ObservationIgnored var source: ObjectIdentifier?
         @ObservationIgnored private var heights: [UUID: CGFloat] = [:]
+        /// How far down the chrome its title ends.
+        @ObservationIgnored private var titleExtent: CGFloat = 0
         /// What the observed properties hold, to read without being observed.
         @ObservationIgnored private var current = (offset: CGFloat(0), chromeHeight: CGFloat(0), isChromeAway: false)
 
@@ -68,8 +71,14 @@ extension View {
             updateAway()
         }
 
+        func setTitleExtent(_ extent: CGFloat) {
+            titleExtent = extent
+            updateAway()
+        }
+
         private func updateAway() {
-            let away = current.chromeHeight > 0 && current.offset > current.chromeHeight - 24
+            let limit = titleExtent > 0 ? titleExtent : current.chromeHeight - 24
+            let away = current.chromeHeight > 0 && current.offset > limit
             guard away != current.isChromeAway else { return }
             current.isChromeAway = away
             isChromeAway = away

@@ -10,14 +10,13 @@ final class DetailPages {
     var all: [WebDocument] { [timeline, files, commits] }
 }
 
-/// The desk, on a split view: the list is a page of its own that an item's detail is pushed
-/// over, or the detail's sidebar, beside it or floating over it (`DeskLayout`). The selection is
+/// The desk, always a split view: the list is the detail's sidebar, beside it or floating over
+/// it, and on a phone a page the detail is pushed over (`DeskLayout`). The selection is
 /// the model's, so every arrangement shows the same thing and nothing remembers which one came
 /// before.
 struct DeskView: View {
     @Environment(AppModel.self) private var model
-    @AppStorage(DeskLayout.listPageWideKey) private var listPageWhenWide = false
-    @AppStorage(DeskLayout.listPageNarrowKey) private var listPageWhenNarrow = true
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @AppStorage(DeskLayout.showsListKey) private var showsList = true
     @AppStorage(RowLines.key) private var rowLines = RowLines.two
     /// The sidebar floating over the detail is out: for now, as anything laid over another is.
@@ -31,11 +30,7 @@ struct DeskView: View {
     @State private var pageMenu: PageMenu?
 
     var body: some View {
-        let layout = DeskLayout(
-            width: width, listWidth: listWidth,
-            prefersListPage: width >= DeskLayout.wideMinWidth ? listPageWhenWide : listPageWhenNarrow,
-            prefersTwoLines: rowLines == .two
-        )
+        let layout = DeskLayout(width: width, listWidth: listWidth, isCompact: sizeClass == .compact, prefersTwoLines: rowLines == .two)
         Group {
             if layout.isMeasured {
                 NavigationSplitView(columnVisibility: columnVisibility(layout), preferredCompactColumn: compactColumn(layout)) {
@@ -45,12 +40,8 @@ struct DeskView: View {
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar { toolbar(layout) }
                 } detail: {
-                    DetailPane(pages: pages, isPushed: layout.isListPage)
+                    DetailPane(pages: pages)
                 }
-                // The split view goes by the size class, so the class says which the list is: a
-                // page of its own (one column, as on a phone), or a sidebar, which the system
-                // stands beside the detail where there is room and floats over it where not.
-                .environment(\.horizontalSizeClass, layout.isListPage ? .compact : .regular)
             } else {
                 Color.clear
             }
@@ -70,8 +61,7 @@ struct DeskView: View {
             if layout.listFloats, model.selection != nil { showsFloatingList = false }
         }
         .focusedSceneValue(\.deskActions, DeskActions(
-            toggleList: { withAnimation { setListShown(!isListShown(layout), layout) } },
-            toggleListPage: { setListPage(!layout.isListPage, layout) }
+            toggleList: { withAnimation { setListShown(!isListShown(layout), layout) } }
         ))
         .onAppear {
             // Start WebKit ahead of the first selection, and open the repository's own links here.
@@ -107,20 +97,6 @@ struct DeskView: View {
         )
     }
 
-    /// The list as a page of its own, or as the detail's sidebar: kept for this kind of width.
-    private func setListPage(_ isPage: Bool, _ layout: DeskLayout) {
-        guard layout.canBeSidebar else { return }
-        if layout.isWide { listPageWhenWide = isPage } else { listPageWhenNarrow = isPage }
-        // Either way the list was asked for, and is there to see: as a sidebar it is out, as a
-        // page it is on top (the detail is pushed over it only for a selection).
-        if isPage {
-            model.selection = nil
-        } else {
-            showsList = true
-            showsFloatingList = true
-        }
-    }
-
     /// In one column, the detail is on top while there is a selection; going back drops it.
     /// Only there: as a sidebar the list isn't a column to go back to, and what the split view
     /// writes then (it does, after having been one column) must not cost the selection.
@@ -132,8 +108,7 @@ struct DeskView: View {
     }
 
     /// Around the list: which list it is at its head (beside the split view's own button for
-    /// putting it away), and at its foot whether it is a page or a sidebar, how things stand,
-    /// the filter and the desk's menu.
+    /// putting it away), and at its foot how things stand, the filter and the desk's menu.
     @ToolbarContentBuilder
     private func toolbar(_ layout: DeskLayout) -> some ToolbarContent {
         @Bindable var model = model
@@ -148,15 +123,6 @@ struct DeskView: View {
             .fixedSize()
         }
         .sharedBackgroundVisibility(.hidden)
-        if layout.canBeSidebar {
-            ToolbarItem(placement: .bottomBar) {
-                if layout.isListPage {
-                    Button("List Beside the Detail", systemImage: "rectangle.split.2x1") { setListPage(false, layout) }
-                } else {
-                    Button("List Alone", systemImage: "arrow.up.left.and.arrow.down.right") { setListPage(true, layout) }
-                }
-            }
-        }
         // On a phone the status shows only with news: a write, or a sync that isn't idle.
         let isBrief = !layout.density.canUseOneLine
         if !isBrief || model.activity != nil || model.syncState != .idle {
@@ -175,8 +141,6 @@ struct DeskView: View {
 struct DeskActions {
     /// Shows the list as a sidebar, or puts it away.
     var toggleList: () -> Void
-    /// The list as a page of its own, or as the detail's sidebar.
-    var toggleListPage: () -> Void
 }
 
 extension FocusedValues {

@@ -1,24 +1,24 @@
 import SwiftUI
 
 /// The selected item: its header, then Conversation / Commits / Files, as in the Mac's detail
-/// pane. Beside the list in a wide window, pushed over it in a narrow one (`isPushed`); either
-/// way it shows the model's selection, and its pages belong to the desk, so a layout change keeps
-/// them.
+/// pane. Beside the list or under it in a split view, pushed over it on a phone; either way it
+/// shows the model's selection, and its pages belong to the desk, so a layout change keeps them.
 ///
-/// The page gets the whole pane: the header lies over its top and scrolls away with it
-/// (`scrollsAway`), and the composer stays folded into a button until asked for.
+/// The page gets the whole pane: the header lies over its top and scrolls away with it, under
+/// the bar, whose title then names the item; the composer stays folded into a button until asked
+/// for.
 struct DetailPane: View {
     @Environment(AppModel.self) private var model
     let pages: DetailPages
-    let isPushed: Bool
     @AppStorage("showAutomated") private var showAutomated = false
     @State private var scrolls = PaneScrolls()
     /// How much of the pane the system's bars cover, which the pages reach under.
     @State private var bars = EdgeInsets()
     @State private var headerHeight: CGFloat = 0
-    @State private var paneWidth: CGFloat = 0
-    /// The composer is open under the conversation.
+    /// The composer is open over the conversation's foot, and how tall it is.
     @State private var isComposing = false
+    @State private var composerHeight: CGFloat = 0
+    @State private var renameText: String?
 
     typealias Tab = AppModel.DetailTab
 
@@ -29,13 +29,14 @@ struct DetailPane: View {
             if let item = model.selectedItem {
                 content(item)
                     // Laid over the pages rather than inset above them: a scroll view of pages
-                    // would start each below it, and every page leaves it room itself.
+                    // would start each below it, and every page leaves it room itself. Clipped
+                    // at the bar's edge, so it leaves under the bar as a page's top does and
+                    // never shows through the bar's buttons.
                     .overlay(alignment: .top) {
                         ActivePage(scrolls: scrolls, item: item) { scroll in
                             VStack(spacing: 0) {
-                                DetailHeader(item: item, pages: pages, showAutomated: $showAutomated)
-                                // Pushed, the tabs are in the navigation bar, beside the way back.
-                                if item.kind == .pullRequest, !isPushed {
+                                DetailHeader(item: item) { scrolls.setTitleExtent($0) }
+                                if item.kind == .pullRequest {
                                     DetailTabs().padding(.horizontal, 12).padding(.bottom, 8)
                                 }
                                 Divider()
@@ -48,19 +49,14 @@ struct DetailPane: View {
                             }
                             // It goes with the page showing, up and away or down when pulled.
                             .offset(y: -min(scroll.offset, 3000))
+                            // Once its title is gone the bar's says what this is, as a large
+                            // title's does.
+                            .navigationTitle(scroll.isChromeAway ? "#\(String(item.number)) \(item.title)" : "")
                         }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                        .clipped()
                     }
-                    // Once the header has left with the page, a line of glass says what this is;
-                    // touching it goes back to the top. Beside the list it is in the pane's own
-                    // bar (below); pushed, the bar holds the tabs, and the line sits under it.
-                    .overlay(alignment: .top) {
-                        if isPushed {
-                            ActivePage(scrolls: scrolls, item: item) { scroll in
-                                CompactTitle(item: item, isShown: scroll.isChromeAway) { scrollToTop(item) }
-                                    .offset(y: 6)
-                            }
-                        }
-                    }
+                    .macTextStrength()
                     .onChange(of: item.id) {
                         if item.kind == .issue { model.detailTab = .conversation }
                         isComposing = false
@@ -71,26 +67,14 @@ struct DetailPane: View {
                         if item.kind == .pullRequest { model.detailTab = .conversation }
                         withAnimation(.snappy(duration: 0.25)) { isComposing = true }
                     }
-                    .toolbar {
-                        if isPushed {
-                            if item.kind == .pullRequest {
-                                // The segments are glass themselves: no second sheet of it behind.
-                                ToolbarItem(placement: .principal) { DetailTabs().frame(maxWidth: 420) }
-                                    .sharedBackgroundVisibility(.hidden)
-                            }
-                        } else {
-                            ToolbarItem(placement: .principal) {
-                                ActivePage(scrolls: scrolls, item: item) { scroll in
-                                    if scroll.isChromeAway {
-                                        Button { scrollToTop(item) } label: { CompactTitle.Line(item: item) }
-                                            // Within the pane's bar: a long title is cut short,
-                                            // not laid over the bar's ends.
-                                            .frame(maxWidth: max(0, paneWidth - 48))
-                                            .accessibilityHint("Scrolls to the top")
-                                    }
-                                }
-                            }
+                    .toolbar { toolbar(item) }
+                    .alert("Rename", isPresented: Binding(get: { renameText != nil }, set: { if !$0 { renameText = nil } })) {
+                        TextField("Title", text: Binding(get: { renameText ?? "" }, set: { renameText = $0 }))
+                        Button("Rename") {
+                            if let renameText { model.rename(item, to: renameText) }
+                            renameText = nil
                         }
+                        Button("Cancel", role: .cancel) { renameText = nil }
                     }
             } else {
                 ContentUnavailableView("No Selection", systemImage: "rectangle.righthalf.inset.filled", description: Text("Select a PR or issue."))
@@ -98,18 +82,32 @@ struct DetailPane: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onGeometryChange(for: EdgeInsets.self) { $0.safeAreaInsets } action: { bars = $0 }
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { paneWidth = $0 }
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    /// Read when touched, not by the body.
-    private func scrollToTop(_ item: Item) {
-        let page = switch item.kind == .issue ? .conversation : model.detailTab {
-        case .conversation: pages.timeline
-        case .commits: pages.commits
-        case .files: pages.files
+    /// In the pane's bar: the item on GitHub, and everything else about it.
+    @ToolbarContentBuilder
+    private func toolbar(_ item: Item) -> some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            Button("Open on GitHub", systemImage: "arrow.up.right") { model.perform(.openInBrowser, on: item.id) }
         }
-        page.run("scrollTo({ top: 0, behavior: 'smooth' })")
+        ToolbarItem(placement: .topBarTrailing) {
+            Menu("More", systemImage: "ellipsis") {
+                ItemMenu(item: item, model: model)
+                Section {
+                    Button("Rename…", systemImage: "pencil") { renameText = item.title }
+                    Button("Refresh", systemImage: "arrow.clockwise") { model.loadDetail(force: true) }
+                    if model.canGoBack {
+                        Button("Back to Previous Item", systemImage: "chevron.backward") { model.goBack() }
+                    }
+                }
+                Section("Conversation") {
+                    Toggle("Show Automated", isOn: $showAutomated)
+                    Button("Expand All", systemImage: "rectangle.expand.vertical") { pages.timeline.run("PRDesk.setAllCards(true)") }
+                    Button("Collapse All", systemImage: "rectangle.compress.vertical") { pages.timeline.run("PRDesk.setAllCards(false)") }
+                }
+            }
+        }
     }
 
     @ViewBuilder
@@ -136,54 +134,49 @@ struct DetailPane: View {
         }
     }
 
-    /// The conversation, with the composer under it rather than over it, so the page ends where
-    /// the composer begins; folded, the page runs to the window's foot.
+    /// The conversation, with the composer over its foot: folded into a button over the corner,
+    /// or open as a card of glass, which the page leaves room under its end for.
     private func conversation(_ item: Item, _ detail: ItemDetail) -> some View {
-        VStack(spacing: 0) {
-            Conversation(item: item, detail: detail, page: pages.timeline, showAutomated: showAutomated)
-                .overlay(alignment: .bottomTrailing) {
-                    if !isComposing {
-                        ComposeButton(hasDraft: !model.draft(for: item.id).isEmpty) {
-                            withAnimation(.snappy(duration: 0.25)) { isComposing = true }
-                        }
-                        .padding(.trailing, 16)
-                        .padding(.bottom, 12)
-                        .transition(.scale(scale: 0.6).combined(with: .opacity))
+        Conversation(item: item, detail: detail, page: pages.timeline, showAutomated: showAutomated)
+            .overlay(alignment: .bottomTrailing) {
+                if !isComposing {
+                    ComposeButton(hasDraft: !model.draft(for: item.id).isEmpty) {
+                        withAnimation(.snappy(duration: 0.25)) { isComposing = true }
                     }
+                    .padding(.trailing, 16)
+                    .padding(.bottom, 12)
+                    .transition(.scale(scale: 0.6).combined(with: .opacity))
                 }
-            if isComposing {
-                composer(item, detail)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-        }
-        // Room under the last comment for the button over the corner.
-        .onChange(of: isComposing, initial: true) { scrolls.conversation.bottomRoom = isComposing ? 0 : ComposeButton.size + 8 }
-        // A comment that went out leaves nothing to keep the composer open for.
-        .onChange(of: detail.entries.count) {
-            withAnimation(.snappy(duration: 0.25)) { isComposing = false }
-        }
+            .overlay(alignment: .bottom) {
+                if isComposing {
+                    composer(item, detail)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .onChange(of: isComposing, initial: true) { setBottomRoom() }
+            .onChange(of: composerHeight) { setBottomRoom() }
+            // A comment that went out leaves nothing to keep the composer open for.
+            .onChange(of: detail.entries.count) {
+                withAnimation(.snappy(duration: 0.25)) { isComposing = false }
+            }
     }
 
-    /// The composer, open: the Mac's, under a handle that folds it away again. What is written
-    /// stays as the item's draft.
+    /// Room under the last comment for what lies over the page's foot.
+    private func setBottomRoom() {
+        scrolls.conversation.bottomRoom = isComposing ? composerHeight + 12 : ComposeButton.size + 8
+    }
+
+    /// The composer, open: the Mac's, on a card of glass floating over the page (and over the
+    /// keyboard). Its own button folds it away again; what is written stays as the item's draft.
     private func composer(_ item: Item, _ detail: ItemDetail) -> some View {
-        VStack(spacing: 0) {
-            Divider()
-            Button {
-                withAnimation(.snappy(duration: 0.25)) { isComposing = false }
-            } label: {
-                Image(systemName: "chevron.compact.down")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 18)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Hide Composer")
-            ComposerView(item: item, detail: detail)
+        ComposerView(item: item, detail: detail) {
+            withAnimation(.snappy(duration: 0.25)) { isComposing = false }
         }
-        .background(.bar)
+        .glassEffect(.regular, in: .rect(cornerRadius: 24))
+        .padding(.horizontal, 10)
+        .padding(.bottom, 8)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { composerHeight = $0 }
         .onAppear { model.requestComposerFocus() }
     }
 }
@@ -207,6 +200,11 @@ private final class PaneScrolls {
     /// The pane's header lies over all of them.
     func setHeader(height: CGFloat) {
         for scroll in [conversation, commits, files] { scroll.setChrome(headerID, height: height) }
+    }
+
+    /// How far down the header its title ends: scrolled that far, the bar names the item.
+    func setTitleExtent(_ extent: CGFloat) {
+        for scroll in [conversation, commits, files] { scroll.setTitleExtent(extent) }
     }
 }
 
@@ -310,52 +308,6 @@ private struct DetailPager<Conversation: View>: View {
     }
 }
 
-/// The item in one line of glass over the page's top, while the header is scrolled away.
-private struct CompactTitle: View {
-    let item: Item
-    let isShown: Bool
-    let action: () -> Void
-
-    static let height: CGFloat = 36
-
-    /// The line itself: state, number and title.
-    struct Line: View {
-        @Environment(AppModel.self) private var model
-        let item: Item
-
-        var body: some View {
-            HStack(spacing: 6) {
-                StateIconView(item: item, size: 14, isMerging: model.isMerging(item))
-                Text("#\(String(item.number))")
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-                Text(itemTitle: item.title, shortenedTags: true, codeFont: .footnote.monospaced())
-                    .lineLimit(1)
-            }
-            .font(.subheadline.weight(.medium))
-        }
-    }
-
-    var body: some View {
-        ZStack {
-            if isShown {
-                Button(action: action) {
-                    Line(item: item)
-                        .padding(.horizontal, 14)
-                        .frame(height: Self.height)
-                        .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .glassEffect(.regular.interactive(), in: .capsule)
-                .padding(.horizontal, 12)
-                .transition(.opacity.combined(with: .offset(y: -8)))
-                .accessibilityHint("Scrolls to the top")
-            }
-        }
-        .animation(.snappy(duration: 0.25), value: isShown)
-    }
-}
-
 /// The composer, folded away: a round glass button over the conversation's corner, which grows
 /// a word when a draft waits behind it.
 private struct ComposeButton: View {
@@ -425,19 +377,19 @@ private struct Conversation: View {
 }
 
 /// Title, state, author and CI; the stack, labels and dates, which fold away; then the board's
-/// controls and the ••• menu.
+/// controls. GitHub and the ••• menu are in the pane's bar.
 private struct DetailHeader: View {
     @Environment(AppModel.self) private var model
     let item: Item
-    let pages: DetailPages
-    @Binding var showAutomated: Bool
+    /// Told how far down the header the title ends.
+    let onTitleExtent: (CGFloat) -> Void
     /// The stack, labels, dates and branches: shown until folded.
     @AppStorage("detailHeaderExpanded") private var isExpanded = true
-    @State private var renameText: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             title
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { onTitleExtent($0 + 10) }
             people
             if isExpanded { more }
             controls
@@ -445,14 +397,6 @@ private struct DetailHeader: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .alert("Rename", isPresented: Binding(get: { renameText != nil }, set: { if !$0 { renameText = nil } })) {
-            TextField("Title", text: Binding(get: { renameText ?? "" }, set: { renameText = $0 }))
-            Button("Rename") {
-                if let renameText { model.rename(item, to: renameText) }
-                renameText = nil
-            }
-            Button("Cancel", role: .cancel) { renameText = nil }
-        }
     }
 
     private var title: some View {
@@ -646,30 +590,6 @@ private struct DetailHeader: View {
                 }
                 .accessibilityLabel(isPinned ? "Unpin" : "Pin")
             }
-            Button {
-                model.perform(.openInBrowser, on: item.id)
-            } label: {
-                RoundGlassIcon(systemName: "arrow.up.right")
-            }
-            .accessibilityLabel("Open on GitHub")
-            Menu {
-                ItemMenu(item: item, model: model)
-                Section {
-                    Button("Rename…", systemImage: "pencil") { renameText = item.title }
-                    Button("Refresh", systemImage: "arrow.clockwise") { model.loadDetail(force: true) }
-                    if model.canGoBack {
-                        Button("Back to Previous Item", systemImage: "chevron.backward") { model.goBack() }
-                    }
-                }
-                Section("Conversation") {
-                    Toggle("Show Automated", isOn: $showAutomated)
-                    Button("Expand All", systemImage: "rectangle.expand.vertical") { pages.timeline.run("PRDesk.setAllCards(true)") }
-                    Button("Collapse All", systemImage: "rectangle.compress.vertical") { pages.timeline.run("PRDesk.setAllCards(false)") }
-                }
-            } label: {
-                RoundGlassIcon(systemName: "ellipsis")
-            }
-            .accessibilityLabel("More")
         }
         .buttonStyle(.plain)
     }

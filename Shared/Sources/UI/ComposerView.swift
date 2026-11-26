@@ -6,6 +6,8 @@ struct ComposerView: View {
     @Environment(AppModel.self) private var model
     let item: Item
     let detail: ItemDetail
+    /// Folds the composer away, where it can be (the iPad's card); the text stays as the draft.
+    var onDismiss: (() -> Void)?
 
     @State private var text = ""
     @State private var previewHTML: String?
@@ -64,7 +66,7 @@ struct ComposerView: View {
                     }
                 }
                 .frame(height: 110)
-                .background(Color.textBackground, in: RoundedRectangle(cornerRadius: 6))
+                .editorGround(focused: false)
             } else {
                 TextEditor(text: $text)
                     .font(.body)
@@ -76,7 +78,6 @@ struct ComposerView: View {
                     .background(alignment: .topLeading) { textMeasure }
                     .frame(height: editorHeight)
                     .padding(4)
-                    .background(Color.textBackground, in: RoundedRectangle(cornerRadius: 6))
                     .overlay(alignment: .topLeading) {
                         if text.isEmpty {
                             Text(placeholder)
@@ -86,10 +87,16 @@ struct ComposerView: View {
                                 .allowsHitTesting(false)
                         }
                     }
-                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(focused ? Color.accentColor.opacity(0.6) : Color.separator, lineWidth: 1))
+                    .editorGround(focused: focused)
             }
 
             HStack(spacing: 8) {
+                #if os(iOS)
+                    if let onDismiss {
+                        Button("Hide Composer", systemImage: "chevron.down", action: onDismiss)
+                            .labelStyle(.iconOnly)
+                    }
+                #endif
                 Toggle("Preview", systemImage: "eye", isOn: $isPreviewing)
                     .toggleStyle(.button)
                     #if os(iOS)
@@ -134,6 +141,9 @@ struct ComposerView: View {
                 #endif
                 if item.kind == .pullRequest, item.isOpen, !isAuthor {
                     Button("Approve") { send(.approve) }
+                        #if os(iOS)
+                            .buttonStyle(.bordered)
+                        #endif
                         .disabled(isBusy)
                         .help("Submit an approving review, with the text as its comment")
                 }
@@ -142,9 +152,21 @@ struct ComposerView: View {
                     .buttonStyle(.borderedProminent)
                     .disabled(trimmed.isEmpty || isBusy)
             }
-            .controlSize(.small)
+            #if os(iOS)
+                // On the card of glass: plain shapes, a capsule each, none of them glass.
+                .buttonBorderShape(.capsule)
+                .padding(.horizontal, 4)
+            #else
+                .controlSize(.small)
+            #endif
         }
-        .padding(8)
+        #if os(iOS)
+            .padding(.horizontal, 10)
+            .padding(.top, 8)
+            .padding(.bottom, 10)
+        #else
+            .padding(8)
+        #endif
         // Load the draft only when the item really changes: reassigning `text` while typing
         // would reset the cursor.
         .task(id: item.id) {
@@ -298,5 +320,18 @@ struct ComposerView: View {
             }
             sending = nil
         }
+    }
+}
+
+private extension View {
+    /// What the text is written on: a bordered field on the Mac. On the iPad the composer is a
+    /// card of glass and the text lies on it directly.
+    @ViewBuilder func editorGround(focused: Bool) -> some View {
+        #if os(macOS)
+            background(Color.textBackground, in: RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(focused ? Color.accentColor.opacity(0.6) : Color.separator, lineWidth: 1))
+        #else
+            self
+        #endif
     }
 }

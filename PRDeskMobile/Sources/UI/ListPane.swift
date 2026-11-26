@@ -20,6 +20,7 @@ struct ListPane: View {
             ItemListView(density: density, highlightsSelection: highlightsSelection)
                 .overlay { emptyState }
         }
+        .macTextStrength()
         .searchable(text: $model.filterText, prompt: "Filter")
         .searchFocused($isFilterFocused)
         .onChange(of: model.filterFocusRequest) { isFilterFocused = true }
@@ -124,8 +125,9 @@ struct ItemListView: View {
     }
 }
 
-/// A section's title and count; tapping folds it. A band of glass from edge to edge: pinned at
-/// the list's top, rows pass under it as they do under the bar above.
+/// A section's title and count; tapping folds it. A band of plain material from edge to edge
+/// (glass glints as rows pass, which tires the eye): pinned at the list's top, rows show dimly
+/// under it.
 private struct SectionHeader: View {
     @Environment(AppModel.self) private var model
     let group: ItemListView.Group
@@ -155,7 +157,7 @@ private struct SectionHeader: View {
             .padding(.horizontal, 10)
             .frame(height: 30)
             .contentShape(Rectangle())
-            .glassEffect(.regular, in: .rect)
+            .background(.regularMaterial)
         }
         .buttonStyle(.plain)
         .listRowInsets(EdgeInsets())

@@ -710,32 +710,27 @@ server and nothing syncs between the devices. The Mac alone follows the board wi
 writes what I do on it, and the Mac follows up as it would after an edit on the web. It keeps its
 own database and its own token (a PAT in Settings, in the Keychain; there is no `gh`).
 
-**Layout.** A pure function of the window's width, my choices and the selection, so rotation,
-multitasking and a resized window always land on the layout the new size calls for. The list is
-not a switcher beside the real thing but half of the desk, so it can have the window to itself at
-any width; the detail can too.
+**Layout.** A pure function of the window (its width and size class), my choices and the
+selection, so rotation, multitasking and a resized window always land on the layout the new size
+calls for. The desk is always a split view (a `NavigationSplitView`, laid out as the system lays
+one out, with its own button, edge swipe and animation), the list its sidebar:
 
 ```
-the list beside the detail (900 pt and wider)        the list alone (any width)
-┌ Dashboard | Parity n | Inbox n  ◧ ┬───────────────┐   ┌ Dashboard | Parity n | Inbox n          ┐
-├ List (400–480 pt)        │ #69856 [RF] Count …   │   ├ List (the whole width) ─────────────────┤
-│ ▾ Good 5                 │ author · Open · CI    │   │ ▾ Good 5                                │
-│  title              7h   │ [Triage Desk …] [HML–]│   │  title …                           7h   │
-│  author · event    me ✓● │ Conversation|Commits|…│   │  #n author · event      me ✓ ● +90 −14  │
-│ ⤢  582 items · 12s  🔍 ••• │ …                   ✎ │   │ ◫  582 items · Synced 12s        🔍 ••• │
+900 pt and wider: the list beside the detail          narrower: the list floats over the detail
+┌ Dashboard | Parity n | Inbox n  ◧ ┬───────── ↗ ••• ┐   ┌ ◧   #n title (once scrolled)   ↗ ••• ┐
+├ List (400–480 pt)        │ #69856 [RF] Count …   │   ├ Detail (the whole width) ───────────────┤
+│ ▾ Good 5                 │ author · Open · CI    │   │ #69856 [RF] Count …                     │
+│  title              7h   │ [Triage Desk …] [HML–]│   │ author · Open · CI                      │
+│  author · event    me ✓● │ Conversation|Commits|…│   │ (◧ brings the list over it; picking a   │
+│ 582 items · 12s    🔍 ••• │ …                   ✎ │   │  row puts the list away again)          │
 └──────────────────────────┴───────────────────────┘   └─────────────────────────────────────────┘
 ```
 
-- The list is one of two things, chosen at its foot (⤢ / ◫, ⇧⌘B) and kept for wide and for
-  narrower windows apart (beside the detail on an iPad on its side, alone upright, to begin with):
-  - **Alone**: a page the whole window wide, with every column; a row pushes its detail over it,
-    the tabs in the navigation bar beside the way back. A phone's width has only this
-  - **The detail's sidebar** (a `NavigationSplitView`, so the system's own button, edge swipe and
-    animation): beside the detail from 900 pt, where ◧ (⌘B) puts it away and the detail has the
-    window; floating over the detail in a narrower window (an iPad upright), where picking a row
-    puts it away again
-- The list keeps the desk's own white ground as a sidebar too, not a sidebar's tint: the rows'
-  colors say things
+- Beside the detail, ◧ (⌘B) puts the list away and the detail has the window. Floating, the list
+  is out while nothing is selected. In a compact window (a phone) the split view is one column:
+  the list is a page, and a row pushes its detail over it
+- The list keeps the desk's own white ground as a sidebar, not a sidebar's tint: the rows' colors
+  say things
 - The bar over the list holds only the lists (the segments are the glass, with none behind
   them) and ◧; at its foot are the status, the filter and ••• (rows, sorting, Sync Now, Settings)
 - Going from one to the other keeps the selection, the detail's tab, its pages (scroll position,
@@ -744,8 +739,9 @@ the list beside the detail (900 pt and wider)        the list alone (any width)
 **List.** The Mac's sections, tints, fading, stacks' rails and marks (§4.1–§4.3), in rows of two
 lines or one (•••, two by default):
 
-- A section's title and count are a band of glass from edge to edge (not a capsule): pinned at
-  the list's top, rows pass under it as under the bar above. Touching it folds the section
+- A section's title and count are a band of plain material from edge to edge (not glass, which
+  glints as rows pass under it): pinned at the list's top, rows show dimly under it. Touching it
+  folds the section
 
 - Two lines: the title with its tags and the age; under it the number, author and marks of trust,
   the latest event (or the board's Comment), then Turn, Review, CI and Size in columns
@@ -766,8 +762,8 @@ lines or one (•••, two by default):
   count, the last sync and the quota; on an iPhone only while there is something to say
 
 **Detail.** As §6, with Status and Priority as segmented controls (one touch; Triage and – clear),
-the checks in a popover from the CI status, and round glass buttons of one size for the pin,
-GitHub and the rest (•••): the row menu, rename, refresh,
+the checks in a popover from the CI status, and a round glass button for the pin. GitHub (↗) and
+the rest (•••) are in the pane's bar: the row menu, rename, refresh,
 back to the previous item, and the conversation's Show Automated / Expand All / Collapse All. In
 Commits a tap picks one commit (again for the preset) and a row's menu extends the selection to it.
 A diff's options (Wrap Lines, Expand All, Collapse All) are behind ••• at the end of its bar, which
@@ -779,16 +775,20 @@ the tabs, and each keeps its own place. Commits and Files load when first shown 
 The page gets the whole pane:
 
 - The header, the tabs and a tab's own bars (the commits and their options, the files' counts) lie
-  over the page's top and scroll away with it, as if they were its beginning; the page then runs
-  up under the window's toolbar. While they are away a line of glass names the item (its state
-  icon, number and title): in the bar over the pane beside the list, under the tabs when the
-  detail is pushed. Touching it scrolls back to the top. The header's
-  stack, labels, dates and the board's Comment also fold away under a chevron
+  over the page's top and scroll away with it under the pane's bar, as if they were its
+  beginning. Once the title is under the bar, the bar's own title names the item, as a large
+  title's does. The header's stack, labels, dates and the board's Comment also fold away under a
+  chevron
 - Pulled past its top the page gives as any scroll view does, and the header goes down with it
 - The composer is folded into a round glass button over the conversation's corner, which grows
-  the word Draft when one waits. It opens the Mac's composer under the conversation with the keyboard up; a handle
-  folds it again, as does sending. Scrolling the page puts the keyboard away
+  the word Draft when one waits. It opens the Mac's composer as a card of glass floating over the
+  page's foot, above the keyboard, the text lying on the glass and its buttons plain capsules; ⌄
+  on it folds it again, as does sending. Scrolling the page puts the keyboard away
 - The page runs to the window's foot, under the home indicator, with room left under its end
+
+**Text.** Secondary and tertiary text (authors, events, ages, a card's "commented 6d ago") are
+set a little darker than iOS's own label colors, in the list and in the pages, to read as they do
+on the Mac.
 
 **Menus in the pages.** The smiley on a card offers the reactions in a row, mine marked (picking
 one of those takes it back). Holding a person offers their profile, their name to copy and,

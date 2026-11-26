@@ -93,7 +93,7 @@ SIMCTL_CHILD_PRDESK_GITHUB_TOKEN="$(gh auth token)" xcrun simctl launch --termin
   bot webhooks and ids and badges repository as one file into the app's Documents, which the app
   imports at launch and deletes (`SetupImport`). A Release build reads no environment and writes
   to GitHub for real.
-- Check both an iPad mini (on its side: list beside detail; upright: list alone) and an iPhone,
+- Check both an iPad mini (on its side: list beside detail; upright: the list floats over it) and an iPhone,
   and window sizes in between: `DeskLayout` is a pure function of the width, so every size must
   come out right whatever came before. An iPad simulator only rotates; an iPhone simulator's app
   can be put on a freely sized display (`devicectl device appResize`, wrapped by the `duo-hinge`
@@ -137,7 +137,7 @@ Both apps compile `Shared/`; each adds its own views and platform parts. Put new
   `NSTableView` with drawn cells, `UI/ItemTable/`), the detail pane, `WebDocument+Mac` (find bar,
   menus), `WebImages+Mac`, `Yab/YabFrontTab` for ⌃⌥⌘D (SPEC §6)
 - `PRDeskMobile/Sources` — the iPad and iPhone (SPEC §9): `UI/DeskView` (a split view: the list
-  alone or as the detail's sidebar, by `DeskLayout`), `ListPane` and `ItemRowView` (a SwiftUI `List`; rows of
+  as the detail's sidebar, or a page on a phone, by `DeskLayout`), `ListPane` and `ItemRowView` (a SwiftUI `List`; rows of
   two lines or one, columns by `RowDensity`), `DetailPane` (its header scrolls away with the
   page, `Shared/Sources/UI/PageChrome`), `ItemMenu`, `PageMenu` (the pages' menus, as popovers),
   `SettingsView`, `DeskCommands` (the menu bar and the Mac's keys); and the
@@ -183,11 +183,17 @@ are used off the main actor); no glass on content (cards, chips, rows).
   observed state in it made the web view lay out at every step of a scroll, which put the offset
   back in bounds and killed the overscroll. Such callbacks write observed state and read only
   unobserved copies (`PageScroll`).
-- `NavigationSplitView` lays out by the horizontal size class, and an iPad mini upright is
-  regular: `DeskView` sets the class itself to say whether the list is a page (compact) or a
-  sidebar (regular). Don't lay anything else out by the class under it. After having been one
-  column, the split view still writes `preferredCompactColumn = .sidebar` while regular: the
-  binding drops the selection only while the list is a page.
+- `NavigationSplitView` lays out by the horizontal size class, which `DeskLayout` takes as it is
+  (compact: one column, the list a page; regular: the list a sidebar, which the system floats
+  over the detail in a narrower window). After having been one column, the split view still
+  writes `preferredCompactColumn = .sidebar` while regular: the binding drops the selection only
+  while compact.
+- A bar's title can't be had from a `principal` item without laying it out by hand (it took the
+  width it liked, over the bar's buttons): the detail sets `navigationTitle`, empty until the
+  header's own title has scrolled under the bar. The header is an overlay clipped at the bar's
+  edge, or it shows through the bar's buttons.
+- The hierarchical styles set at a pane's root (`macTextStrength`) must stay inside its
+  `toolbar`: a `Menu` in a bar drawn with them all but vanishes.
 - Views in a `ScrollView` can't reach under the bars with `ignoresSafeArea`, and a
   `safeAreaInset` on the scroll view pushes its content down. The detail's pager (`DetailPager`)
   gives each page negative padding to the window's edges and `safeAreaPadding` back, and the
