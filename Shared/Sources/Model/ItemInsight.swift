@@ -96,7 +96,10 @@ struct ItemInsight: Hashable, Sendable {
         let myReview = viewer.flatMap(item.review(by:))
         let myLast = ([myReview?.submittedAt] + human.filter { isMe($0.actor) }.map(\.at)).compactMap(\.self).max()
 
-        directAsk = Self.directAsk(item: item, human: human, myLast: myLast, isMe: isMe)
+        let talk: Set<Item.Event.Kind> = [.comment, .approved, .changesRequested, .reviewed]
+        let myTalkLast = ([myReview?.submittedAt] + human.filter { isMe($0.actor) && talk.contains($0.kind) }.map(\.at))
+            .compactMap(\.self).max()
+        directAsk = Self.directAsk(item: item, human: human, myLast: myLast, myTalkLast: myTalkLast, isMe: isMe)
 
         // Merging also closes; on a merged PR the merge is the event worth naming.
         let latest = human.last { event in
@@ -144,10 +147,14 @@ struct ItemInsight: Hashable, Sendable {
         return !nearPush
     }
 
-    /// A mention, a deliberate review request, or others talking after the viewer took part.
-    private static func directAsk(item: Item, human: [Item.Event], myLast: Date?, isMe: (String?) -> Bool) -> DirectAsk? {
+    /// A mention, a deliberate review request, or others talking after the viewer took part:
+    /// each stands until the viewer answers. A mention or a request is answered by a comment or
+    /// a review after it (`myTalkLast`); a reply, by anything of the viewer's after it.
+    private static func directAsk(
+        item: Item, human: [Item.Event], myLast: Date?, myTalkLast: Date?, isMe: (String?) -> Bool
+    ) -> DirectAsk? {
         var asks: [DirectAsk] = []
-        for event in item.events {
+        for event in item.events where event.at > myTalkLast ?? .distantPast {
             switch event.kind {
             case .mentioned where isMe(event.target):
                 asks.append(DirectAsk(at: event.at, reason: "mentioned you"))

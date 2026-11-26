@@ -27,10 +27,22 @@ struct ItemRow: Hashable, Sendable {
     var isPinned: Bool { board?.isPinned == true }
     var comment: String? { board?.isArchived == false ? board?.comment : nil }
 
-    /// Why a Shelf item is back in Triage: someone asked the viewer directly after it was skipped.
-    var wakeReason: String? {
+    /// What woke a Shelf item: someone asked the viewer directly after it was shelved, and the
+    /// viewer hasn't answered.
+    private var wake: DirectAsk? {
         guard triage == .skipped, let ask = insight.directAsk, ask.at > board?.statusAt ?? .distantPast else { return nil }
-        return ask.reason
+        return ask
+    }
+
+    /// Why a Shelf item is back in Triage.
+    var wakeReason: String? { wake?.reason }
+
+    /// The latest event is what woke the item (a comment that mentions the viewer and its
+    /// mention are two events of one moment). A row that shows the latest event then shows it in
+    /// the reason's color and leaves the reason's tag out, rather than say one thing twice.
+    var wakeIsLatestEvent: Bool {
+        guard let wake, let at = insight.summaryAt else { return false }
+        return abs(at.timeIntervalSince(wake.at)) < 5
     }
 
     /// The Status as the list treats it: none for a woken Shelf item, which is back in Triage,

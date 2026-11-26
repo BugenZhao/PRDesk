@@ -73,19 +73,19 @@ struct ItemRowView: View {
         ViewThatFits(in: .horizontal) {
             if density.showsNotes {
                 HStack(spacing: 5) {
-                    titleCell
+                    titleCell(showsEvent: true)
                     comment
                     Spacer(minLength: 8)
                     summary
                 }
                 HStack(spacing: 5) {
-                    titleCell
+                    titleCell(showsEvent: true)
                     Spacer(minLength: 8)
                     summary
                 }
             }
             HStack(spacing: 5) {
-                titleCell
+                titleCell(showsEvent: false)
                 Spacer(minLength: 0)
             }
         }
@@ -104,10 +104,18 @@ struct ItemRowView: View {
         updated.frame(width: columns.updated, alignment: .trailing)
     }
 
-    @ViewBuilder private var titleCell: some View {
+    /// `showsEvent`: the row shows the latest event too, which stands for the wake's tag when
+    /// it is what woke the item (`ItemRow.wakeIsLatestEvent`).
+    @ViewBuilder
+    private func titleCell(showsEvent: Bool) -> some View {
         StateIconView(item: item, size: 15 * scale, isMerging: row.isMerging)
         title
-        tags
+        tags(showsWake: !(showsEvent && row.wakeIsLatestEvent))
+    }
+
+    /// The latest event's color: the wake's when it is what woke the item.
+    private var eventStyle: AnyShapeStyle {
+        row.wakeIsLatestEvent ? AnyShapeStyle(Color.purple) : .tertiaryText
     }
 
     /// The title on the first line with the age; under it who and what happened, then the marks,
@@ -115,7 +123,7 @@ struct ItemRowView: View {
     private func twoLineCells(_ columns: RowColumns) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 5) {
-                titleCell
+                titleCell(showsEvent: secondLineIsEvent)
                 if density.showsNotes { comment }
                 Spacer(minLength: 0)
                 updated
@@ -131,7 +139,7 @@ struct ItemRowView: View {
                 BadgeIcons(login: item.author, size: 12 * scale)
                 if isParity { link }
                 if let text = secondLineNote {
-                    Text(text).foregroundStyle(.tertiaryText).lineLimit(1)
+                    Text(text).foregroundStyle(secondLineIsEvent ? eventStyle : .tertiaryText).lineLimit(1)
                 }
                 Spacer(minLength: 0)
                 // Whose turn, then the two marks side by side in their columns.
@@ -154,6 +162,11 @@ struct ItemRowView: View {
         if !density.showsNotes, let comment = row.comment { return comment }
         guard let summary = row.insight.summary else { return nil }
         return row.insight.summaryAt.map { "\(summary) \($0.compactAge())" } ?? summary
+    }
+
+    /// The second line's note is the latest event, not the Comment in its place.
+    private var secondLineIsEvent: Bool {
+        (density.showsNotes || row.comment == nil) && row.insight.summary != nil
     }
 
     // MARK: Cells
@@ -191,7 +204,8 @@ struct ItemRowView: View {
 
     /// What marks the item beside its title: an agent session, an adoption, why it is in the
     /// Inbox, why a Shelf item woke.
-    @ViewBuilder private var tags: some View {
+    @ViewBuilder
+    private func tags(showsWake: Bool) -> some View {
         if row.board?.sessionLinks.isEmpty == false {
             Image(systemName: "terminal").font(.caption2).foregroundStyle(.secondaryText)
         }
@@ -204,7 +218,7 @@ struct ItemRowView: View {
                 Chip(text: triage.rawValue).fixedSize()
             }
         }
-        if let reason = row.wakeReason {
+        if showsWake, let reason = row.wakeReason {
             Chip(text: reason, color: .purple).fixedSize()
         }
     }
@@ -227,7 +241,7 @@ struct ItemRowView: View {
         if let summary = row.insight.summary, let at = row.insight.summaryAt {
             Text("\(summary) \(at.compactAge())")
                 .font(.caption)
-                .foregroundStyle(.tertiaryText)
+                .foregroundStyle(eventStyle)
                 .lineLimit(1)
                 .frame(maxWidth: 190, alignment: .trailing)
                 .fixedSize()

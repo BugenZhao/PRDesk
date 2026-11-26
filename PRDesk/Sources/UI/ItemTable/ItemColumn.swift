@@ -216,7 +216,9 @@ enum ItemColumn: String, CaseIterable {
                 runs.append(.chip(triage.rawValue, color: .secondaryLabelColor))
             }
         }
-        if let reason = row.wakeReason {
+        // The latest event, at the cell's end, says why when it is what woke the item.
+        let eventIsWake = row.wakeIsLatestEvent && row.insight.summary != nil
+        if let reason = row.wakeReason, !eventIsWake {
             runs.append(.chip(reason, color: .systemPurple))
         }
         // The board comment and the latest event make room for the title: they shrink, then go,
@@ -229,8 +231,16 @@ enum ItemColumn: String, CaseIterable {
         // whole while the words before it shrink.
         if let summary = row.insight.summary, let at = row.insight.summaryAt {
             runs.append(.spring)
-            runs.append(.optional(.text(summary, color: .tertiaryLabelColor, font: CellFont.small, flexible: true, maxWidth: 150), priority: 0, minWidth: 44))
-            runs.append(.optional(.text(at.compactAge(relativeTo: now), color: .tertiaryLabelColor, font: CellFont.small), priority: 0))
+            let age = CellRun.text(at.compactAge(relativeTo: now), color: eventIsWake ? .systemPurple : .tertiaryLabelColor, font: CellFont.small)
+            if eventIsWake {
+                // In the reason's color and in its stead: it goes after the comment, and its age
+                // stays whatever the room, as the tag did.
+                runs.append(.optional(.text(summary, color: .systemPurple, font: CellFont.small, flexible: true, maxWidth: 150), priority: 2, minWidth: 44))
+                runs.append(age)
+            } else {
+                runs.append(.optional(.text(summary, color: .tertiaryLabelColor, font: CellFont.small, flexible: true, maxWidth: 150), priority: 0, minWidth: 44))
+                runs.append(.optional(age, priority: 0))
+            }
         }
         return runs
     }

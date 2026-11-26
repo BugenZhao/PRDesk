@@ -127,11 +127,16 @@ covers the app's side of it, and where the two disagree, that note wins and this
   items completely (doesn't show or change them). The old `Good` and `Pending` count as Desk,
   `Stale` as Tray; Done on an open item (e.g. reopened) counts as untriaged
 - **Woken**: a Shelf item goes back to Triage, with a reason tag, if someone reaches me directly
-  after it was shelved; Status itself is unchanged. "Reaches me directly" means:
+  after it was shelved, until I answer; Status itself is unchanged. "Reaches me directly" means:
   - I'm mentioned
   - someone requests my review by hand (not the automatic requests the author sends on opening,
     marking ready or pushing)
   - on an item I've taken part in, someone else comments or reviews after my last activity
+
+  The latest of these counts, and only while it is unanswered: a comment or review of mine after
+  a mention or a request answers it, and anything of mine after a reply does. Answered, the item
+  is back on the Shelf by itself (its subscription is left as GitHub has it: only shelving it
+  again by hand turns it back)
 
   Pressing `s` on a woken item (or choosing Shelf in the detail) shelves it again: Shelf is
   written again, its set time refreshed, and the subscription set back to UNSUBSCRIBED (GitHub
@@ -400,7 +405,7 @@ well
 | (row) | Closed items are faded as a whole row; so are draft PRs (keeping only the unread dot), setting them apart from PRs waiting for review at a glance |
 | (marker) | The first, narrow column: `•` for unread activity from others since I last saw the item: opened it here, or read its notification anywhere (on the web, in GitHub's apps), going by when GitHub says each notification updated in the last 14 days was last read. When the item is in a stack, this column draws the stack's lines (see §4.1), with this dot as the node: the accent color when unread, otherwise gray (the icon before the title shows state), hollow for drafts; a forked child turns from its parent onto its own line to the right; official stacks are joined by solid lines, branch- and commit-joined ones by dashed lines. Two lines fit, with narrower spacing for more. Hovering shows the stack number and position, the base branch, the PR whose commits it starts with (for a commit-joined one), and which members are in other groups. Priority has no column of its own, only the row's background (§4.3) |
 | # | Number; small icons tell PRs and issues apart |
-| Title | State icon + title (leading `[..]` / `xx:` tags faded), a reason tag on woken items; the matching emoji on items sent to Grok Bots, and a `terminal` icon on items with a board Session (§3.3), a `link` icon on PRs the parity agent is adopting (§3.2); then the board Comment, if any; a gray summary of the latest event (e.g. `@xx commented 2h`, `you reviewed 2d`) always right-aligned; truncated text (title, comment, summary) shows in full in a tooltip on hover |
+| Title | State icon + title (leading `[..]` / `xx:` tags faded), a reason tag on woken items (purple, e.g. `mentioned you`, `@xx replied`; left out when the latest event at the cell's end is the very thing that woke the item, which is then purple instead of gray, so one thing isn't said twice); the matching emoji on items sent to Grok Bots, and a `terminal` icon on items with a board Session (§3.3), a `link` icon on PRs the parity agent is adopting (§3.2); then the board Comment, if any; a gray summary of the latest event (e.g. `@xx commented 2h`, `you reviewed 2d`) always right-aligned; truncated text (title, comment, summary) shows in full in a tooltip on hover |
 | Author | Avatar + login (italic for first-time contributors); trust marks (seal, org badges, see §5, §5.1) right-aligned |
 | Review | A bare ✓ + total approvals (including mine): on others' PRs, green when I've approved, gray when only others have; on my own PRs (which I can't approve), green when reviewDecision = APPROVED (approvals meet the merge requirement, the same condition as the Good group), gray otherwise; a red ✗ follows when I've requested changes. Built like the CI column: a small mark + a number, in fixed positions |
 | Turn | `review` (my review requested and not done) / `me` / `them` / empty (closed) |
@@ -796,7 +801,8 @@ lines or one (•••, two by default):
   folds the section
 
 - Two lines: the title with its tags and the age; under it the number, author and marks of trust,
-  the latest event (or the board's Comment), then the size (+n −n, at any width: a sidebar or a
+  the latest event (or the board's Comment; purple in place of a woken item's tag when it is
+  what woke it, as on the Mac), then the size (+n −n, at any width: a sidebar or a
   phone is never wide enough for a Size column), Turn, Review and CI
 - One line: the Mac's columns under sortable column titles. They give way as the list narrows so
   the title keeps the most room: Author's name under 960 pt (the picture stays), Size under 720,
