@@ -44,10 +44,9 @@ final class AvatarCache {
 }
 
 extension Badge {
-    /// The org's brand tile or bundled logo, without color for a secondary badge, for the view's
-    /// appearance: a bitmap (`BadgeImages`) doesn't follow it as the logo itself did.
+    /// The org's brand tile or bundled logo, without color for a secondary badge.
     @MainActor
-    func image(isDark: Bool) -> UIImage? {
-        BadgeImages.image(for: self, style: isDark ? .dark : .light)
+    var image: UIImage? {
+        BadgeImages.image(for: self, style: UITraitCollection.current.userInterfaceStyle)
     }
 }

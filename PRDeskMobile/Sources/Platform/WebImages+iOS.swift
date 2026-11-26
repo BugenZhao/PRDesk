@@ -55,27 +55,12 @@ enum BadgeImages {
             image = brandTile(tile.text, hex: tile.hex)
         } else if let name = badge.org.logoAsset,
                   let logo = UIImage(named: name, in: nil, compatibleWith: UITraitCollection(userInterfaceStyle: style)) {
-            let bitmap = rasterized(logo, style: style)
-            image = badge.isSecondary ? grayscale(bitmap) : bitmap
+            image = badge.isSecondary ? grayscale(logo) : logo
         } else {
             image = nil
         }
         cache[key] = image
         return image
-    }
-
-    /// The logos are SVGs, which SwiftUI drew at a badge's size without antialiasing: every
-    /// edge a stair of whole pixels on a device. Drawn once into a bitmap a few times larger, a
-    /// badge is that scaled down, smooth.
-    private static func rasterized(_ logo: UIImage, style: UIUserInterfaceStyle) -> UIImage {
-        let side: CGFloat = 32
-        let fit = min(side / max(logo.size.width, 1), side / max(logo.size.height, 1))
-        let size = CGSize(width: (logo.size.width * fit).rounded(), height: (logo.size.height * fit).rounded())
-        let format = UIGraphicsImageRendererFormat(for: UITraitCollection(userInterfaceStyle: style))
-        format.scale = 3
-        return UIGraphicsImageRenderer(size: size, format: format).image { _ in
-            logo.draw(in: CGRect(origin: .zero, size: size))
-        }
     }
 
     /// `text` in white on a rounded square of the color `hex`, shrunk to fit.
