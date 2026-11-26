@@ -187,7 +187,7 @@ are used off the main actor); no glass on content (cards, chips, rows).
   unobserved copies (`PageScroll`).
 - `NavigationSplitView` lays out by the horizontal size class (compact: one column, the list a
   page; regular: the list a sidebar, which the system floats over the detail in a narrower
-  window). `DeskLayout` takes the system's class, except for the Full-Width Table, where
+  window). `DeskLayout` takes the system's class, except for the Full-Width List, where
   `DeskView` sets it to compact on the split view to get the system's own one column on an iPad.
   Don't lay anything else out by the class under it. After having been one column, the split
   view still writes `preferredCompactColumn = .sidebar` while regular: the binding drops the

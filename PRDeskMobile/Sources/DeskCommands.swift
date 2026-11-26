@@ -17,7 +17,7 @@ struct DeskCommands: Commands {
         CommandGroup(after: .toolbar) {
             Button("Show or Hide the List") { desk?.toggleList() }
                 .keyboardShortcut("b")
-            Button("Full-Width Table") { desk?.toggleTable() }
+            Button("Full-Width List") { desk?.toggleTable() }
                 .keyboardShortcut("b", modifiers: [.command, .shift])
             Button(rowLines == .two ? "Rows of One Line" : "Rows of Two Lines") {
                 rowLines = rowLines == .two ? .one : .two

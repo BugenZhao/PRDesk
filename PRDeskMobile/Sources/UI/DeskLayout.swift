@@ -8,8 +8,8 @@ import CoreGraphics
 /// detail's sidebar, beside it in a wide window and floating over it in a narrower one, and in a
 /// compact window (a phone) a page of its own that the detail is pushed over.
 ///
-/// On an iPad the list can also be asked for as a table: the same one column a phone has, the
-/// whole window wide, with a line a row and every column there is room for. The split view is
+/// On an iPad the list can also be asked for the whole window wide: the same one column a phone
+/// has, with room for every column. How many lines a row takes is a choice of its own. The split view is
 /// told its width is compact for that, so it is the system's own collapsed form, and the choice
 /// is kept for wide and for narrower windows apart.
 struct DeskLayout: Equatable {
@@ -45,9 +45,8 @@ struct DeskLayout: Equatable {
     /// The list is a sidebar that floats over the detail rather than standing beside it.
     var listFloats: Bool { !isListPage && !isWide }
 
-    /// A table's rows are a line each: that is what it is asked for.
     var density: RowDensity {
-        RowDensity(listWidth: listWidth > 0 ? listWidth : (isListPage ? width : 460), prefersTwoLines: prefersTwoLines && !isTable)
+        RowDensity(listWidth: listWidth > 0 ? listWidth : (isListPage ? width : 460), prefersTwoLines: prefersTwoLines)
     }
 }
 

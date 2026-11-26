@@ -159,7 +159,7 @@ struct DeskView: View {
         ToolbarSpacer(.fixed, placement: .bottomBar)
         ToolbarItem(placement: .bottomBar) {
             DeskMenu(
-                rowLines: $rowLines, canChooseLines: layout.density.canUseOneLine && !layout.isTable,
+                rowLines: $rowLines, canChooseLines: layout.density.canUseOneLine,
                 // Offered where the window isn't one column already.
                 isTable: layout.isCompact ? nil : Binding(get: { layout.isTable }, set: { setTable($0, layout) }),
                 showsSettings: $showsSettings
@@ -206,7 +206,7 @@ private struct DeskMenu: View {
         @Bindable var model = model
         Menu("More", systemImage: "ellipsis") {
             if let isTable {
-                Toggle("Full-Width Table", systemImage: "tablecells", isOn: isTable)
+                Toggle("Full-Width List", systemImage: "tablecells", isOn: isTable)
             }
             if canChooseLines {
                 Picker("Rows", selection: $rowLines) {
