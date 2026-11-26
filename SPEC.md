@@ -773,8 +773,9 @@ lines or one (•••, two by default):
   item is in several): onto the Desk from Tray, Shelf or Attic, off the Desk to the Shelf (Good
   is Desk too), and in Triage, where that choice is made, Desk with Shelf beside it. Nothing for
   a PR Merger is merging. Tray, Attic and the pin are in the row's menu and the detail
-- Holding a row opens the Mac's row menu: open, copy link, read, Status, Priority, pin, add to
-  Desk, ready / draft, linked PR, agent session, author, Grok Bot
+- Holding a row opens the Mac's row menu, in this order: where else the item is, as a row of
+  buttons at its head (GitHub, the agent session, Copy Link); what I make of it (read, Status,
+  Priority, pin, add to Desk); the item itself (linked PR, author, ready / draft); Grok Bot
 - The filter (§4.4) is the system's search field, a button at the list's foot
 - At the list's foot, one button stands for the Mac's status bar. Its symbol says how things
   stand at a glance: two arrows (turning while syncing, orange when the quota runs low), an arrow
@@ -788,8 +789,10 @@ phone), each a glass capsule saying what is set,
 the checks in a popover from the CI status, and a round glass button for the pin. In the pane's
 bar, one capsule holds where else the item is: its agent session (`terminal`, where the board has
 one; the newest, with a menu of them all when there are several, §3.3) and GitHub (↗, the symbol
-Open on GitHub has in the menus too). The rest (•••) is beside it: the row menu, rename, refresh,
-back to the previous item, and the conversation's Show Automated / Expand All / Collapse All. In
+GitHub has in the menus too). Not on a phone, whose bar is short of room: there they are the
+buttons at the menu's head. The rest (•••) is beside it: the row menu with Rename among the
+item's own, then the conversation's Show Automated / Expand All / Collapse All, then refresh and
+back to the previous item. In
 Commits a tap picks one commit (again for the preset) and a row's menu extends the selection to it.
 A diff's options (Wrap Lines, Expand All, Collapse All) are behind ••• at the end of its bar, which
 has to fit a phone.

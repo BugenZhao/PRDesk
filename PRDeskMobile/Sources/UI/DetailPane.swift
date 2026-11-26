@@ -10,6 +10,9 @@ import SwiftUI
 struct DetailPane: View {
     @Environment(AppModel.self) private var model
     let pages: DetailPages
+    /// The bar has room for the item's session and GitHub beside the menu (not a phone's, where
+    /// they are at the menu's head).
+    var showsLinks = true
     @AppStorage("showAutomated") private var showAutomated = false
     @State private var scrolls = PaneScrolls()
     /// How much of the pane the system's bars cover, which the pages reach under.
@@ -118,26 +121,28 @@ struct DetailPane: View {
                 BarTitle(item: item, isShown: scroll.isChromeAway || headerLift > 0) { scrollToTop(item) }
             }
         }
-        // One capsule for where else the item is; the menu in one of its own.
-        ToolbarItemGroup(placement: .topBarTrailing) {
-            SessionButton(item: item)
-            Button("Open on GitHub", systemImage: "arrow.up.right") { model.perform(.openInBrowser, on: item.id) }
+        // One capsule for where else the item is, where the bar has the room; the menu in one
+        // of its own.
+        if showsLinks {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                SessionButton(item: item)
+                Button("Open on GitHub", systemImage: "arrow.up.right") { model.perform(.openInBrowser, on: item.id) }
+            }
+            ToolbarSpacer(.fixed, placement: .topBarTrailing)
         }
-        ToolbarSpacer(.fixed, placement: .topBarTrailing)
         ToolbarItem(placement: .topBarTrailing) {
             Menu("More", systemImage: "ellipsis") {
-                ItemMenu(item: item, model: model)
-                Section {
-                    Button("Rename…", systemImage: "pencil") { renameText = item.title }
-                    Button("Refresh", systemImage: "arrow.clockwise") { model.loadDetail(force: true) }
-                    if model.canGoBack {
-                        Button("Back to Previous Item", systemImage: "chevron.backward") { model.goBack() }
-                    }
-                }
+                ItemMenu(item: item, model: model) { renameText = item.title }
                 Section("Conversation") {
                     Toggle("Show Automated", isOn: $showAutomated)
                     Button("Expand All", systemImage: "rectangle.expand.vertical") { pages.timeline.run("PRDesk.setAllCards(true)") }
                     Button("Collapse All", systemImage: "rectangle.compress.vertical") { pages.timeline.run("PRDesk.setAllCards(false)") }
+                }
+                Section {
+                    Button("Refresh", systemImage: "arrow.clockwise") { model.loadDetail(force: true) }
+                    if model.canGoBack {
+                        Button("Back to Previous Item", systemImage: "chevron.backward") { model.goBack() }
+                    }
                 }
             }
         }

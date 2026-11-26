@@ -75,7 +75,9 @@ struct DeskView: View {
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar { toolbar(layout) }
                 } detail: {
-                    DetailPane(pages: pages)
+                    // By the window's width, not the size class, which is compact for the
+                    // Full-Width List on an iPad too.
+                    DetailPane(pages: pages, showsLinks: !layout.isMeasured || layout.width >= 500)
                         .onAppear { detailHasAppeared = true }
                         .onDisappear { detailHasAppeared = false }
                 }

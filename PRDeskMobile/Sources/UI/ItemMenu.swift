@@ -2,9 +2,15 @@ import SwiftUI
 
 /// What can be done with an item, as a menu: held on a row, and behind the detail's ••• button.
 /// The same actions as the Mac's keys and row menu, through `AppModel.perform`.
+///
+/// In this order: where else the item is (a row of buttons at the menu's head: GitHub, its agent
+/// session, its link to copy), what I make of it (read, and the board's Status, Priority and
+/// pin), the item itself (its linked PR, its author, draft or ready, its title), then the bots.
 struct ItemMenu: View {
     let item: Item
     let model: AppModel
+    /// Asks for a new title, where the menu can (the detail's).
+    var rename: (() -> Void)?
 
     /// Whether the board's fields (Status, Priority, the pin) are the app's to set: not for the
     /// parity fork's staging PRs, nor for another tracker's items on the board.
@@ -16,14 +22,19 @@ struct ItemMenu: View {
         let board = model.board(for: item)
         let isUnread = model.isUnread(item)
 
-        Button("Open on GitHub", systemImage: "arrow.up.right") { model.perform(.openInBrowser, on: item.id) }
-        Button("Copy Link", systemImage: "link") { model.perform(.copyLink, on: item.id) }
-        Button(isUnread ? "Mark as Read" : "Mark as Unread", systemImage: isUnread ? "envelope.open" : "envelope.badge") {
-            model.perform(.toggleRead, on: item.id)
+        ControlGroup {
+            Button("GitHub", systemImage: "arrow.up.right") { model.perform(.openInBrowser, on: item.id) }
+            if board?.sessionLinks.isEmpty == false {
+                Button("Session", systemImage: "terminal") { model.perform(.openSession, on: item.id) }
+            }
+            Button("Copy Link", systemImage: "link") { model.perform(.copyLink, on: item.id) }
         }
 
-        if Self.isOnBoard(item, model: model) {
-            Section {
+        Section {
+            Button(isUnread ? "Mark as Read" : "Mark as Unread", systemImage: isUnread ? "envelope.open" : "envelope.badge") {
+                model.perform(.toggleRead, on: item.id)
+            }
+            if Self.isOnBoard(item, model: model) {
                 let triage = model.triage(for: item)
                 Menu("Status", systemImage: "square.stack") {
                     Toggle("Triage", isOn: Binding(
@@ -64,6 +75,12 @@ struct ItemMenu: View {
         }
 
         Section {
+            if model.linkedPR(of: item) != nil {
+                Button("Go to Linked PR", systemImage: "arrow.left.arrow.right") { model.perform(.openLinked, on: item.id) }
+            }
+            if item.author != nil {
+                Button("Author's Profile", systemImage: "person.crop.circle") { model.perform(.openAuthorProfile, on: item.id) }
+            }
             if let toggle = item.draftToggle {
                 Button {
                     Task { await model.toggleDraft(item) }
@@ -71,14 +88,8 @@ struct ItemMenu: View {
                     Label { Text(toggle.title) } icon: { toggle.icon.image }
                 }
             }
-            if model.linkedPR(of: item) != nil {
-                Button("Go to Linked PR", systemImage: "arrow.left.arrow.right") { model.perform(.openLinked, on: item.id) }
-            }
-            if board?.sessionLinks.isEmpty == false {
-                Button("Open Agent Session", systemImage: "terminal") { model.perform(.openSession, on: item.id) }
-            }
-            if item.author != nil {
-                Button("Author's Profile", systemImage: "person.crop.circle") { model.perform(.openAuthorProfile, on: item.id) }
+            if let rename {
+                Button("Rename…", systemImage: "pencil", action: rename)
             }
         }
 
