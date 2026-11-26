@@ -56,7 +56,6 @@ struct DetailPane: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                         .clipped()
                     }
-                    .macTextStrength()
                     .onChange(of: item.id) {
                         if item.kind == .issue { model.detailTab = .conversation }
                         isComposing = false
@@ -389,6 +388,7 @@ private struct DetailHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             title
+                .macTextStrength()
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { onTitleExtent($0 + 10) }
             people
             if isExpanded { more }
@@ -458,6 +458,8 @@ private struct DetailHeader: View {
             .accessibilityLabel(isExpanded ? "Show Less" : "Show More")
         }
         .font(.callout)
+        // Its buttons are plain (the CI status, the chevron), with no color of their own to lose.
+        .macTextStrength()
     }
 
     /// What folds away: dates and branches, the adoption, the stack, the labels and the board's
@@ -475,7 +477,7 @@ private struct DetailHeader: View {
             }
         }
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Color.secondaryText)
 
         AdoptionNote(item: item)
 
@@ -492,7 +494,7 @@ private struct DetailHeader: View {
         if let board = model.board(for: item), !board.isArchived, let comment = board.comment, !comment.isEmpty {
             Label(comment, systemImage: "text.bubble")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.secondaryText)
         }
     }
 

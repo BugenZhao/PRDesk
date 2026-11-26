@@ -192,8 +192,10 @@ are used off the main actor); no glass on content (cards, chips, rows).
   width it liked, over the bar's buttons): the detail sets `navigationTitle`, empty until the
   header's own title has scrolled under the bar. The header is an overlay clipped at the bar's
   edge, or it shows through the bar's buttons.
-- The hierarchical styles set at a pane's root (`macTextStrength`) must stay inside its
-  `toolbar`: a `Menu` in a bar drawn with them all but vanishes.
+- A foreground style set around a view takes over the labels of the buttons and menus inside it:
+  a tinted button's blue and a prominent one's white come out black, a bar's `Menu` all but
+  vanishes. `macTextStrength` (darker `.secondary` / `.tertiary` on iOS) goes only around text:
+  a list row, a section's title, the header's title.
 - Views in a `ScrollView` can't reach under the bars with `ignoresSafeArea`, and a
   `safeAreaInset` on the scroll view pushes its content down. The detail's pager (`DetailPager`)
   gives each page negative padding to the window's edges and `safeAreaPadding` back, and the

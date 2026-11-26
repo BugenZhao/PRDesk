@@ -57,6 +57,7 @@ struct ItemRowView: View {
         .padding(.trailing, RowColumns.trailingInset)
         .frame(minHeight: columns.height)
         .contentShape(Rectangle())
+        .macTextStrength()
     }
 
     // MARK: Layouts

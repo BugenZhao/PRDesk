@@ -32,9 +32,7 @@ extension Color {
     extension Color {
         /// Secondary and tertiary text as strong as they read on the Mac. iOS's own label colors
         /// are a shade lighter, and its text isn't smoothed heavier as the Mac's is, so these
-        /// are a little darker than the Mac's nominal values (50% and 26% black). Set as the
-        /// hierarchical styles of each pane's content (`macTextStrength`), inside its toolbar: a
-        /// bar's menu drawn with them all but vanishes.
+        /// are a little darker than the Mac's nominal values (50% and 26% black).
         static let secondaryText = Color(uiColor: UIColor { traits in
             traits.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.6) : UIColor(white: 0, alpha: 0.56)
         })
@@ -44,8 +42,12 @@ extension Color {
     }
 
     extension View {
+        /// Makes them the hierarchical styles (`.secondary`, `.tertiary`) of the text within.
+        /// Only around text: any foreground style set from outside also takes over the labels of
+        /// the buttons and menus inside, which then lose their own color (a tinted button's blue,
+        /// a prominent one's white) and come out black.
         func macTextStrength() -> some View {
-            foregroundStyle(Color.primary, Color.secondaryText, Color.tertiaryText)
+            foregroundStyle(.foreground, Color.secondaryText, Color.tertiaryText)
         }
     }
 #endif

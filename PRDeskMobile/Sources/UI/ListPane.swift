@@ -20,7 +20,6 @@ struct ListPane: View {
             ItemListView(density: density, highlightsSelection: highlightsSelection)
                 .overlay { emptyState }
         }
-        .macTextStrength()
         .searchable(text: $model.filterText, prompt: "Filter")
         .searchFocused($isFilterFocused)
         .onChange(of: model.filterFocusRequest) { isFilterFocused = true }
@@ -154,6 +153,7 @@ private struct SectionHeader: View {
             }
             .font(.footnote.weight(.semibold))
             .textCase(nil)
+            .macTextStrength()
             .padding(.horizontal, 10)
             .frame(height: 30)
             .contentShape(Rectangle())
@@ -330,7 +330,7 @@ struct StatusLine: View {
         }
         .font(.caption)
         .monospacedDigit()
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Color.secondaryText)
         .lineLimit(1)
         .padding(.horizontal, 6)
     }
