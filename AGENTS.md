@@ -194,8 +194,12 @@ are used off the main actor); no glass on content (cards, chips, rows).
   selection only while the list is a page.
 - The detail's bar title is a view of our own in `ToolbarItem(placement: .title)`, which the
   system keeps between the bar's buttons (a `principal` item took the width it liked, over them).
-  It is always there and fades by opacity once the header's own title has scrolled under the
-  bar. The header is an overlay clipped at the bar's edge, or it shows through the bar's buttons.
+  The bar centers it at the width it asks for, so it asks for more than any bar has
+  (`idealWidth`) and aligns its text to the leading end of what it is given.
+  `.toolbarTitleDisplayMode(.inlineLarge)`, the system's leading title, is for a text title: it
+  left this view centered, and a view in `.largeTitle` didn't show at all. The title is always
+  there and fades by opacity once the header's own title has scrolled under the bar. The header
+  is an overlay clipped at the bar's edge, or it shows through the bar's buttons.
 - The split view writes `columnVisibility` itself: `.detailOnly` when the window gets narrower
   or comes out of one column, and in the background (snapshots at other sizes), and it writes
   *before* the view sees the new width. Don't take a write for the viewer's choice at once, and

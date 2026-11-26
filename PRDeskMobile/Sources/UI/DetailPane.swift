@@ -228,8 +228,11 @@ private struct BarTitle: View {
                 .foregroundStyle(Color.secondaryText)
             }
             .lineLimit(1)
-            // The whole of the bar between its buttons, the text at its leading end.
-            .frame(maxWidth: .infinity, alignment: .leading)
+            // The bar centers its title at the width the title asks for. Asking for more than
+            // any bar has, it is given all there is between the bar's buttons, and the text
+            // goes to the leading end of that. (The system's own leading title, `.inlineLarge`,
+            // is for a title of plain text, not a view.)
+            .frame(idealWidth: 4000, maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
