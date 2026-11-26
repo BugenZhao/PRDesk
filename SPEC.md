@@ -738,9 +738,7 @@ one out, with its own button, edge swipe and animation), the list its sidebar:
   back. Kept for wide and for narrower windows apart; turning it off brings the sidebar back.
   Rows of one line or two is a choice of its own (••• too), the same for the table and the sidebar.
   Going between full width and the sidebar, the window dissolves from one to the other, the
-  bar's head the same across it: the lists are symbols alone through the change, their names
-  folding into them before it and opening out after, the capsule shrinking and growing from its
-  leading end
+  bar's head the same across it
 - The list keeps the desk's own white ground as a sidebar, not a sidebar's tint: the rows' colors
   say things
 - The bar over the list holds the lists, the filter, ⤢ and ◧, the last two (about where the
@@ -748,9 +746,8 @@ one out, with its own button, edge swipe and animation), the list its sidebar:
   system's selection (the lens that follows a finger across it), the chosen one tinted and its
   symbol filled, and the system's badges for what waits in Parity and the Inbox, in the blue of
   the unread dots. A grid for Dashboard, an equals sign in a circle for Parity, a bell for the
-  Inbox; each with its name beside it at full width and on a phone (at ordinary text sizes), the
-  symbols alone as a sidebar, where the bar is short of room. As tall as the bar's buttons
-  either way;
+  Inbox: symbols alone, everywhere, each in the middle of its button, a badge on its symbol's
+  corner. As tall as the bar's buttons;
   at its foot are the sync status button, the filter and ••• (rows, sorting, Settings)
 - Going from one to the other keeps the selection, the detail's tab, its pages (scroll position,
   loaded diffs) and a comment being written. Nothing remembers which layout came before

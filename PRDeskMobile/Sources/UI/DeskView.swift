@@ -34,11 +34,6 @@ struct DeskView: View {
     @State private var visibility = NavigationSplitViewVisibility.all
     /// Counts the window's rearrangements, to tell whether one came after a write.
     @State private var rearrangements = 0
-    /// The list switcher shows the lists' names; nil until first laid out. Its own state, behind
-    /// the layout's: going to full width the switcher is first as it was, then opens out, so
-    /// the bar's head is the same across the change (`wantsNames`).
-    @State private var switcherShowsNames: Bool?
-    @Environment(\.dynamicTypeSize) private var textSize
     /// Set for a moment to have the split view take the compact width again (`settle`).
     @State private var renewsCompact = false
     /// The detail's column is on screen.
@@ -109,16 +104,6 @@ struct DeskView: View {
         // The window is arranged another way (turned, resized), or the app is back in front:
         // the system has had its say about the columns, and the viewer's choice goes back in.
         .onChange(of: arrangement, initial: true) { settle() }
-        .task(id: [layout.isMeasured, wantsNames(layout)]) {
-            let wanted = wantsNames(layout)
-            guard layout.isMeasured else { return }
-            // Names go at once (the bar they were in may be gone), and at first there is
-            // nothing to come from. They come once the window has changed its layout.
-            guard wanted, switcherShowsNames != nil else { return switcherShowsNames = wanted }
-            try? await Task.sleep(for: .milliseconds(320))
-            guard !Task.isCancelled else { return }
-            switcherShowsNames = true
-        }
         .onChange(of: scenePhase) { if scenePhase == .active { settle() } }
         .focusedSceneValue(\.deskActions, DeskActions(
             toggleList: { withAnimation { setListShown(!isListShown(layout), layout) } },
@@ -200,29 +185,11 @@ struct DeskView: View {
         }
     }
 
-    /// The lists by name in the bar: where the list has the window, and the window the room (a
-    /// phone has it at ordinary text sizes).
-    private func wantsNames(_ layout: DeskLayout) -> Bool {
-        layout.isListPage && (layout.width >= 600 || textSize <= .large)
-    }
-
     /// The list as a table the whole window wide, or back as the detail's sidebar: kept for this
     /// kind of width. Either way the list was asked for and is there to see: as a table it is on
     /// top (the detail is pushed over it only for a selection), as a sidebar it is out.
     private func setTable(_ isTable: Bool, _ layout: DeskLayout) {
         guard !layout.isCompact else { return }
-        // The bar's head stays as it is across the change: going to the sidebar, whose bar has
-        // no room for names, the switcher folds its names away first (it opens them, going
-        // the other way, once the change is made).
-        guard isTable || switcherShowsNames != true else {
-            switcherShowsNames = false
-            Task { @MainActor in
-                // A moment for the bar to lay the shorter switcher out.
-                try? await Task.sleep(for: .milliseconds(80))
-                setTable(isTable, self.layout)
-            }
-            return
-        }
         dissolveWindow()
         if layout.isWide { tableWhenWide = isTable } else { tableWhenNarrow = isTable }
         if isTable {
@@ -266,11 +233,7 @@ struct DeskView: View {
         // The segments are glass themselves: no second sheet of it behind them.
         // One item, so one capsule of the bar's glass around the three lists.
         ToolbarItem(placement: .topBarLeading) {
-            let names = switcherShowsNames ?? wantsNames(layout)
-            ListTabBar(
-                selection: $model.mode, parityCount: model.parityWaitingCount, inboxCount: model.unreadInboxCount,
-                showsNames: names
-            )
+            ListTabBar(selection: $model.mode, parityCount: model.parityWaitingCount, inboxCount: model.unreadInboxCount)
         }
         .sharedBackgroundVisibility(.hidden)
         // Where the window isn't one column already: the filter, then the list the whole window
