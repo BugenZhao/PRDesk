@@ -190,10 +190,13 @@ are used off the main actor); no glass on content (cards, chips, rows).
   over the detail in a narrower window). After having been one column, the split view still
   writes `preferredCompactColumn = .sidebar` while regular: the binding drops the selection only
   while compact.
-- A bar's title can't be had from a `principal` item without laying it out by hand (it took the
-  width it liked, over the bar's buttons): the detail sets `navigationTitle`, empty until the
-  header's own title has scrolled under the bar. The header is an overlay clipped at the bar's
-  edge, or it shows through the bar's buttons.
+- The detail's bar title is a view of our own in `ToolbarItem(placement: .title)`, which the
+  system keeps between the bar's buttons (a `principal` item took the width it liked, over them).
+  It is always there and fades by opacity once the header's own title has scrolled under the
+  bar. The header is an overlay clipped at the bar's edge, or it shows through the bar's buttons.
+- In the background the system lays the window out at other sizes for its snapshots, and the
+  split view writes `columnVisibility` for those: the binding takes writes only while the scene
+  is active. What must survive the app being stopped in the background is `@SceneStorage`.
 - Liquid Glass (read `SwiftUI-Implementing-Liquid-Glass-Design.md` first; the exported skills
   don't cover it): buttons are the system's glass ones (`.buttonStyle(.glass)`, `.glassProminent`
   for the one that matters) with the labels the system gives them, which are the label color,

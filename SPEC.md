@@ -727,7 +727,8 @@ one out, with its own button, edge swipe and animation), the list its sidebar:
 ```
 
 - Beside the detail, ◧ (⌘B) puts the list away and the detail has the window. Floating, the list
-  is out while nothing is selected. In a compact window (a phone) the split view is one column:
+  is out while nothing is selected. Whether it is out is kept across leaving the app and coming
+  back, also when the system has stopped the app meanwhile. In a compact window (a phone) the split view is one column:
   the list is a page, and a row pushes its detail over it
 - The list keeps the desk's own white ground as a sidebar, not a sidebar's tint: the rows' colors
   say things
@@ -744,7 +745,8 @@ lines or one (•••, two by default):
   folds the section
 
 - Two lines: the title with its tags and the age; under it the number, author and marks of trust,
-  the latest event (or the board's Comment), then Turn, Review, CI and Size in columns
+  the latest event (or the board's Comment), then the size (+n −n, at any width: a sidebar or a
+  phone is never wide enough for a Size column), Turn, Review and CI
 - One line: the Mac's columns under sortable column titles. They give way as the list narrows so
   the title keeps the most room: Author's name under 960 pt (the picture stays), Size under 720,
   the number, the Comment and the latest event under 640, where tags are also shortened
@@ -776,9 +778,10 @@ The page gets the whole pane:
 
 - The header, the tabs and a tab's own bars (the commits and their options, the files' counts) lie
   over the page's top and scroll away with it under the pane's bar, as if they were its
-  beginning. Once the title is under the bar, the bar's own title names the item, as a large
-  title's does. The header's stack, labels, dates and the board's Comment also fold away under a
-  chevron
+  beginning. Once the title is under the bar, the item fades into the bar's title place in two
+  lines of our own: its state icon, number and title, and under them the author, Draft, the CI
+  status and the size. Touching it scrolls back to the top. The header's stack, labels, dates and
+  the board's Comment also fold away under a chevron
 - Pulled past its top the page gives as any scroll view does, and the header goes down with it
 - The composer is folded into a round glass button over the conversation's corner, which grows
   the word Draft when one waits. Open, it is one card of glass floating over the page's foot,

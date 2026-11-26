@@ -49,9 +49,6 @@ struct DetailPane: View {
                             }
                             // It goes with the page showing, up and away or down when pulled.
                             .offset(y: -min(scroll.offset, 3000))
-                            // Once its title is gone the bar's says what this is, as a large
-                            // title's does.
-                            .navigationTitle(scroll.isChromeAway ? "#\(String(item.number)) \(item.title)" : "")
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                         .clipped()
@@ -84,9 +81,16 @@ struct DetailPane: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    /// In the pane's bar: the item on GitHub, and everything else about it.
+    /// In the pane's bar: the item in two lines once the header's title has scrolled under the
+    /// bar, the item on GitHub, and everything else about it.
     @ToolbarContentBuilder
     private func toolbar(_ item: Item) -> some ToolbarContent {
+        // In the title's own place, which the system keeps between the bar's buttons.
+        ToolbarItem(placement: .title) {
+            ActivePage(scrolls: scrolls, item: item) { scroll in
+                BarTitle(item: item, isShown: scroll.isChromeAway) { scrollToTop(item) }
+            }
+        }
         ToolbarItem(placement: .topBarTrailing) {
             Button("Open on GitHub", systemImage: "arrow.up.right") { model.perform(.openInBrowser, on: item.id) }
         }
@@ -107,6 +111,16 @@ struct DetailPane: View {
                 }
             }
         }
+    }
+
+    /// Read when touched, not by the body.
+    private func scrollToTop(_ item: Item) {
+        let page = switch item.kind == .issue ? .conversation : model.detailTab {
+        case .conversation: pages.timeline
+        case .commits: pages.commits
+        case .files: pages.files
+        }
+        page.run("scrollTo({ top: 0, behavior: 'smooth' })")
     }
 
     @ViewBuilder
@@ -178,6 +192,55 @@ struct DetailPane: View {
         .padding(.bottom, 8)
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { composerHeight = $0 }
         .onAppear { model.requestComposerFocus() }
+    }
+}
+
+/// The item in the pane's bar while its header is out of sight: its state, number and title,
+/// and under them who, how it stands and how big it is. It fades in and out; touching it goes
+/// back to the top.
+private struct BarTitle: View {
+    @Environment(AppModel.self) private var model
+    let item: Item
+    let isShown: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 1) {
+                HStack(spacing: 5) {
+                    StateIconView(item: item, size: 13, isMerging: model.isMerging(item))
+                    Text("#\(String(item.number))")
+                        .foregroundStyle(Color.secondaryText)
+                        .monospacedDigit()
+                    Text(itemTitle: item.title, shortenedTags: true, codeFont: .footnote.monospaced())
+                }
+                .font(.subheadline.weight(.semibold))
+                HStack(spacing: 5) {
+                    Text(item.author ?? "ghost")
+                    if item.isDraft, item.isOpen { Text("· Draft") }
+                    if let ci = item.ci {
+                        Text("·")
+                        CISummary(ci: ci)
+                    }
+                    if let additions = item.additions, let deletions = item.deletions {
+                        Text("·")
+                        Text("+\(additions)").foregroundStyle(Color.diffAdded)
+                        Text("−\(deletions)").foregroundStyle(Color.diffRemoved)
+                    }
+                }
+                .font(.caption)
+                .monospacedDigit()
+                .foregroundStyle(Color.secondaryText)
+            }
+            .lineLimit(1)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .opacity(isShown ? 1 : 0)
+        .allowsHitTesting(isShown)
+        .accessibilityHidden(!isShown)
+        .accessibilityHint("Scrolls to the top")
+        .animation(.easeInOut(duration: 0.2), value: isShown)
     }
 }
 

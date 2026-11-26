@@ -19,8 +19,10 @@ struct DeskView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @AppStorage(DeskLayout.showsListKey) private var showsList = true
     @AppStorage(RowLines.key) private var rowLines = RowLines.two
-    /// The sidebar floating over the detail is out: for now, as anything laid over another is.
-    @State private var showsFloatingList = false
+    /// The sidebar floating over the detail is out. Kept with the scene, so it comes back as it
+    /// was when the system has put the app away and starts it again.
+    @SceneStorage("showsFloatingList") private var showsFloatingList = false
+    @Environment(\.scenePhase) private var scenePhase
     @State private var width: CGFloat = 0
     /// The list's own width, which as a sidebar the split view decides.
     @State private var listWidth: CGFloat = 0
@@ -93,7 +95,10 @@ struct DeskView: View {
     private func columnVisibility(_ layout: DeskLayout) -> Binding<NavigationSplitViewVisibility> {
         Binding(
             get: { isListShown(layout) ? .all : .detailOnly },
-            set: { setListShown($0 != .detailOnly, layout) }
+            // Only while the viewer is here: in the background the system lays the window out
+            // at other sizes for its snapshots, and the split view, putting its sidebar away for
+            // those, would write that back as if the viewer had.
+            set: { if scenePhase == .active { setListShown($0 != .detailOnly, layout) } }
         )
     }
 

@@ -136,10 +136,12 @@ struct ItemRowView: View {
                 }
                 Spacer(minLength: 0)
                 // Whose turn, then the two marks side by side in their columns.
+                // The size at its own width, ahead of the marks' columns: a list beside the detail
+                // or on a phone is never wide enough for the one-line rows' Size column.
+                size.fixedSize().padding(.trailing, 4)
                 turn
                 review.frame(width: columns.review)
                 ci.frame(width: columns.ci)
-                if density.showsSize { size.frame(width: columns.size) }
             }
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -304,7 +306,7 @@ struct ItemRowView: View {
         if let additions = item.additions, let deletions = item.deletions {
             HStack(spacing: 0) {
                 Text("+\(additions)").foregroundStyle(Color.diffAdded)
-                Spacer(minLength: 2)
+                Spacer(minLength: 5)
                 Text("−\(deletions)").foregroundStyle(Color.diffRemoved)
             }
             .font(.caption.monospacedDigit())
