@@ -231,11 +231,13 @@ enum ItemColumn: String, CaseIterable {
         // whole while the words before it shrink.
         if let summary = row.insight.summary, let at = row.insight.summaryAt {
             runs.append(.spring)
-            let age = CellRun.text(at.compactAge(relativeTo: now), color: eventIsWake ? .systemPurple : .tertiaryLabelColor, font: CellFont.small)
+            // The reason's purple, as faint as the gray it takes the place of.
+            let wakeColor = NSColor.systemPurple.withAlphaComponent(0.55)
+            let age = CellRun.text(at.compactAge(relativeTo: now), color: eventIsWake ? wakeColor : .tertiaryLabelColor, font: CellFont.small)
             if eventIsWake {
                 // In the reason's color and in its stead: it goes after the comment, and its age
                 // stays whatever the room, as the tag did.
-                runs.append(.optional(.text(summary, color: .systemPurple, font: CellFont.small, flexible: true, maxWidth: 150), priority: 2, minWidth: 44))
+                runs.append(.optional(.text(summary, color: wakeColor, font: CellFont.small, flexible: true, maxWidth: 150), priority: 2, minWidth: 44))
                 runs.append(age)
             } else {
                 runs.append(.optional(.text(summary, color: .tertiaryLabelColor, font: CellFont.small, flexible: true, maxWidth: 150), priority: 0, minWidth: 44))

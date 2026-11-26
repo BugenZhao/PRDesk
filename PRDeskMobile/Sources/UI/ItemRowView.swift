@@ -113,9 +113,10 @@ struct ItemRowView: View {
         tags(showsWake: !(showsEvent && row.wakeIsLatestEvent))
     }
 
-    /// The latest event's color: the wake's when it is what woke the item.
+    /// The latest event's color: the wake's purple when it is what woke the item, as faint as
+    /// the gray it takes the place of.
     private var eventStyle: AnyShapeStyle {
-        row.wakeIsLatestEvent ? AnyShapeStyle(Color.purple) : .tertiaryText
+        row.wakeIsLatestEvent ? AnyShapeStyle(Color.purple.opacity(0.55)) : .tertiaryText
     }
 
     /// The title on the first line with the age; under it who and what happened, then the marks,
