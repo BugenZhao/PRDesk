@@ -58,9 +58,11 @@ private struct TabBarView: UIViewRepresentable {
 
     private func items() -> [UITabBarItem] {
         Self.modes.enumerated().map { index, mode in
-            // At the size and weight of the bar's buttons beside it. The chosen list's symbol
-            // is filled, as SwiftUI's tab views have theirs; UIKit asks for it by name.
-            let configuration = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)
+            // The configuration of the bar's own buttons (measured: the same symbol comes out
+            // the same size in both). The chosen list's symbol is filled, as SwiftUI's tab views
+            // have theirs; UIKit asks for it by name.
+            let configuration = UIImage.SymbolConfiguration(textStyle: .body, scale: .large)
+                .applying(UIImage.SymbolConfiguration(weight: .medium))
             let item = UITabBarItem(
                 title: showsNames ? mode.1 : nil, image: UIImage(systemName: mode.2, withConfiguration: configuration), tag: index
             )
@@ -75,7 +77,7 @@ private struct TabBarView: UIViewRepresentable {
         host.onMeasure = onMeasure
         // The list changes on the next turn, so the bar's own selection isn't held up by it.
         context.coordinator.select = { mode in DispatchQueue.main.async { selection = mode } }
-        if context.coordinator.showsNames != showsNames {
+        if context.coordinator.showsNames == nil {
             context.coordinator.showsNames = showsNames
             // The bar is told its width is a wide window's, whatever the window's is: there a
             // tab bar's capsule is as wide as its items need (in a narrow one it fills the
@@ -90,6 +92,13 @@ private struct TabBarView: UIViewRepresentable {
             bar.standardAppearance = appearance
             bar.items = items()
             host.setNeedsMeasure()
+        } else if context.coordinator.showsNames != showsNames {
+            context.coordinator.showsNames = showsNames
+            // The names open out of the symbols and fold back into them: the same items, their
+            // titles set inside the bar's own animated layout.
+            host.change {
+                for (item, mode) in zip(bar.items ?? [], Self.modes) { item.title = showsNames ? mode.1 : nil }
+            }
         }
         let index = Self.modes.firstIndex { $0.0 == selection } ?? 0
         if bar.selectedItem?.tag != index { bar.selectedItem = bar.items?[index] }
@@ -139,6 +148,24 @@ final class TabBarHost: UIView {
         setNeedsLayout()
     }
 
+    /// Makes a change to the bar that resizes its capsule, animated: the capsule grows or
+    /// shrinks from its leading end, the bar moving under it in the same animation (the bar
+    /// keeps its capsule centered in its own, wider, bounds).
+    func change(_ change: @escaping () -> Void) {
+        guard window != nil, !UIAccessibility.isReduceMotionEnabled else {
+            change()
+            return setNeedsMeasure()
+        }
+        UIView.animate(
+            withDuration: 0.45, delay: 0, usingSpringWithDamping: 0.86, initialSpringVelocity: 0,
+            options: [.beginFromCurrentState, .allowUserInteraction]
+        ) {
+            change()
+            self.measure()
+            self.placeBar()
+        }
+    }
+
     override func didMoveToWindow() {
         super.didMoveToWindow()
         if window != nil { setNeedsMeasure() }
@@ -168,9 +195,13 @@ final class TabBarHost: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         if needsMeasure, window != nil { measure() }
+        placeBar()
+    }
+
+    /// At the host's leading end, whatever the host's width is just then: the item is given
+    /// its new width at once when the names come or go, while the capsule is still on its way.
+    private func placeBar() {
         guard let capsule else { return }
-        // At the leading end: while the host is still as wide as it was (names just gone), the
-        // capsule doesn't move.
         bar.frame.origin = CGPoint(x: -capsule.minX, y: -capsule.minY + (bounds.height - capsule.height) / 2)
     }
 
