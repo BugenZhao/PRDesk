@@ -42,6 +42,7 @@ struct MainView: View {
                 contribution: { model.contribution(for: $0) },
                 affiliationMenu: { AffiliationMenu.make(for: $0, model: model) },
                 hasLinkedPR: { model.linkedPR(of: $0) != nil },
+                canSendToBot: { model.canSend($0, for: $1) },
                 badgeVersion: model.affiliationsVersion + AvatarCache.shared.version,
                 onAction: { model.perform($0, on: $1) },
                 onSort: { model.sort = $0 },

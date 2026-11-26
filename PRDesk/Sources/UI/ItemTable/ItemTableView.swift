@@ -16,6 +16,8 @@ struct ItemTableView: NSViewRepresentable {
     var affiliationMenu: ([String]) -> NSMenu
     /// Whether an item has a PR at the other end of a parity pair (Go to Linked PR).
     var hasLinkedPR: (Item) -> Bool
+    /// Whether a request to a Grok Bot applies to an item.
+    var canSendToBot: (BotRequest, Item) -> Bool
     /// Changes when badge data or avatars change, which the rows themselves don't reflect.
     var badgeVersion: Int
     /// An action on the selected items (or the right-clicked one, if it is outside the selection).
@@ -602,7 +604,7 @@ struct ItemTableView: NSViewRepresentable {
                 default: .off
                 }
                 switch Self.menuActions[item.tag].action {
-                case let .sendToBot(request, _): item.isEnabled = targets.contains { request.applies(to: $0.item) }
+                case let .sendToBot(request, _): item.isEnabled = targets.contains { parent.canSendToBot(request, $0.item) }
                 case .openSession: item.isEnabled = targets.contains { $0.board?.sessionLinks.isEmpty == false }
                 case .openLinked: item.isEnabled = targets.contains { parent.hasLinkedPR($0.item) }
                 default: break

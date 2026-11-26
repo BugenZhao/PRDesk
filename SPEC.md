@@ -247,8 +247,9 @@ covers how the app sends and shows them:
   it to Desk on the board, so the app leaves the board alone
 - 🫴 Adopt (`d`) → Richard Loop: have the parity agent vet a PR for adoption (§3.2) now rather
   than wait for its daily sweep; it adopts the PR if it qualifies (the runbook's §2 rule 7 and
-  §8b), or records why not. Only for open PRs in the repository; for other items it's grayed out
-  in the context menu and the key is ignored
+  §8b), or records why not. Only for open PRs in the repository that are someone else's (not
+  mine, nor the agent's own); for other items it's grayed out in the context menu and the key is
+  ignored
 - 🚀 Merge (`r`) → Merger: drives CI and merges following the merge skill; only for PRs in the
   repository that are open and approved (reviewDecision = APPROVED, the same condition as the Good
   group). For other items it's grayed out in the context menu and the key is ignored (staging PRs
@@ -775,7 +776,9 @@ lines or one (•••, two by default):
   a PR Merger is merging. Tray, Attic and the pin are in the row's menu and the detail
 - Holding a row opens the Mac's row menu, in this order: where else the item is, as a row of
   buttons at its head (GitHub, the agent session, Copy Link); what I make of it (read, Status,
-  Priority, pin, add to Desk); the item itself (linked PR, author, ready / draft); Grok Bot
+  Priority, pin, add to Desk); the item itself (linked PR, author, ready / draft); the Grok Bot
+  requests, again as a row of buttons under their emoji. What doesn't apply to the item isn't in
+  the menu at all (the Mac's shows it dimmed)
 - The filter (§4.4) is the system's search field, a button at the list's foot
 - At the list's foot, one button stands for the Mac's status bar. Its symbol says how things
   stand at a glance: two arrows (turning while syncing, orange when the quota runs low), an arrow

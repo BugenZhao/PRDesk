@@ -5,7 +5,9 @@ import SwiftUI
 ///
 /// In this order: where else the item is (a row of buttons at the menu's head: GitHub, its agent
 /// session, its link to copy), what I make of it (read, and the board's Status, Priority and
-/// pin), the item itself (its linked PR, its author, draft or ready, its title), then the bots.
+/// pin), the item itself (its linked PR, its author, draft or ready, its title), then the bots,
+/// again as a row of buttons. What doesn't apply to the item isn't there: a menu under a finger
+/// has no room for what can't be chosen (the Mac's shows it dimmed, where its key is learned).
 struct ItemMenu: View {
     let item: Item
     let model: AppModel
@@ -16,6 +18,16 @@ struct ItemMenu: View {
     /// parity fork's staging PRs, nor for another tracker's items on the board.
     static func isOnBoard(_ item: Item, model: AppModel) -> Bool {
         !item.isParityStaging && item.isUpstream && model.board(for: item)?.isForeign != true
+    }
+
+    /// An emoji as a picture, in its own colors: a menu takes an image for a button's icon, and
+    /// tints a template.
+    private static func picture(of emoji: String) -> UIImage {
+        let text = emoji as NSString
+        let attributes: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 19)]
+        let size = text.size(withAttributes: attributes)
+        return UIGraphicsImageRenderer(size: size).image { _ in text.draw(at: .zero, withAttributes: attributes) }
+            .withRenderingMode(.alwaysOriginal)
     }
 
     var body: some View {
@@ -94,11 +106,14 @@ struct ItemMenu: View {
         }
 
         Section("Grok Bot") {
-            ForEach(BotRequest.allCases, id: \.self) { request in
-                Button("\(request.emoji) \(request.title)…") {
-                    model.perform(.sendToBot(request, withNote: true), on: item.id)
+            ControlGroup {
+                ForEach(BotRequest.allCases.filter { model.canSend($0, for: item) }, id: \.self) { request in
+                    Button {
+                        model.perform(.sendToBot(request, withNote: true), on: item.id)
+                    } label: {
+                        Label { Text(request.title) } icon: { Image(uiImage: Self.picture(of: request.emoji)) }
+                    }
                 }
-                .disabled(!request.applies(to: item))
             }
         }
     }

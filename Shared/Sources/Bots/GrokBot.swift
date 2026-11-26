@@ -28,13 +28,15 @@ enum BotRequest: String, CaseIterable, Codable, Sendable {
         }
     }
 
-    /// Whether the request applies to `item`: adopting takes open PRs of the repository, and Merger
-    /// only the approved ones (as in Good); staging PRs go through the parity agent.
-    func applies(to item: Item) -> Bool {
+    /// Whether the request applies to `item`: adopting takes open PRs of the repository that are
+    /// someone else's (not the viewer's own, nor the parity agent's, which there is nothing to
+    /// adopt of), and Merger only the approved ones (as in Good); staging PRs go through the
+    /// parity agent.
+    func applies(to item: Item, viewer: String?) -> Bool {
         let upstreamPR = item.kind == .pullRequest && item.isOpen && item.isUpstream
         return switch self {
         case .investigate, .track: true
-        case .adopt: upstreamPR
+        case .adopt: upstreamPR && !sameLogin(item.author, viewer) && !Parity.isBot(item.author)
         case .merge: upstreamPR && item.reviewDecision == "APPROVED"
         }
     }

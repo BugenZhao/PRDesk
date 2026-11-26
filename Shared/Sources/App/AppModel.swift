@@ -891,6 +891,11 @@ final class AppModel {
         !snapshot.items.contains { $0.id == item.id }
     }
 
+    /// Whether the request can go to its bot for this item (`BotRequest.applies`).
+    func canSend(_ request: BotRequest, for item: Item) -> Bool {
+        request.applies(to: item, viewer: viewer)
+    }
+
     /// Whether adding the item would list it: not for one closed too long ago (pinning keeps it).
     func canAddToDesk(_ item: Item) -> Bool {
         isOpenedOnly(item) && isOnDesk(item)
@@ -1031,7 +1036,7 @@ final class AppModel {
         case .addToDesk:
             addToDesk(items.filter(canAddToDesk))
         case let .sendToBot(request, _):
-            items = items.filter(request.applies)
+            items = items.filter { canSend(request, for: $0) }
         default:
             break
         }
