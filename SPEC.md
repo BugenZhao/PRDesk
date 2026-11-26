@@ -800,11 +800,15 @@ lines or one (•••, two by default):
   glints as rows pass under it): pinned at the list's top, rows show dimly under it. Touching it
   folds the section
 
-- Two lines: the title with its tags and that time; under it the number, author and marks of trust,
+- Two lines: the title with its tags and that time, which says whose turn it is as well, with no
+  word for it (`review`, `me` and `them` are three widths, and kept what follows from lining
+  up): the label color and a medium weight when the move is mine, a review asked of me included; gray
+  when it is theirs, fainter once theirs has been quiet for a week. Under it the number, author
+  and marks of trust,
   the latest event (or the board's Comment; purple in place of a woken item's tag when it is
   what woke it, as on the Mac; what the author did goes without "author", right after the
   author's name: `pushed 9d`), then the size (+n −n, at any width: a sidebar or a
-  phone is never wide enough for a Size column), Turn, Review and CI
+  phone is never wide enough for a Size column), Review and CI
 - One line: the Mac's columns under sortable column titles. They give way as the list narrows so
   the title keeps the most room: Author's name under 960 pt (the picture stays), Size under 720,
   the number, the Comment and the latest event under 640. Tags are shortened ("[RF]") under 960

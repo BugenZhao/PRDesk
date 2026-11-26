@@ -101,7 +101,7 @@ struct ItemRowView: View {
         turn.column(columns.turn, alignment: .leading)
         ci.column(columns.ci)
         if density.showsSize { size.column(columns.size) }
-        updated.frame(width: columns.updated, alignment: .trailing)
+        time(saysTurn: false).frame(width: columns.updated, alignment: .trailing)
     }
 
     /// `showsEvent`: the row shows the latest event too, which stands for the wake's tag when
@@ -119,15 +119,16 @@ struct ItemRowView: View {
         row.wakeIsLatestEvent ? AnyShapeStyle(Color.purple.opacity(0.55)) : .tertiaryText
     }
 
-    /// The title on the first line with the age; under it who and what happened, then the marks,
-    /// which keep their columns so they line up down the list.
+    /// The title on the first line with the time, which also says whose turn it is; under it who
+    /// and what happened, then the size and the marks, which keep their columns so they line up
+    /// down the list.
     private func twoLineCells(_ columns: RowColumns) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 5) {
                 titleCell(showsEvent: secondLineIsEvent)
                 if density.showsNotes { comment }
                 Spacer(minLength: 0)
-                updated
+                time(saysTurn: true)
             }
             HStack(spacing: 5) {
                 if density.showsNumber {
@@ -143,11 +144,11 @@ struct ItemRowView: View {
                     Text(text).foregroundStyle(secondLineIsEvent ? eventStyle : .tertiaryText).lineLimit(1)
                 }
                 Spacer(minLength: 0)
-                // Whose turn, then the two marks side by side in their columns.
-                // The size at its own width, ahead of the marks' columns: a list beside the detail
-                // or on a phone is never wide enough for the one-line rows' Size column.
+                // The size at its own width, ahead of the two marks in their columns: a list
+                // beside the detail or on a phone is never wide enough for the one-line rows'
+                // Size column. No word for whose turn it is here (the time says it): words of
+                // three widths kept the sizes from lining up.
                 size.fixedSize().padding(.trailing, 4)
-                turn
                 review.column(columns.review)
                 ci.column(columns.ci)
             }
@@ -331,13 +332,23 @@ struct ItemRowView: View {
 
     /// The row's one time: when the item was last updated, or how long ago it was opened while
     /// the list is sorted by that (the Mac's Age and Upd columns in the room for one).
-    private var updated: some View {
-        Text((model.sort.key == .age ? item.createdAt : item.updatedAt).compactAge())
-            .font(.caption.monospacedDigit())
-            .foregroundStyle(.secondaryText)
+    ///
+    /// `saysTurn`: in a two-line row it stands for the Turn column too, by its weight alone:
+    /// the label color and a little heavier when the move is mine (a review asked of me
+    /// included), gray when it is theirs, and fainter once theirs has been quiet for a week.
+    private func time(saysTurn: Bool) -> some View {
+        let mark = saysTurn ? row.turnMark : nil
+        let isMine = mark?.isMine == true
+        let showsAge = model.sort.key == .age
+        let isQuiet = mark != nil && !isMine && !showsAge && Date().timeIntervalSince(item.updatedAt) >= 7 * 86400
+        return Text((showsAge ? item.createdAt : item.updatedAt).compactAge())
+            .font(.caption.monospacedDigit().weight(isMine ? .medium : .regular))
+            // The label color itself: `.primary` would follow a dimmed container.
+            .foregroundStyle(isMine ? AnyShapeStyle(Color.primary) : isQuiet ? .tertiaryText : .secondaryText)
             .lineLimit(1)
             .fixedSize()
             .layoutPriority(2)
+            .accessibilityValue(mark.map { $0.isMine ? "Your turn" : "Their turn" } ?? "")
     }
 }
 
