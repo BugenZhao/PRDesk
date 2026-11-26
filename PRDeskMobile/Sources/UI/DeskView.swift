@@ -217,7 +217,14 @@ struct DeskView: View {
         @Bindable var model = model
         // The segments are glass themselves: no second sheet of it behind them.
         ToolbarItem(placement: .topBarLeading) {
-            ListSwitcher(isBrief: !layout.isListPage)
+            // As a sidebar the bar is short of room: the lists by their symbols, in the
+            // system's own tab bar.
+            if layout.isListPage {
+                ListSwitcher()
+            } else {
+                ListTabBar(selection: $model.mode, parityCount: model.parityWaitingCount, inboxCount: model.unreadInboxCount)
+                    .listTabBarFrame()
+            }
         }
         .sharedBackgroundVisibility(.hidden)
         // Where the window isn't one column already: the list the whole window wide, or back
@@ -249,55 +256,39 @@ struct DeskView: View {
     }
 }
 
-/// Which list shows: Dashboard, Parity or Inbox, as segments. By name where there is room, by
-/// symbol where the list is a sidebar and the bar is short of it. What waits in Parity and the
-/// Inbox is a badge on its segment's corner.
+/// Which list shows, by name: Dashboard, Parity or Inbox as segments, where the bar has room
+/// (the list at full width, a phone). As a sidebar it is `ListTabBar`, by symbol. What waits in
+/// Parity and the Inbox is a badge on its name's corner.
 private struct ListSwitcher: View {
     @Environment(AppModel.self) private var model
-    let isBrief: Bool
 
     var body: some View {
         @Bindable var model = model
         Picker("View", selection: $model.mode) {
-            segment("Dashboard", symbol: "square.grid.2x2").tag(AppModel.ListMode.dashboard)
-            segment("Parity", symbol: "arrow.left.arrow.right").tag(AppModel.ListMode.parity)
-            segment("Inbox", symbol: "bell").tag(AppModel.ListMode.inbox)
+            Text("Dashboard").tag(AppModel.ListMode.dashboard)
+            Text("Parity").tag(AppModel.ListMode.parity)
+            Text("Inbox").tag(AppModel.ListMode.inbox)
         }
         .pickerStyle(.segmented)
-        .modifier(SwitcherWidth(isBrief: isBrief))
-        // The segments are of one width, so each label is in the middle of a third of the
-        // control: a hidden copy of it there gives the badge the label's corner to sit on.
+        .fixedSize()
+        // A segment takes no badge. The segments are of one width, so each name is in the
+        // middle of a third of the control: a hidden copy of it there gives the badge the
+        // name's corner to sit on.
         .overlay {
             HStack(spacing: 0) {
-                badge(0, on: "Dashboard", symbol: "square.grid.2x2")
-                badge(model.parityWaitingCount, on: "Parity", symbol: "arrow.left.arrow.right")
-                badge(model.unreadInboxCount, on: "Inbox", symbol: "bell")
+                badge(0, on: "Dashboard")
+                badge(model.parityWaitingCount, on: "Parity")
+                badge(model.unreadInboxCount, on: "Inbox")
             }
             .allowsHitTesting(false)
         }
     }
 
-    @ViewBuilder
-    private func segment(_ name: String, symbol: String) -> some View {
-        if isBrief {
-            // At the size and weight of the bar's own buttons: a segment's image is drawn as
-            // it comes, small and light, whatever font the view is given.
-            Image(uiImage: Self.image(symbol)).accessibilityLabel(name)
-        } else {
-            Text(name)
-        }
-    }
-
-    private static func image(_ symbol: String) -> UIImage {
-        let configuration = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)
-        return UIImage(systemName: symbol, withConfiguration: configuration) ?? UIImage()
-    }
-
-    private func badge(_ count: Int, on name: String, symbol: String) -> some View {
-        segment(name, symbol: symbol)
+    private func badge(_ count: Int, on name: String) -> some View {
+        Text(name)
             .font(.subheadline.weight(.medium))
             .hidden()
-            // From the label's upper trailing corner outwards, a little over it.
+            // From the name's upper trailing corner outwards, a little over it.
             .overlay(alignment: .topTrailing) {
                 Color.clear.frame(width: 0, height: 0).overlay(alignment: .bottomLeading) {
                     if count > 0 {
@@ -310,26 +301,12 @@ private struct ListSwitcher: View {
                             // The color of the list's unread dots, not an alarm's red.
                             .background(Color.accentColor, in: .capsule)
                             .fixedSize()
-                            .offset(x: -3, y: 6)
+                            .offset(x: 3, y: 6)
                             .accessibilityLabel("\(count) waiting")
                     }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-/// Named segments take the width their names need; symbols alone would be cramped, and get a
-/// touch's width each.
-private struct SwitcherWidth: ViewModifier {
-    let isBrief: Bool
-
-    func body(content: Content) -> some View {
-        if isBrief {
-            content.frame(width: 156)
-        } else {
-            content.fixedSize()
-        }
     }
 }
 

@@ -739,12 +739,13 @@ one out, with its own button, edge swipe and animation), the list its sidebar:
   Rows of one line or two is a choice of its own (••• too), the same for the table and the sidebar
 - The list keeps the desk's own white ground as a sidebar, not a sidebar's tint: the rows' colors
   say things
-- The bar over the list holds the lists (the segments are the glass, with none behind them), ⤢,
-  the filter and ◧. As a sidebar it is short of room, and the lists are symbols there
-  (a grid for Dashboard, two arrows for Parity, a bell for the Inbox, at the size and weight of
-  the bar's buttons); at full width and on a phone they are named. What waits in Parity and the
-  Inbox is a badge on the label's corner either way, in the blue of the unread dots. ⤢, the
-  filter and ◧ are a round button each; at its foot are the sync status button, the filter and ••• (rows, sorting, Settings)
+- The bar over the list holds the lists, ⤢, the filter and ◧, a round button each. At full
+  width and on a phone the lists are named segments (the segments are the glass, with none behind
+  them). As a sidebar the bar is short of room, and they are symbols in the system's own tab bar
+  (a grid for Dashboard, two arrows for Parity, a bell for the Inbox): a capsule of glass with the
+  system's selection, the chosen one tinted. What waits in Parity and the Inbox is a badge on
+  the label's corner either way, in the blue of the unread dots;
+  at its foot are the sync status button, the filter and ••• (rows, sorting, Settings)
 - Going from one to the other keeps the selection, the detail's tab, its pages (scroll position,
   loaded diffs) and a comment being written. Nothing remembers which layout came before
 

@@ -214,16 +214,17 @@ are used off the main actor); no glass on content (cards, chips, rows).
   by rules of its own, and CSS `zoom` on the root then moved the boxes and left the text at
   13 px. The zoom is set from Swift (`PRDesk.setTextScale`: 1.2 times the Dynamic Type factor).
   `@ScaledMetric` of 1 comes back rounded to 1 at every size; scale 100 and divide.
-- A segment's `Image(systemName:)` is drawn small and light whatever font it is given: build a
-  `UIImage` with a `SymbolConfiguration` (20 pt medium matches the bar's buttons). The system's
-  search button joins the capsule of whatever is at the bar's end unless it is placed by name
-  (`DefaultToolbarItem(kind: .search, placement: .topBarTrailing)`) with a `ToolbarSpacer(.fixed)`
-  on each side; in a compact window it is placed in the bottom bar instead.
-- A segmented `Picker`'s segment is text or an image, never both (`Text` with an interpolated
-  `Image` shows the text alone), and it takes no badge. `ListSwitcher` overlays its badges: the
-  segments are of one width, so a hidden copy of each label in a third of the control gives the
-  badge the label's corner. Alignment guides set on the badge inside the overlay did nothing;
-  it hangs from a zero-size anchor instead.
+- The sidebar's list switcher is a real `UITabBar` on its own (`ListTabBar`), not an imitation:
+  built against this SDK it draws its glass capsule, the system's selection and badges by
+  itself, and takes untitled items with a `SymbolConfiguration` (17 pt medium matches the bar's
+  buttons). In a toolbar it must be given its size (it collapses to nothing otherwise), and it
+  draws its capsule in the upper 44 pt of a 54 pt height: `listTabBarFrame` lays it out by the
+  capsule. A segmented `Picker` could not do this: a segment is text or an image, never both,
+  draws an image small and light whatever its font, and takes no badge (`ListSwitcher`, used
+  where the lists are named, overlays its own).
+- The system's search button joins the capsule of whatever is at the bar's end unless it is
+  placed by name (`DefaultToolbarItem(kind: .search, placement: .topBarTrailing)`) with a
+  `ToolbarSpacer(.fixed)` on each side; in a compact window it is placed in the bottom bar.
 - Liquid Glass (read `SwiftUI-Implementing-Liquid-Glass-Design.md` first; the exported skills
   don't cover it): buttons are the system's glass ones (`.buttonStyle(.glass)`, `.glassProminent`
   for the one that matters) with the labels the system gives them, which are the label color,
