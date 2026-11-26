@@ -4,9 +4,20 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# Signed with this Mac's Apple Development certificate where there is one, so the app is the
+# same app to macOS from one install to the next (its Keychain items, what it was allowed). The
+# team comes from the certificate and is never written into the project, which signs ad hoc.
+signing=()
+team=$(security find-certificate -c "Apple Development" -p 2>/dev/null \
+  | openssl x509 -noout -subject -nameopt multiline 2>/dev/null \
+  | awk -F'= ' '/organizationalUnitName/ {print $2; exit}' || true)
+if [[ -n "$team" ]] && security find-identity -p codesigning -v | grep -q "Apple Development"; then
+  signing=(CODE_SIGN_IDENTITY="Apple Development" DEVELOPMENT_TEAM="$team")
+fi
+
 tuist generate --no-open >/dev/null
 xcodebuild -workspace PRDesk.xcworkspace -scheme PRDesk -configuration Release \
-  -derivedDataPath .build/DerivedData -destination 'platform=macOS' build -quiet
+  -derivedDataPath .build/DerivedData -destination 'platform=macOS' "${signing[@]}" build -quiet
 
 app=".build/DerivedData/Build/Products/Release/PRDesk.app"
 dest="/Applications/PR Desk.app"

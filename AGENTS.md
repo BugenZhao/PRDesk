@@ -13,6 +13,9 @@ open .build/DerivedData/Build/Products/Debug/PRDesk.app
 
 `scripts/install.sh` builds Release and installs it as `/Applications/PR Desk.app` (quitting any
 running copy first) — that is the copy for daily use. Keep the build free of warnings.
+The project signs ad hoc; `install.sh` signs the installed copy with this Mac's Apple Development
+certificate where there is one (the team is read from the certificate, never written here: the
+repo is public), so macOS takes each install for the same app. Test copies stay ad hoc.
 
 Debug builds accept `-PRDeskAppearance dark|light` to force an appearance, `-PRDeskNoSync YES`
 to skip syncing on their own (no searches, board, inbox or prefetched details; only what is opened,
@@ -213,8 +216,8 @@ are used off the main actor); no glass on content (cards, chips, rows).
   afterwards.
 - Yab's `native_context` and `tabs` only see the space on screen, `native_context` gives tab URLs
   as origins only (join with `tabs` by the first 8 characters of the id). `yab exec` is documented to open a hidden Yab if none is running. Stay on
-  `yab exec` rather than AppleScript: PR Desk is ad-hoc signed, so the Automation prompt would likely
-  come back after each install.
+  `yab exec` rather than AppleScript: a copy signed ad hoc (any test copy, and the installed one on
+  a Mac without a development certificate) gets the Automation prompt again after each build.
 - The triage board (GitHub Project `vllm-project` #56) is the source of truth for Status, Priority,
   Comment and pins (its Pinned field) (SPEC §3.1). The app writes them only on an explicit user action, never from a rule (an off-board PR the user approves is added as Good, standing in for the board's own approval workflow, and 🚀 sets Merging once the board's automation has had its say);
   it also shares the board with another tracker (`Python Parity Backlog`), whose items it must
