@@ -223,8 +223,9 @@ struct DetailPane: View {
 }
 
 /// The item in the pane's bar while its header is out of sight, from the bar's leading end: its
-/// state and title, and under them who wrote it (picture, name, marks of trust) and how big it
-/// is. It fades in and out; touching it goes back to the top.
+/// state and title, and under them its number, who wrote it (picture, name, marks of trust) and
+/// how big it is, as a row of the list has them. It fades in and out; touching it goes back to
+/// the top.
 private struct BarTitle: View {
     @Environment(AppModel.self) private var model
     let item: Item
@@ -240,6 +241,7 @@ private struct BarTitle: View {
                 }
                 .font(.subheadline.weight(.semibold))
                 HStack(spacing: 4) {
+                    Text("#\(String(item.number))")
                     AvatarView(login: item.author, size: 14)
                     Text(item.author ?? "ghost")
                     BadgeIcons(login: item.author, size: 11)

@@ -803,7 +803,8 @@ The page gets the whole pane:
   over the page's top and scroll away with it under the pane's bar, as if they were its
   beginning. Once the title is under the bar, the item fades into the bar's title place in two
   lines of our own, from the bar's leading end: its state icon and title, and under them the
-  author (picture, name, marks of trust), Draft and the size. No number and no CI status there. Touching it scrolls back to the top. The header's stack, labels, dates and
+  number, the author (picture, name, marks of trust), Draft and the size, as a two-line row of
+  the list has them. No CI status there. Touching it scrolls back to the top. The header's stack, labels, dates and
   the board's Comment also fold away under a chevron
 - Pulled past its top the page gives as any scroll view does, and the header goes down with it
 - The composer is folded into a button of the system's bar at the pane's foot (in every tab; it
