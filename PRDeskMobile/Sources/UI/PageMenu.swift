@@ -10,6 +10,13 @@ struct PageMenu: Identifiable {
     let page: WebDocument
 
     var anchor: CGRect { CGRect(x: point.x - 1, y: point.y - 1, width: 2, height: 2) }
+
+    /// The reactions hang under their button, a row as wide as a phone: left to the system
+    /// they went beside it, where the row had no room and lost its ends. The others are left
+    /// to the system (they are asked for anywhere on the page).
+    var arrowEdge: Edge? {
+        if case .reaction = request { .top } else { nil }
+    }
 }
 
 struct PageMenuView: View {

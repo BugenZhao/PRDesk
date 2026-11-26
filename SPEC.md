@@ -881,7 +881,7 @@ The page gets the whole pane:
 
 **Ground.** The detail's pages are on a grouped list's ground (light gray; black in dark mode),
 and their cards and diffs are that list's cells in color (white; dark gray), so a card stands
-out as it does on the Mac's window. The ground begins where the header (and a tab's own bars)
+out as it does on the Mac's window, with rounder corners than the Mac's. The ground begins where the header (and a tab's own bars)
 ends and moves with it; the header and the pane's bar stay on white, as the list's are. Links are
 the system's blue.
 
@@ -891,8 +891,8 @@ own label colors, in the list and in the pages. The pages' text is the size of t
 up) and follows the viewer's text size (Dynamic Type) as the rest of the app does, while it is
 running too.
 
-**Menus in the pages.** The smiley on a card offers the reactions in a row, mine marked (picking
-one of those takes it back). Holding a person offers their profile, their name to copy and,
+**Menus in the pages.** The smiley on a card offers the reactions in a row hanging under it,
+mine marked (picking one of those takes it back). Holding a person offers their profile, their name to copy and,
 unless the Mac's badges are read (below), the orgs to tie them to by hand (§5); holding a file's header offers Viewed, its path and its page on
 GitHub.
 

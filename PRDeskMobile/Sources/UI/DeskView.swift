@@ -39,6 +39,8 @@ struct DeskView: View {
     /// The detail's column is on screen.
     @State private var detailHasAppeared = false
     @State private var width: CGFloat = 0
+    /// Where the desk begins in the window (below the status bar, on a phone).
+    @State private var origin = CGPoint.zero
     /// The list's own width, which as a sidebar the split view decides.
     @State private var listWidth: CGFloat = 0
     @State private var pages = DetailPages()
@@ -89,7 +91,10 @@ struct DeskView: View {
             }
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
-        .popover(item: $pageMenu, attachmentAnchor: .rect(.rect(pageMenu?.anchor ?? .zero))) { menu in
+        .onGeometryChange(for: CGPoint.self) { $0.frame(in: .global).origin } action: { origin = $0 }
+        // A page gives its point in the window; the anchor is in the desk's own space, which
+        // begins below the status bar (the popover pointed that much too low).
+        .popover(item: $pageMenu, attachmentAnchor: .rect(.rect((pageMenu?.anchor ?? .zero).offsetBy(dx: -origin.x, dy: -origin.y))), arrowEdge: pageMenu?.arrowEdge) { menu in
             PageMenuView(menu: menu).environment(model)
         }
         .sheet(isPresented: $showsSettings) { SettingsView() }

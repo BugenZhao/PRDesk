@@ -629,7 +629,9 @@ const PRDesk = (() => {
     const reactAdd = event.target.closest(".react-add");
     if (reactAdd) {
       const rect = reactAdd.getBoundingClientRect();
-      post({ type: "reactionMenu", subject: reactAdd.dataset.subject, x: rect.left, y: rect.bottom + 2 });
+      // Under the button's leading end for the Mac's menu; under its middle for a popover's arrow.
+      const x = document.documentElement.dataset.platform === "phone" ? rect.left + rect.width / 2 : rect.left;
+      post({ type: "reactionMenu", subject: reactAdd.dataset.subject, x, y: rect.bottom + 2 });
       return;
     }
     const reaction = event.target.closest(".reaction");

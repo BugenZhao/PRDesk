@@ -289,6 +289,11 @@ are used off the main actor); no glass on content (cards, chips, rows).
   cards didn't fold and files didn't open on the iPad. `detail.js` listens on `document`, and
   `detail.css` gives the page's own controls a pointer cursor on iOS; give a new tappable
   element one too.
+- A popover's `attachmentAnchor: .rect(.rect(…))` is in the space of the view the popover is
+  on, not the window's. A page gives its menus' points in the window (`webView.convert(_:to:
+  nil)`), and the desk begins below the status bar on a phone, so the pages' popovers pointed
+  62 pt too low: `DeskView` takes its own origin off. Left to itself a popover goes beside its
+  anchor where it likes, even where it doesn't fit: the reactions say `arrowEdge: .top`.
 - The pages' colors are WebKit's system color keywords, and several are the Mac's alone
   (`-apple-system-control-accent`, `-control-background`, `-text-background`): on iOS a custom
   property holding one is invalid where it is used, quietly, so links had the text's color and

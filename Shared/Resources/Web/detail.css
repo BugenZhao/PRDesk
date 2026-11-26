@@ -41,6 +41,11 @@ html[data-platform="phone"] [data-login], html[data-platform="phone"] .fhead { -
 html[data-platform="phone"] :is(.fhead, .vbox, .card .head, .card > .preview, .reaction, .react-add) {
   cursor: pointer; -webkit-tap-highlight-color: transparent;
 }
+/* Rounder there, as the system's own cards and cells are. */
+html[data-platform="phone"] .card { border-radius: 14px; }
+html[data-platform="phone"] .file { border-radius: 12px; }
+html[data-platform="phone"] :is(.rc, .md pre) { border-radius: 9px; }
+html[data-platform="phone"] .rc-hunk { border-radius: 6px; }
 #root { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
 #root:empty { display: none; }
 a { color: var(--accent); text-decoration: none; }
