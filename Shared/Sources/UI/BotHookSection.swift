@@ -36,7 +36,6 @@ private struct BotHookFields: View {
         #if os(iOS)
         .textInputAutocapitalization(.never)
         .autocorrectionDisabled()
-        .font(.callout.monospaced())
         #endif
         HStack {
             Button("Save") {

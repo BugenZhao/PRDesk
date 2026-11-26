@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// The token for GitHub, how often to sync, and the Grok Bots to send to.
+/// What this copy is and how syncing goes first, then badges; the token and the Grok Bots,
+/// set once, below.
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -16,6 +17,37 @@ struct SettingsView: View {
         @Bindable var model = model
         NavigationStack {
             Form {
+                Section {
+                    VersionRow()
+                }
+
+                Section {
+                    LabeledContent("Last Synced", value: model.lastSyncedAt.map { "\($0.compactAge()) ago" } ?? "never")
+                    if case let .rateLimited(until) = model.syncState {
+                        LabeledContent("API Quota", value: "used up until \(until.formatted(date: .omitted, time: .shortened))")
+                    } else if let rate = model.rateLimit {
+                        LabeledContent("API Quota", value: "\(rate.remaining.formatted()) left")
+                    }
+                } header: {
+                    Text("Syncing")
+                } footer: {
+                    Text("The quota is GitHub's hourly budget, shared with the Mac. Your Mac follows up what you change here: notifications for Shelf and Attic items, approved PRs on the board.")
+                }
+
+                Section {
+                    TextField("owner/name", text: $badgesRepository)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .onSubmit { Task { await model.shareBadges(soon: true) } }
+                    LabeledContent("Status") {
+                        BadgeShareStatus(state: model.badgeShareState, verb: "Read")
+                    }
+                } header: {
+                    Text("Badges")
+                } footer: {
+                    Text("The private repository your Mac publishes its badges to (Settings › Affiliations there). They are read from it at each sync, the ones set by hand included; the token below must be able to read it. Without one, badges are only what you set by hand here.")
+                }
+
                 Section {
                     SecureField(hasSavedToken ? "Saved; enter a new one to replace it" : "Personal access token", text: $token)
                         .textInputAutocapitalization(.never)
@@ -40,19 +72,6 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    LabeledContent("Last Synced", value: model.lastSyncedAt.map { "\($0.compactAge()) ago" } ?? "never")
-                    if case let .rateLimited(until) = model.syncState {
-                        LabeledContent("API Quota", value: "used up until \(until.formatted(date: .omitted, time: .shortened))")
-                    } else if let rate = model.rateLimit {
-                        LabeledContent("API Quota", value: "\(rate.remaining.formatted()) left")
-                    }
-                } header: {
-                    Text("Syncing")
-                } footer: {
-                    Text("The quota is GitHub's hourly budget, shared with the Mac. Your Mac follows up what you change here: notifications for Shelf and Attic items, approved PRs on the board.")
-                }
-
-                Section {
                     LabeledContent("👀 🔥 🫴") {
                         TextField("Richard Loop's id", text: $assistantBot)
                     }
@@ -66,28 +85,8 @@ struct SettingsView: View {
                 }
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
-                .font(.callout.monospaced())
-
-                Section {
-                    TextField("owner/name", text: $badgesRepository)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .font(.callout.monospaced())
-                        .onSubmit { Task { await model.shareBadges(soon: true) } }
-                    LabeledContent("Status") {
-                        BadgeShareStatus(state: model.badgeShareState, verb: "Read")
-                    }
-                } header: {
-                    Text("Badges")
-                } footer: {
-                    Text("The private repository your Mac publishes its badges to (Settings › Affiliations there). They are read from it at each sync, the ones set by hand included; the token above must be able to read it. Without one, badges are only what you set by hand here.")
-                }
 
                 BotHookSection(fallback: "With one set, sends go out from here.")
-
-                Section("About") {
-                    VersionRow()
-                }
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
