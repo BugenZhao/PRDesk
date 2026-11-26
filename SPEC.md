@@ -788,8 +788,10 @@ lines or one (•••, two by default):
 **Detail.** As §6, with Status and Priority as segmented controls (one touch; Triage and – clear)
 where the pane is wide enough for both on one row, and as two menus on that row where it isn't (a
 phone), each a glass capsule saying what is set,
-the checks in a popover from the CI status, and a round glass button for the pin. GitHub (↗) and
-the rest (•••) are in the pane's bar: the row menu, rename, refresh,
+the checks in a popover from the CI status, and a round glass button for the pin. In the pane's
+bar, one capsule holds where else the item is: its agent session (`terminal`, where the board has
+one; the newest, with a menu of them all when there are several, §3.3) and GitHub (↗, the symbol
+Open on GitHub has in the menus too). The rest (•••) is beside it: the row menu, rename, refresh,
 back to the previous item, and the conversation's Show Automated / Expand All / Collapse All. In
 Commits a tap picks one commit (again for the preset) and a row's menu extends the selection to it.
 A diff's options (Wrap Lines, Expand All, Collapse All) are behind ••• at the end of its bar, which
@@ -807,12 +809,17 @@ The page gets the whole pane:
   author (picture, name, marks of trust), Draft and the size. No number and no CI status there. Touching it scrolls back to the top. The header's stack, labels, dates and
   the board's Comment also fold away under a chevron
 - Pulled past its top the page gives as any scroll view does, and the header goes down with it
-- The composer is folded into a round glass button over the conversation's corner, which grows
-  the word Draft when one waits. Open, it is one card of glass floating over the page's foot,
+- The composer is folded into a button of the system's bar at the pane's foot (in every tab; it
+  goes to the conversation), which grows the word Draft when one waits. Open, the bar is hidden and
+  it is one card of glass floating over the page's foot,
   above the keyboard: the text lies on the card, and under it are the system's own glass buttons
   with the labels the system gives them (⌄ to fold it, preview and ••• as circles of one size,
   Approve, and Comment as the prominent one), all of one height. Sending folds it too. Scrolling
-  the page puts the keyboard away
+  the page puts the keyboard away. Where the keyboard leaves no room for the header and the
+  composer both (an iPad mini on its side, a phone), the header moves up out of the way, the page
+  with it, and the bar's title names the item
+- In the pages a tap does what a click does on the Mac: folds a card, opens a file's diff, marks
+  it viewed, reacts
 - The page runs to the window's foot, under the home indicator, with room left under its end
 
 **Text.** Secondary and tertiary text (authors, events, ages, a card's "commented 6d ago") are

@@ -5,8 +5,8 @@ import SwiftUI
 /// shows the model's selection, and its pages belong to the desk, so a layout change keeps them.
 ///
 /// The page gets the whole pane: the header lies over its top and scrolls away with it, under
-/// the bar, whose title then names the item; the composer stays folded into a button until asked
-/// for.
+/// the bar, whose title then names the item; the composer stays folded into a button in the bar
+/// at the pane's foot until asked for.
 struct DetailPane: View {
     @Environment(AppModel.self) private var model
     let pages: DetailPages
@@ -18,6 +18,8 @@ struct DetailPane: View {
     /// The composer is open over the conversation's foot, and how tall it is.
     @State private var isComposing = false
     @State private var composerHeight: CGFloat = 0
+    /// The pane's height between the bars, and the keyboard when it is up.
+    @State private var paneHeight: CGFloat = 0
     @State private var renameText: String?
 
     typealias Tab = AppModel.DetailTab
@@ -47,8 +49,10 @@ struct DetailPane: View {
                                 headerHeight = $0
                                 scrolls.setHeader(height: $0)
                             }
-                            // It goes with the page showing, up and away or down when pulled.
-                            .offset(y: -min(scroll.offset, 3000))
+                            // It goes with the page showing, up and away or down when pulled,
+                            // and out of the composer's way.
+                            .offset(y: -min(max(scroll.offset, headerLift), 3000))
+                            .animation(.snappy(duration: 0.25), value: headerLift)
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                         .clipped()
@@ -58,12 +62,19 @@ struct DetailPane: View {
                         isComposing = false
                     }
                     // Asked for by key (c): the composer opens, in the conversation.
-                    .onChange(of: model.composerFocusRequest) {
-                        guard !isComposing else { return }
-                        if item.kind == .pullRequest { model.detailTab = .conversation }
-                        withAnimation(.snappy(duration: 0.25)) { isComposing = true }
-                    }
+                    .onChange(of: model.composerFocusRequest) { compose(item) }
                     .toolbar { toolbar(item) }
+                    .toolbarVisibility(isComposing ? .hidden : .automatic, for: .bottomBar)
+                    // The page goes up with the header where it can, so the room the header
+                    // leaves shows the conversation rather than the page's empty top.
+                    .onChange(of: headerLift) { _, lift in
+                        let scrollView = pages.timeline.webView.scrollView
+                        let end = scrollView.contentSize.height - scrollView.bounds.height
+                        let target = min(lift, end)
+                        if scrollView.contentOffset.y < target {
+                            scrollView.setContentOffset(CGPoint(x: 0, y: target), animated: true)
+                        }
+                    }
                     .alert("Rename", isPresented: Binding(get: { renameText != nil }, set: { if !$0 { renameText = nil } })) {
                         TextField("Title", text: Binding(get: { renameText ?? "" }, set: { renameText = $0 }))
                         Button("Rename") {
@@ -78,22 +89,41 @@ struct DetailPane: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onGeometryChange(for: EdgeInsets.self) { $0.safeAreaInsets } action: { bars = $0 }
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { paneHeight = $0 }
         .navigationBarTitleDisplayMode(.inline)
     }
 
+    /// How far the header moves up for the composer: all of itself where the pane, with the
+    /// keyboard up, has no room for both (an iPad mini on its side), or the field being typed in
+    /// would lie under it.
+    private var headerLift: CGFloat {
+        isComposing && paneHeight - headerHeight < composerHeight + 60 ? headerHeight : 0
+    }
+
+    /// Opens the composer, in the conversation.
+    private func compose(_ item: Item) {
+        guard !isComposing else { return }
+        if item.kind == .pullRequest { model.detailTab = .conversation }
+        withAnimation(.snappy(duration: 0.25)) { isComposing = true }
+    }
+
     /// In the pane's bar: the item in two lines once the header's title has scrolled under the
-    /// bar, the item on GitHub, and everything else about it.
+    /// bar, the item elsewhere (its agent session, GitHub), and everything else about it. In the
+    /// bar at the pane's foot, the composer's button while it is folded away.
     @ToolbarContentBuilder
     private func toolbar(_ item: Item) -> some ToolbarContent {
         // In the title's own place, which the system keeps between the bar's buttons.
         ToolbarItem(placement: .title) {
             ActivePage(scrolls: scrolls, item: item) { scroll in
-                BarTitle(item: item, isShown: scroll.isChromeAway) { scrollToTop(item) }
+                BarTitle(item: item, isShown: scroll.isChromeAway || headerLift > 0) { scrollToTop(item) }
             }
         }
-        ToolbarItem(placement: .topBarTrailing) {
+        // One capsule for where else the item is; the menu in one of its own.
+        ToolbarItemGroup(placement: .topBarTrailing) {
+            SessionButton(item: item)
             Button("Open on GitHub", systemImage: "arrow.up.right") { model.perform(.openInBrowser, on: item.id) }
         }
+        ToolbarSpacer(.fixed, placement: .topBarTrailing)
         ToolbarItem(placement: .topBarTrailing) {
             Menu("More", systemImage: "ellipsis") {
                 ItemMenu(item: item, model: model)
@@ -110,6 +140,12 @@ struct DetailPane: View {
                     Button("Collapse All", systemImage: "rectangle.compress.vertical") { pages.timeline.run("PRDesk.setAllCards(false)") }
                 }
             }
+        }
+        // Always there, and the bar hidden while the composer is open: taking the item out as
+        // the keyboard came up left the pane laid out a hundred points too high.
+        ToolbarSpacer(.flexible, placement: .bottomBar)
+        ToolbarItem(placement: .bottomBar) {
+            ComposeButton(item: item) { compose(item) }
         }
     }
 
@@ -147,20 +183,10 @@ struct DetailPane: View {
         }
     }
 
-    /// The conversation, with the composer over its foot: folded into a button over the corner,
-    /// or open, which the page leaves room under its end for.
+    /// The conversation, with the composer over its foot when open, which the page leaves room
+    /// under its end for.
     private func conversation(_ item: Item, _ detail: ItemDetail) -> some View {
         Conversation(item: item, detail: detail, page: pages.timeline, showAutomated: showAutomated)
-            .overlay(alignment: .bottomTrailing) {
-                if !isComposing {
-                    ComposeButton(hasDraft: !model.draft(for: item.id).isEmpty) {
-                        withAnimation(.snappy(duration: 0.25)) { isComposing = true }
-                    }
-                    .padding(.trailing, 16)
-                    .padding(.bottom, 12)
-                    .transition(.scale(scale: 0.6).combined(with: .opacity))
-                }
-            }
             .overlay(alignment: .bottom) {
                 if isComposing {
                     composer(item, detail)
@@ -175,9 +201,10 @@ struct DetailPane: View {
             }
     }
 
-    /// Room under the last comment for what lies over the page's foot.
+    /// Room under the last comment for the composer over the page's foot (the bar there is the
+    /// system's, which the page keeps clear of already).
     private func setBottomRoom() {
-        scrolls.conversation.bottomRoom = isComposing ? composerHeight + 12 : ComposeButton.size + 8
+        scrolls.conversation.bottomRoom = isComposing ? composerHeight + 12 : 0
     }
 
     /// The composer, open: the Mac's, on one card of glass floating over the page (and over the
@@ -350,6 +377,16 @@ private struct DetailPager<Conversation: View>: View {
         .onChange(of: position.viewID(type: AppModel.DetailTab.self)) { _, tab in
             if let tab, tab != model.detailTab { model.detailTab = tab }
         }
+        // Come to rest, the page showing is the tab, whatever was asked for: a touch that stops
+        // a slide half way leaves the position naming the page it was sliding to.
+        .onScrollPhaseChange { _, phase, context in
+            let width = context.geometry.containerSize.width
+            guard phase == .idle, width > 0 else { return }
+            let tabs: [AppModel.DetailTab] = [.conversation, .commits, .files]
+            let index = Int((context.geometry.contentOffset.x / width).rounded())
+            let tab = tabs[min(max(index, 0), tabs.count - 1)]
+            if tab != model.detailTab { model.detailTab = tab }
+        }
     }
 
     private func page(_ tab: AppModel.DetailTab, @ViewBuilder _ content: () -> some View) -> some View {
@@ -371,29 +408,48 @@ private struct DetailPager<Conversation: View>: View {
     }
 }
 
-/// The composer, folded away: a round glass button over the conversation's corner, which grows
-/// a word when a draft waits behind it.
+/// The composer, folded away: a button in the bar at the pane's foot, which grows a word when a
+/// draft waits behind it. A view of its own, so a draft being typed redraws only this.
 private struct ComposeButton: View {
-    let hasDraft: Bool
+    @Environment(AppModel.self) private var model
+    let item: Item
     let action: () -> Void
 
-    static let size: CGFloat = 48
+    var body: some View {
+        if model.draft(for: item.id).isEmpty {
+            Button("Comment or Review", systemImage: "square.and.pencil", action: action)
+        } else {
+            Button(action: action) {
+                Label("Draft", systemImage: "square.and.pencil").labelStyle(.titleAndIcon)
+            }
+            .accessibilityLabel("Continue Draft")
+        }
+    }
+}
+
+/// Opens the agent sessions written to the board's Session field: the latest one, or any of them
+/// from a menu when there are several (as the Mac's button).
+private struct SessionButton: View {
+    @Environment(AppModel.self) private var model
+    let item: Item
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                Image(systemName: "square.and.pencil")
-                if hasDraft { Text("Draft") }
+        let links = model.board(for: item)?.sessionLinks ?? []
+        if links.count == 1 {
+            Button("Open \(AgentSession.agentName(for: links[0])) Session", systemImage: "terminal") {
+                AgentSession.open(links[0])
             }
-            .font(.system(size: 18, weight: .medium))
-            .padding(.horizontal, hasDraft ? 16 : 0)
-            .frame(minWidth: Self.size)
-            .frame(height: Self.size)
-            .contentShape(Capsule())
-            .glassEffect(.regular.interactive(), in: .capsule)
+        } else if let latest = links.last {
+            Menu("Open Agent Session", systemImage: "terminal") {
+                ForEach(Array(links.enumerated().reversed()), id: \.offset) { index, link in
+                    Button("\(AgentSession.agentName(for: link)) session \(index + 1)\(index == links.count - 1 ? " (latest)" : "")") {
+                        AgentSession.open(link)
+                    }
+                }
+            } primaryAction: {
+                AgentSession.open(latest)
+            }
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(hasDraft ? "Continue Draft" : "Comment or Review")
     }
 }
 

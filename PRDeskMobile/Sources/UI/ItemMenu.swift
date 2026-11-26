@@ -16,7 +16,7 @@ struct ItemMenu: View {
         let board = model.board(for: item)
         let isUnread = model.isUnread(item)
 
-        Button("Open on GitHub", systemImage: "safari") { model.perform(.openInBrowser, on: item.id) }
+        Button("Open on GitHub", systemImage: "arrow.up.right") { model.perform(.openInBrowser, on: item.id) }
         Button("Copy Link", systemImage: "link") { model.perform(.copyLink, on: item.id) }
         Button(isUnread ? "Mark as Read" : "Mark as Unread", systemImage: isUnread ? "envelope.open" : "envelope.badge") {
             model.perform(.toggleRead, on: item.id)

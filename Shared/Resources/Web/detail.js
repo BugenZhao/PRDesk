@@ -602,7 +602,10 @@ const PRDesk = (() => {
     post({ type: "openItem", repo: target.repo, number: Number(target.number) });
   }
 
-  addEventListener("click", (event) => {
+  // On the document, not the window: under a finger WebKit sends a click only to what it takes
+  // for clickable, which is what has a click listener itself or, when the document has one, a
+  // pointer cursor (the stylesheet gives the page's own controls one on iOS).
+  document.addEventListener("click", (event) => {
     if (event.button !== 0) return;
     const link = event.target.closest("a[href]");
     if (link) {

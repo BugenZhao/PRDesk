@@ -267,6 +267,20 @@ are used off the main actor); no glass on content (cards, chips, rows).
   (`foregroundStyle(_:_:_:)`) didn't reach a `Text` styled itself: tags came out as iOS's
   tertiary, the latest event (tertiary in a secondary line) as its quaternary. Check a gray by
   its pixels in a simulator screenshot (60% black on white is 102).
+- In a web page under a finger, WebKit sends a click only to what it takes for clickable: a
+  link, a button, an element with a click listener of its own, or, when the *document* has a
+  click listener, an element with `cursor: pointer`. A listener on the window (a bare
+  `addEventListener`) counts for nothing: touch and pointer events arrived and no click did, so
+  cards didn't fold and files didn't open on the iPad. `detail.js` listens on `document`, and
+  `detail.css` gives the page's own controls a pointer cursor on iOS; give a new tappable
+  element one too.
+- A bottom-bar item taken out of `.toolbar` in the same change that brings the keyboard up left
+  the detail pane laid out about a hundred points too high (header over the bar, composer under
+  the keyboard). The composer's button stays in the toolbar and the bar is hidden with
+  `toolbarVisibility` instead.
+- A touch on the detail's pager while it slides to a tab stops it at the nearest page with the
+  `ScrollPosition` still naming the tab asked for: once the scroll is idle, the tab is set from
+  the offset (`onScrollPhaseChange`).
 - Views in a `ScrollView` can't reach under the bars with `ignoresSafeArea`, and a
   `safeAreaInset` on the scroll view pushes its content down. The detail's pager (`DetailPager`)
   gives each page negative padding to the window's edges and `safeAreaPadding` back, and the
