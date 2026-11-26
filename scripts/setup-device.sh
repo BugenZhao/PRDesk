@@ -26,7 +26,8 @@ if [[ "${2:-}" != "--secrets-only" ]]; then
   xcodebuild -workspace PRDesk.xcworkspace -scheme PRDeskMobile -configuration Release \
     -derivedDataPath "$DD" -destination "$DESTINATION" \
     -allowProvisioningUpdates -allowProvisioningDeviceRegistration \
-    CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM="$TEAM" build \
+    CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM="$TEAM" \
+    PRDESK_COMMIT="$(git rev-parse --short=7 HEAD)$(git diff --quiet HEAD -- || echo +)" build \
     | grep -E 'warning:|error:|BUILD (SUCCEEDED|FAILED)' | grep -v appintents | sort -u
   xcrun devicectl device install app --device "$DEVICE" "$DD/Build/Products/Release-iphoneos/PRDeskMobile.app" | tail -2
 fi

@@ -106,6 +106,10 @@ private struct TokenSettingsView: View {
                 Text("The unread inbox count, with a menu of the items you are working on.")
                     .foregroundStyle(.secondary)
             }
+
+            Section("About") {
+                VersionRow()
+            }
         }
         .settingsPage()
         .task { hasSavedToken = Keychain.readToken() != nil }

@@ -89,6 +89,10 @@ struct SettingsView: View {
                 }
 
                 BotHookSection(fallback: "With one set, sends go out from here.")
+
+                Section("About") {
+                    VersionRow()
+                }
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)

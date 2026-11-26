@@ -748,6 +748,11 @@ device attached to it: it builds and installs the app and sends the Mac's token,
 and repository in one file, which the app takes into its Keychain and preferences when it next
 starts, and deletes.
 
+**Versions.** The Mac, the iPad and the iPhone are each installed on their own, so Settings ›
+About says which commit a copy was built from and how many commits the repository's `main` is
+ahead of it ("7d0a972 · 26 commits behind main"), on the Mac too. A note, with no warning: a
+copy some commits behind is as good as it was.
+
 **While it is open.** The app syncs on its timer while it is open, and when the list is pulled or
 ⌘R asks. It doesn't sync in the background and sends no notifications, so the unread count is on
 the Inbox's symbol in the app, not on the app's icon (which takes the permission to notify).

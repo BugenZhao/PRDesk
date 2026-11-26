@@ -28,6 +28,8 @@ let project = Project(
                     "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": "",
                     "MARKETING_VERSION": "0.1",
                     "CURRENT_PROJECT_VERSION": "1",
+                    // The commit an install is built from (`AppVersion`), set by the install scripts.
+                    "PRDESK_COMMIT": "",
                     // Local-only app: sign to run locally, no sandbox (needs to run `gh`).
                     "CODE_SIGN_IDENTITY": "-",
                     "CODE_SIGN_STYLE": "Manual",
@@ -62,6 +64,7 @@ let project = Project(
                 "LSApplicationQueriesSchemes": ["grokbot"],
                 // Handoff of the item being looked at (`ItemHandoff`), as in the Mac's Info.plist.
                 "NSUserActivityTypes": ["com.bugenzhao.PRDesk.item"],
+                "PRDeskCommit": "$(PRDESK_COMMIT)",
             ]),
             sources: ["PRDeskMobile/Sources/**", "Shared/Sources/**"],
             resources: ["Shared/Resources/AppIcon.icon", "Shared/Resources/Assets.xcassets", "Shared/Resources/Web/**"],
@@ -75,6 +78,8 @@ let project = Project(
                     "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": "",
                     "MARKETING_VERSION": "0.1",
                     "CURRENT_PROJECT_VERSION": "1",
+                    // The commit an install is built from (`AppVersion`), set by the install scripts.
+                    "PRDESK_COMMIT": "",
                 ]
             )
         ),

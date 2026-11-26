@@ -13,9 +13,11 @@ team=$(security find-certificate -c "Apple Development" -p 2>/dev/null \
 [[ -n "$team" ]] && security find-identity -p codesigning -v | grep -q "Apple Development" || team=""
 
 tuist generate --no-open >/dev/null
+# What Settings shows as the version: the commit, with a + for changes not committed.
+commit="$(git rev-parse --short=7 HEAD)$(git diff --quiet HEAD -- || echo +)"
 build() {
   xcodebuild -workspace PRDesk.xcworkspace -scheme PRDesk -configuration Release \
-    -derivedDataPath .build/DerivedData -destination 'platform=macOS' "$@" build -quiet
+    -derivedDataPath .build/DerivedData -destination 'platform=macOS' PRDESK_COMMIT="$commit" "$@" build -quiet
 }
 if [[ -z "$team" ]]; then
   build

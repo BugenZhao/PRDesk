@@ -21,6 +21,14 @@ which Xcode makes with the account in its settings; without either it signs as b
 so. Test copies stay ad hoc, and must not take that entitlements file: without a profile macOS
 won't start an app that has them.
 
+The iPad and iPhone are installed apart, with `scripts/install-devices.sh`: one Release build,
+installed on every paired device in reach (by cable, or over the network at home; an office's
+Wi-Fi usually keeps devices apart), the others named and left. Not after every change, which
+would stop the app in the user's hand all day: when pushing, or when asked. A new device is set
+up once with `setup-device.sh` (below). Every install is stamped with its commit
+(`PRDESK_COMMIT` → `AppVersion`), which Settings shows with how far `main` has moved on since, as
+a note: that is how to tell which device has what.
+
 Debug builds accept `-PRDeskAppearance dark|light` to force an appearance, `-PRDeskNoSync YES`
 to skip syncing on their own (no searches, board, inbox or prefetched details; only what is opened,
 and ⌘R), and
