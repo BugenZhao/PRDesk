@@ -823,8 +823,8 @@ The page gets the whole pane:
 - The page runs to the window's foot, under the home indicator, with room left under its end
 
 **Text.** Secondary and tertiary text (authors, events, ages, a card's "commented 6d ago") are
-set a little darker than iOS's own label colors, in the list and in the pages, to read as they do
-on the Mac. The pages' text is the size of the list's titles (their 13 px base a size
+the Mac's grays (50% and 26% black, 55% and 25% white in dark mode), a little darker than iOS's
+own label colors, in the list and in the pages. The pages' text is the size of the list's titles (their 13 px base a size
 up) and follows the viewer's text size (Dynamic Type) as the rest of the app does, while it is
 running too.
 

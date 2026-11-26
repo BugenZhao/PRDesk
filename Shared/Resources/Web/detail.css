@@ -18,11 +18,11 @@ body { font: 13px -apple-system, system-ui, sans-serif; color: var(--label); -we
    size up instead. The app then sets the zoom itself, by the device and the viewer's text size
    (`PRDesk.setTextScale`); this is what shows until it has. */
 html[data-platform="phone"] { -webkit-text-size-adjust: 100%; zoom: 1.2; }
-/* Secondary and tertiary text as strong as they read on the Mac: iOS's own label colors are a
-   shade lighter and its text isn't smoothed heavier (the same values as `Color.secondaryText`). */
-html[data-platform="phone"] { --secondary: rgba(0, 0, 0, .6); --tertiary: rgba(0, 0, 0, .38); }
+/* Secondary and tertiary text in the Mac's grays: iOS's own label colors are a shade lighter
+   (the same values as `Color.secondaryText`). */
+html[data-platform="phone"] { --secondary: rgba(0, 0, 0, .5); --tertiary: rgba(0, 0, 0, .26); }
 @media (prefers-color-scheme: dark) {
-  html[data-platform="phone"] { --secondary: rgba(255, 255, 255, .72); --tertiary: rgba(255, 255, 255, .42); }
+  html[data-platform="phone"] { --secondary: rgba(255, 255, 255, .55); --tertiary: rgba(255, 255, 255, .25); }
 }
 /* Holding a person or a file's header asks for the app's menu, not the system's callout. */
 html[data-platform="phone"] [data-login], html[data-platform="phone"] .fhead { -webkit-touch-callout: none; -webkit-user-select: none; }

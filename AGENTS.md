@@ -261,12 +261,13 @@ are used off the main actor); no glass on content (cards, chips, rows).
 - A foreground style set around a view takes over the labels of the buttons and menus inside it
   (a prominent button's white comes out black, a bar's `Menu` all but vanishes).
 - Gray text and symbols in a view an iPad shows take `.secondaryText` / `.tertiaryText`
-  (`PlatformColors`: the hierarchical styles on the Mac, colors of our own on iOS, in
-  `detail.css` too), never `.secondary` / `.tertiary`. iOS's grays are lighter than the Mac's
-  and its text isn't smoothed heavier, and setting darker ones around a view
+  (`PlatformColors`: the hierarchical styles on the Mac, the Mac's values as colors on iOS, in
+  `detail.css` too; the user chose the Mac's own values over darker ones that made up for the
+  Mac's heavier text smoothing), never `.secondary` / `.tertiary`. iOS's grays are lighter than
+  the Mac's, and setting darker ones around a view
   (`foregroundStyle(_:_:_:)`) didn't reach a `Text` styled itself: tags came out as iOS's
   tertiary, the latest event (tertiary in a secondary line) as its quaternary. Check a gray by
-  its pixels in a simulator screenshot (60% black on white is 102).
+  its pixels in a simulator screenshot (50% black on white is 128, 26% is 189).
 - In a web page under a finger, WebKit sends a click only to what it takes for clickable: a
   link, a button, an element with a click listener of its own, or, when the *document* has a
   click listener, an element with `cursor: pointer`. A listener on the window (a bare
