@@ -732,15 +732,17 @@ one out, with its own button, edge swipe and animation), the list its sidebar:
   when the system has stopped the app meanwhile), although the system puts sidebars away by
   itself at such times. In a compact window (a phone) the split view is one column:
   the list is a page, and a row pushes its detail over it
-- **Full-Width List** (in the list's •••, ⇧⌘B) is a third state on an iPad, for reading the list
+- **Full-Width List** (⤢ in the bar over the list, ⇧⌘B) is a third state on an iPad, for reading the list
   with room for every column: the split view is told its width is compact, so it is the system's
   own one column, the list the whole window wide; a row pushes its detail over it, with the way
   back. Kept for wide and for narrower windows apart; turning it off brings the sidebar back.
   Rows of one line or two is a choice of its own (••• too), the same for the table and the sidebar
 - The list keeps the desk's own white ground as a sidebar, not a sidebar's tint: the rows' colors
   say things
-- The bar over the list holds only the lists (the segments are the glass, with none behind
-  them) and ◧; at its foot are the sync status button, the filter and ••• (rows, sorting, Settings)
+- The bar over the list holds the lists (the segments are the glass, with none behind them), ⤢,
+  the filter and ◧. As a sidebar it is short of room, and the lists are symbols there
+  (▤ Dashboard, = Parity, 🔔 Inbox); at full width and on a phone they are named. What waits in
+  Parity and the Inbox is a red badge on the label's corner either way; at its foot are the sync status button, the filter and ••• (rows, sorting, Settings)
 - Going from one to the other keeps the selection, the detail's tab, its pages (scroll position,
   loaded diffs) and a comment being written. Nothing remembers which layout came before
 

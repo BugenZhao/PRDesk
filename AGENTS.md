@@ -214,6 +214,11 @@ are used off the main actor); no glass on content (cards, chips, rows).
   by rules of its own, and CSS `zoom` on the root then moved the boxes and left the text at
   13 px. The zoom is set from Swift (`PRDesk.setTextScale`: 1.2 times the Dynamic Type factor).
   `@ScaledMetric` of 1 comes back rounded to 1 at every size; scale 100 and divide.
+- A segmented `Picker`'s segment is text or an image, never both (`Text` with an interpolated
+  `Image` shows the text alone), and it takes no badge. `ListSwitcher` overlays its badges: the
+  segments are of one width, so a hidden copy of each label in a third of the control gives the
+  badge the label's corner. Alignment guides set on the badge inside the overlay did nothing;
+  it hangs from a zero-size anchor instead.
 - Liquid Glass (read `SwiftUI-Implementing-Liquid-Glass-Design.md` first; the exported skills
   don't cover it): buttons are the system's glass ones (`.buttonStyle(.glass)`, `.glassProminent`
   for the one that matters) with the labels the system gives them, which are the label color,

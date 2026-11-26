@@ -217,15 +217,21 @@ struct DeskView: View {
         @Bindable var model = model
         // The segments are glass themselves: no second sheet of it behind them.
         ToolbarItem(placement: .topBarLeading) {
-            Picker("View", selection: $model.mode) {
-                Text("Dashboard").tag(AppModel.ListMode.dashboard)
-                Text(model.parityWaitingCount == 0 ? "Parity" : "Parity \(model.parityWaitingCount)").tag(AppModel.ListMode.parity)
-                Text(model.unreadInboxCount == 0 ? "Inbox" : "Inbox \(model.unreadInboxCount)").tag(AppModel.ListMode.inbox)
-            }
-            .pickerStyle(.segmented)
-            .fixedSize()
+            ListSwitcher(isBrief: !layout.isListPage)
         }
         .sharedBackgroundVisibility(.hidden)
+        // The list the whole window wide, or back beside the detail: where the window isn't one
+        // column already. A button of its own, beside the filter's.
+        if !layout.isCompact {
+            ToolbarSpacer(.fixed, placement: .topBarTrailing)
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(
+                    layout.isTable ? "List Beside the Detail" : "Full-Width List",
+                    systemImage: layout.isTable ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right"
+                ) { setTable(!layout.isTable, layout) }
+            }
+            ToolbarSpacer(.fixed, placement: .topBarTrailing)
+        }
         ToolbarItem(placement: .bottomBar) { SyncStatusButton() }
         ToolbarSpacer(.flexible, placement: .bottomBar)
         DefaultToolbarItem(kind: .search, placement: .bottomBar)
@@ -233,11 +239,71 @@ struct DeskView: View {
         ToolbarItem(placement: .bottomBar) {
             DeskMenu(
                 rowLines: $rowLines, canChooseLines: layout.density.canUseOneLine,
-                // Offered where the window isn't one column already.
-                isTable: layout.isCompact ? nil : Binding(get: { layout.isTable }, set: { setTable($0, layout) }),
                 showsSettings: $showsSettings
             )
         }
+    }
+}
+
+/// Which list shows: Dashboard, Parity or Inbox, as segments. By name where there is room, by
+/// symbol where the list is a sidebar and the bar is short of it. What waits in Parity and the
+/// Inbox is a badge on its segment's corner.
+private struct ListSwitcher: View {
+    @Environment(AppModel.self) private var model
+    let isBrief: Bool
+
+    var body: some View {
+        @Bindable var model = model
+        Picker("View", selection: $model.mode) {
+            segment("Dashboard", symbol: "rectangle.grid.1x2").tag(AppModel.ListMode.dashboard)
+            segment("Parity", symbol: "equal").tag(AppModel.ListMode.parity)
+            segment("Inbox", symbol: "bell").tag(AppModel.ListMode.inbox)
+        }
+        .pickerStyle(.segmented)
+        .fixedSize()
+        // The segments are of one width, so each label is in the middle of a third of the
+        // control: a hidden copy of it there gives the badge the label's corner to sit on.
+        .overlay {
+            HStack(spacing: 0) {
+                badge(0, on: "Dashboard", symbol: "rectangle.grid.1x2")
+                badge(model.parityWaitingCount, on: "Parity", symbol: "equal")
+                badge(model.unreadInboxCount, on: "Inbox", symbol: "bell")
+            }
+            .allowsHitTesting(false)
+        }
+    }
+
+    @ViewBuilder
+    private func segment(_ name: String, symbol: String) -> some View {
+        if isBrief {
+            Image(systemName: symbol).accessibilityLabel(name)
+        } else {
+            Text(name)
+        }
+    }
+
+    private func badge(_ count: Int, on name: String, symbol: String) -> some View {
+        segment(name, symbol: symbol)
+            .font(.subheadline.weight(.medium))
+            .hidden()
+            // From the label's upper trailing corner outwards, a little over it.
+            .overlay(alignment: .topTrailing) {
+                Color.clear.frame(width: 0, height: 0).overlay(alignment: .bottomLeading) {
+                    if count > 0 {
+                        Text(count > 99 ? "99+" : String(count))
+                            .font(.system(size: 10.5, weight: .semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 4.5)
+                            .frame(minWidth: 16, minHeight: 16)
+                            .background(.red, in: .capsule)
+                            .fixedSize()
+                            .offset(x: -3, y: 6)
+                            .accessibilityLabel("\(count) waiting")
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -266,8 +332,6 @@ private struct DeskMenu: View {
     @Binding var rowLines: RowLines
     /// The list is wide enough for rows of one line; a phone's never is, and isn't offered them.
     let canChooseLines: Bool
-    /// The list as a table the whole window wide; nil where there is no such choice (a phone).
-    let isTable: Binding<Bool>?
     @Binding var showsSettings: Bool
 
     private static let keys: [(ItemSort.Key, String)] = [
@@ -278,9 +342,6 @@ private struct DeskMenu: View {
     var body: some View {
         @Bindable var model = model
         Menu("More", systemImage: "ellipsis") {
-            if let isTable {
-                Toggle("Full-Width List", systemImage: "tablecells", isOn: isTable)
-            }
             if canChooseLines {
                 Picker("Rows", selection: $rowLines) {
                     Label("Two Lines", systemImage: "rectangle.grid.1x2").tag(RowLines.two)
