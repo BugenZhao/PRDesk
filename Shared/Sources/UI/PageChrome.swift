@@ -27,28 +27,53 @@ extension View {
     /// How far the page in a pane has scrolled from its top, which the pane's web view reports
     /// (`WebDocumentView`), and how tall the chrome laid over the page's top is: the web view
     /// starts the page below it, and the chrome follows the page up as it scrolls.
+    ///
+    /// The web view reports from inside its own layout at times, and UIKit takes whatever
+    /// observed state a view reads during its layout as a reason to lay it out again when that
+    /// state changes: a web view laid out at every step of a scroll loses its overscroll (the
+    /// layout puts the offset back in bounds). So `report` and `setChrome` read only the
+    /// unobserved copies kept here, and write the observed properties.
     @MainActor
     @Observable
     final class PageScroll {
-        var offset: CGFloat = 0
-        /// The web view host reporting, so one that goes away doesn't reset what its successor set.
-        @ObservationIgnored var source: ObjectIdentifier?
-
+        private(set) var offset: CGFloat = 0
         /// All the chrome over the page, top to bottom.
         private(set) var chromeHeight: CGFloat = 0
+        /// The chrome has left with the page: something else has to say what the page is. Set
+        /// only when it flips, so a view reading it isn't redrawn at every step of a scroll.
+        private(set) var isChromeAway = false
+        /// Room to leave under the page's end, for what floats over the pane's foot.
+        var bottomRoom: CGFloat = 0
+
+        /// The web view host reporting, so one that goes away doesn't reset what its successor set.
+        @ObservationIgnored var source: ObjectIdentifier?
         @ObservationIgnored private var heights: [UUID: CGFloat] = [:]
+        /// What the observed properties hold, to read without being observed.
+        @ObservationIgnored private var current = (offset: CGFloat(0), chromeHeight: CGFloat(0), isChromeAway: false)
+
+        /// The page's offset from its top; negative while it is pulled past it.
+        func report(offset: CGFloat) {
+            guard abs(current.offset - offset) > 0.2 else { return }
+            current.offset = offset
+            self.offset = offset
+            updateAway()
+        }
 
         func setChrome(_ id: UUID, height: CGFloat?) {
             heights[id] = height
             let total = heights.values.reduce(0, +)
-            if abs(total - chromeHeight) > 0.5 { chromeHeight = total }
+            guard abs(total - current.chromeHeight) > 0.5 else { return }
+            current.chromeHeight = total
+            chromeHeight = total
+            updateAway()
         }
 
-        /// Room to leave under the page's end, for what floats over the pane's foot.
-        var bottomRoom: CGFloat = 0
-
-        /// The chrome has left with the page: something else has to say what the page is.
-        var isChromeAway: Bool { chromeHeight > 0 && offset > chromeHeight - 24 }
+        private func updateAway() {
+            let away = current.chromeHeight > 0 && current.offset > current.chromeHeight - 24
+            guard away != current.isChromeAway else { return }
+            current.isChromeAway = away
+            isChromeAway = away
+        }
     }
 
     extension View {
@@ -68,8 +93,9 @@ extension View {
                 .background(Color(uiColor: .systemBackground))
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { scroll?.setChrome(id, height: $0) }
                 .onDisappear { scroll?.setChrome(id, height: nil) }
-                // Not past its own height by much: an offset in the thousands buys nothing.
-                .offset(y: -min(max(scroll?.offset ?? 0, 0), 3000))
+                // With the page both ways: up and away, and down when the page is pulled past its
+                // top. Not past its own height by much: an offset in the thousands buys nothing.
+                .offset(y: -min(scroll?.offset ?? 0, 3000))
         }
     }
 #endif

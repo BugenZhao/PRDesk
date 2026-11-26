@@ -714,24 +714,28 @@ own database and its own token (a PAT in Settings, in the Keychain; there is no 
 rotation, multitasking and a resized window always land on the layout the new size calls for:
 
 ```
-900 pt and wider, detail shown                       narrower, or detail hidden
-┌ Dashboard | Parity n | Inbox n      ▣ ≡ ⟳ ⚙ 🔍 ┐   ┌ Dashboard | Parity n | Inbox n  ≡ ⟳ ⚙ 🔍 ┐
+900 pt and wider                                     narrower
+┌ ◧ Dashboard | Parity n | Inbox n          🔍 ••• ┐   ┌ Dashboard | Parity n | Inbox n     🔍 ••• ┐
 ├ List (2/5, 400–480 pt) ┬ Detail ───────────────┤   ├ List (the whole width) ─────────────────┤
 │ ▾ Good 5               │ #69856 [RF] Count …   │   │ ▾ Good 5                                │
 │  title            7h   │ author · Open · CI    │   │  title …                           7h   │
 │  author · event  me ✓● │ [Triage Desk …] [HML–]│   │  #n author · event      me ✓ ● +90 −14  │
 │ ▾ Desk 24              │ Conversation|Commits|…│   │ (a row pushes its detail, with the tabs │
-│ 582 items · Synced 12s │ …            composer │   │  in the navigation bar)                 │
+│ 582 items · Synced 12s │ …                   ✎ │   │  in the navigation bar)                 │
 └────────────────────────┴───────────────────────┘   └─────────────────────────────────────────┘
 ```
 
-- An iPad mini on its side is the first; upright, and any iPhone, the second. ▣ (⌘B) hides the
-  detail where it would show, for the list alone at full width
+- An iPad mini on its side is the first; upright, and any iPhone, the second. ◧ (⌘B) puts the
+  list away as a sidebar goes, the detail having the window, and brings it back; asking for the
+  filter by key brings it back too
+- The bar holds little, each thing a glass of its own: ◧, the lists (the segments are the glass,
+  with none behind them), the filter and ••• (rows, sorting, Sync Now, Settings). A phone's bar
+  has no room for the filter, which the system keeps at the window's foot there
 - Going from one to the other keeps the selection, the detail's tab, its pages (scroll position,
   loaded diffs) and a comment being written. Nothing remembers which layout came before
 
 **List.** The Mac's sections, tints, fading, stacks' rails and marks (§4.1–§4.3), in rows of two
-lines or one (≡, two by default):
+lines or one (•••, two by default):
 
 - Two lines: the title with its tags and the age; under it the number, author and marks of trust,
   the latest event (or the board's Comment), then Turn, Review, CI and Size in columns
@@ -739,19 +743,20 @@ lines or one (≡, two by default):
   the title keeps the most room: Author's name under 960 pt (the picture stays), Size under 720,
   the number, the Comment and the latest event under 640, where tags are also shortened
 - Narrower than 450 pt rows are always two lines
-- ≡ also sorts (the same keys as the Mac's columns). Pulling down syncs
+- ••• also sorts (the same keys as the Mac's columns). Pulling down syncs, as does Sync Now there
 - Swiping a row right marks it read / unread (a full swipe) or pins it; swiping left sets the
   Status, Desk nearest the edge, without the one it has. Holding a row opens the Mac's row menu:
   open, copy link, read, Status, Priority, pin, add to Desk, ready / draft, linked PR, agent
   session, author, Grok Bot
-- The filter (§4.4) is the system's search field: in the toolbar on an iPad, a button under the
-  list on an iPhone
+- The filter (§4.4) is the system's search field: a button in the toolbar on an iPad, at the
+  window's foot on an iPhone
 - A capsule of glass over the list's foot shows the write under way as the Mac's status bar does,
   otherwise the item count, the last sync and the quota; on an iPhone only while there is
   something to say
 
 **Detail.** As §6, with Status and Priority as segmented controls (one touch; Triage and – clear),
-the checks in a popover from the CI status, and the rest behind •••: the row menu, rename, refresh,
+the checks in a popover from the CI status, and round glass buttons of one size for the pin,
+GitHub and the rest (•••): the row menu, rename, refresh,
 back to the previous item, and the conversation's Show Automated / Expand All / Collapse All. In
 Commits a tap picks one commit (again for the preset) and a row's menu extends the selection to it.
 
@@ -763,8 +768,9 @@ The page gets the whole pane:
   icon, number and title): in the empty stretch of the toolbar over the pane beside the list,
   under the toolbar when the detail is pushed. Touching it scrolls back to the top. The header's
   stack, labels, dates and the board's Comment also fold away under a chevron
-- The composer is folded into a glass button over the conversation's corner, which says Draft when
-  one waits. It opens the Mac's composer under the conversation with the keyboard up; a handle
+- Pulled past its top the page gives as any scroll view does, and the header goes down with it
+- The composer is folded into a round glass button over the conversation's corner, which grows
+  the word Draft when one waits. It opens the Mac's composer under the conversation with the keyboard up; a handle
   folds it again, as does sending. Scrolling the page puts the keyboard away
 - The page runs to the window's foot, under the home indicator, with room left under its end
 

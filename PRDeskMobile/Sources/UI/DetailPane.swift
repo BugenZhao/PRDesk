@@ -11,6 +11,8 @@ struct DetailPane: View {
     @Environment(AppModel.self) private var model
     let pages: DetailPages
     let isPushed: Bool
+    /// The list is put away: the pane has the window, and the bar over it only the desk's buttons.
+    var isAlone = false
     @AppStorage("showAutomated") private var showAutomated = false
     @State private var scroll = PageScroll()
     /// The composer is open under the conversation.
@@ -20,8 +22,11 @@ struct DetailPane: View {
 
     /// The toolbar's row of buttons, which the bars over the pane end with.
     private static let barHeight: CGFloat = 62
-    /// The window's buttons at the bar's trailing end, which the title's line stops short of.
-    private static let windowButtonsWidth: CGFloat = 270
+    /// The desk's buttons at the bar's trailing end, which the title's line stops short of: the
+    /// filter and the menu, or the menu alone while the list is away.
+    private var trailingButtonsWidth: CGFloat { isAlone ? 64 : 124 }
+    /// The button that brings the list back, at the bar's leading end while the list is away.
+    private static let listButtonWidth: CGFloat = 60
 
     var body: some View {
         Group {
@@ -47,7 +52,8 @@ struct DetailPane: View {
                         // Beside the list the bar over this pane is empty up to the window's
                         // buttons: the line goes there, level with them. Pushed, the bar holds
                         // the way back and the tabs, and the line sits under it.
-                        .padding(.trailing, isPushed ? 0 : Self.windowButtonsWidth)
+                        .padding(.leading, isAlone ? Self.listButtonWidth : 0)
+                        .padding(.trailing, isPushed ? 0 : trailingButtonsWidth)
                         .offset(y: isPushed ? 6 : -(Self.barHeight + CompactTitle.height) / 2)
                     }
                     .onChange(of: item.id) {
@@ -62,7 +68,9 @@ struct DetailPane: View {
                     }
                     .toolbar {
                         if isPushed, item.kind == .pullRequest {
+                            // The segments are glass themselves: no second sheet of it behind.
                             ToolbarItem(placement: .principal) { tabs.frame(maxWidth: 420) }
+                                .sharedBackgroundVisibility(.hidden)
                         }
                     }
             } else {
@@ -107,7 +115,8 @@ struct DetailPane: View {
                                 ComposeButton(hasDraft: !model.draft(for: item.id).isEmpty) {
                                     withAnimation(.snappy(duration: 0.25)) { isComposing = true }
                                 }
-                                .padding(16)
+                                .padding(.trailing, 16)
+                                .padding(.bottom, 12)
                                 .transition(.scale(scale: 0.6).combined(with: .opacity))
                             }
                         }
@@ -117,7 +126,7 @@ struct DetailPane: View {
                     }
                 }
                 // Room under the last comment for the button over the corner.
-                .onChange(of: isComposing, initial: true) { scroll.bottomRoom = isComposing ? 0 : 56 }
+                .onChange(of: isComposing, initial: true) { scroll.bottomRoom = isComposing ? 0 : ComposeButton.size + 8 }
                 .onDisappear { scroll.bottomRoom = 0 }
                 // A comment that went out leaves nothing to keep the composer open for.
                 .onChange(of: detail.entries.count) {
@@ -204,11 +213,13 @@ private struct CompactTitle: View {
     }
 }
 
-/// The composer, folded away: a glass button over the conversation's corner. It says so when a
-/// draft waits behind it.
+/// The composer, folded away: a round glass button over the conversation's corner, which grows
+/// a word when a draft waits behind it.
 private struct ComposeButton: View {
     let hasDraft: Bool
     let action: () -> Void
+
+    static let size: CGFloat = 48
 
     var body: some View {
         Button(action: action) {
@@ -216,13 +227,33 @@ private struct ComposeButton: View {
                 Image(systemName: "square.and.pencil")
                 if hasDraft { Text("Draft") }
             }
-            .font(.body.weight(.medium))
-            .frame(minWidth: 22, minHeight: 26)
+            .font(.system(size: 18, weight: .medium))
+            .padding(.horizontal, hasDraft ? 16 : 0)
+            .frame(minWidth: Self.size)
+            .frame(height: Self.size)
+            .contentShape(Capsule())
+            .glassEffect(.regular.interactive(), in: .capsule)
         }
-        .buttonStyle(.glass)
-        .buttonBorderShape(.capsule)
-        .controlSize(.regular)
+        .buttonStyle(.plain)
         .accessibilityLabel(hasDraft ? "Continue Draft" : "Comment or Review")
+    }
+}
+
+/// The face of a round glass button in the header: one size whatever the symbol, and the same
+/// for a button and a menu.
+private struct RoundGlassIcon: View {
+    let systemName: String
+    var tint: Color = .primary
+
+    static let size: CGFloat = 34
+
+    var body: some View {
+        Image(systemName: systemName)
+            .font(.system(size: 15, weight: .medium))
+            .foregroundStyle(tint)
+            .frame(width: Self.size, height: Self.size)
+            .contentShape(Circle())
+            .glassEffect(.regular.interactive(), in: .circle)
     }
 }
 
@@ -459,19 +490,26 @@ private struct DetailHeader: View {
     }
 
     private func buttons(onBoard: Bool) -> some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 8) {
             if model.detailState == .loading {
-                ProgressView().controlSize(.small).padding(.trailing, 4)
+                ProgressView().controlSize(.small)
             }
             if onBoard {
                 let isPinned = model.board(for: item)?.isPinned == true
-                Button(isPinned ? "Unpin" : "Pin", systemImage: isPinned ? "pin.fill" : "pin") {
+                Button {
                     model.perform(.togglePin, on: item.id)
+                } label: {
+                    RoundGlassIcon(systemName: isPinned ? "pin.fill" : "pin", tint: isPinned ? .orange : .primary)
                 }
-                .foregroundStyle(isPinned ? AnyShapeStyle(.orange) : AnyShapeStyle(.tint))
+                .accessibilityLabel(isPinned ? "Unpin" : "Pin")
             }
-            Button("Open on GitHub", systemImage: "arrow.up.right") { model.perform(.openInBrowser, on: item.id) }
-            Menu("More", systemImage: "ellipsis") {
+            Button {
+                model.perform(.openInBrowser, on: item.id)
+            } label: {
+                RoundGlassIcon(systemName: "arrow.up.right")
+            }
+            .accessibilityLabel("Open on GitHub")
+            Menu {
                 ItemMenu(item: item, model: model)
                 Section {
                     Button("Rename…", systemImage: "pencil") { renameText = item.title }
@@ -485,11 +523,11 @@ private struct DetailHeader: View {
                     Button("Expand All", systemImage: "rectangle.expand.vertical") { pages.timeline.run("PRDesk.setAllCards(true)") }
                     Button("Collapse All", systemImage: "rectangle.compress.vertical") { pages.timeline.run("PRDesk.setAllCards(false)") }
                 }
+            } label: {
+                RoundGlassIcon(systemName: "ellipsis")
             }
+            .accessibilityLabel("More")
         }
-        .labelStyle(.iconOnly)
-        .buttonStyle(.glass)
-        .buttonBorderShape(.circle)
-        .controlSize(.small)
+        .buttonStyle(.plain)
     }
 }

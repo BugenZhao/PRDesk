@@ -66,17 +66,17 @@ private struct WebDocumentHost: UIViewRepresentable {
             }
         }
 
-        /// From the top of the page as laid out, below everything over it.
+        /// From the top of the page as laid out, below everything over it. This runs inside the
+        /// web view's layout at times, so it reads nothing observed (see `PageScroll`).
         func report(_ scrollView: UIScrollView) {
             guard let scroll else { return }
-            let offset = scrollView.contentOffset.y
             scroll.source = ObjectIdentifier(self)
-            if abs(scroll.offset - offset) > 0.2 { scroll.offset = offset }
+            scroll.report(offset: scrollView.contentOffset.y)
         }
 
         func stop() {
             observation = nil
-            if let scroll, scroll.source == ObjectIdentifier(self) { scroll.offset = 0 }
+            if let scroll, scroll.source == ObjectIdentifier(self) { scroll.report(offset: 0) }
         }
     }
 
@@ -132,9 +132,11 @@ final class PageContainer: UIView {
 
     func applyInsets(force: Bool = false) {
         guard let scrollView = subviews.lazy.compactMap({ ($0 as? DocumentWebView)?.scrollView }).first else { return }
-        scrollView.contentInsetAdjustmentBehavior = .never
+        // Set only when they change: this runs at every update of the view.
+        if scrollView.contentInsetAdjustmentBehavior != .never { scrollView.contentInsetAdjustmentBehavior = .never }
         let bars = safeAreaInsets
-        scrollView.verticalScrollIndicatorInsets = UIEdgeInsets(top: bars.top, left: 0, bottom: bars.bottom, right: 0)
+        let indicators = UIEdgeInsets(top: bars.top, left: 0, bottom: bars.bottom, right: 0)
+        if scrollView.verticalScrollIndicatorInsets != indicators { scrollView.verticalScrollIndicatorInsets = indicators }
         guard force || bars != reported else { return }
         reported = bars
         onBarsChange?(bars.top, bars.bottom)

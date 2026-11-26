@@ -9,12 +9,12 @@ import SwiftUI
 struct DeskCommands: Commands {
     let model: AppModel
     /// The same settings as `DeskView`'s.
-    @AppStorage("prefersSplit") private var prefersSplit = true
+    @AppStorage(DeskLayout.showsListKey) private var showsList = true
     @AppStorage(RowLines.key) private var rowLines = RowLines.two
 
     var body: some Commands {
         CommandGroup(after: .toolbar) {
-            Button(prefersSplit ? "Hide Detail" : "Show Detail") { prefersSplit.toggle() }
+            Button(showsList ? "Hide List" : "Show List") { showsList.toggle() }
                 .keyboardShortcut("b")
             Button(rowLines == .two ? "Rows of One Line" : "Rows of Two Lines") {
                 rowLines = rowLines == .two ? .one : .two

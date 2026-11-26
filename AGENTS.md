@@ -165,6 +165,16 @@ are used off the main actor); no glass on content (cards, chips, rows).
 
 ## Gotchas learned here
 
+- On iOS, UIKit takes any `@Observable` state a view reads during its `layoutSubviews` as a
+  reason to lay it out again when that state changes. A KVO or delegate callback can run inside
+  a layout (`WKWebView` sets its scroll view's frame there, which moves `contentOffset`): reading
+  observed state in it made the web view lay out at every step of a scroll, which put the offset
+  back in bounds and killed the overscroll. Such callbacks write observed state and read only
+  unobserved copies (`PageScroll`).
+- A segmented `Picker` in a toolbar is glass itself: give its `ToolbarItem`
+  `.sharedBackgroundVisibility(.hidden)`, or it sits in a second sheet of it. Items share one
+  capsule unless a `ToolbarSpacer(.fixed)` parts them, and what doesn't fit a phone's bar is
+  folded into a menu the system makes (unlabelled), so give a narrow bar less.
 - Never give views in the window a vertical `fixedSize` or a layout that grows tall at tiny widths:
   the window measures its minimum size with a very narrow proposal, and the result can force the
   window taller than the screen. `NSViewRepresentable`s should implement `sizeThatFits`.

@@ -6,19 +6,27 @@ import CoreGraphics
 struct DeskLayout: Equatable {
     /// The window's width; zero until it is measured.
     var width: CGFloat
-    /// The viewer's choice where there is room for both: the list beside the detail, or the list
-    /// alone at full width with every column.
-    var prefersSplit: Bool
+    /// The viewer's choice where there is room for both: the list beside the detail, or put away
+    /// like a sidebar, the detail having the window.
+    var showsList: Bool
     /// The viewer's choice of rows: two lines each, or one as on the Mac.
     var prefersTwoLines: Bool
 
     /// Below this the list and the detail don't fit side by side (an iPad mini in portrait, any
     /// iPhone): the list fills the window and an item's detail is pushed over it.
     static let splitMinWidth: CGFloat = 900
+    /// Keeps the choice of `showsList`.
+    static let showsListKey = "showsList"
 
     var isMeasured: Bool { width > 0 }
-    var canSplit: Bool { width >= Self.splitMinWidth }
-    var isSplit: Bool { canSplit && prefersSplit }
+    /// The detail has a pane of its own, beside the list.
+    var isSplit: Bool { width >= Self.splitMinWidth }
+    /// The list is put away. Only beside the detail: alone in the window it is all there is.
+    var isListHidden: Bool { isSplit && !showsList }
+
+    /// The bar over the list has room for the filter's button beside the lists and the menu. A
+    /// phone's hasn't: there the system keeps the filter at the window's foot.
+    var showsFilterInBar: Bool { width >= 560 }
 
     /// Two fifths of the window beside the detail, within what the columns need and what the
     /// detail can spare.
