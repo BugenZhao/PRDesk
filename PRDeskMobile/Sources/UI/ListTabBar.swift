@@ -32,9 +32,9 @@ private struct TabBarView: UIViewRepresentable {
     let onMeasure: (CGSize) -> Void
 
     static let modes: [(AppModel.ListMode, String, String)] = [
-        (.dashboard, "Dashboard", "square.grid.2x2"),
-        (.parity, "Parity", "equal.circle"),
-        (.inbox, "Inbox", "bell"),
+        (.dashboard, "Dashboard", "list.bullet.rectangle"),
+        (.parity, "Parity", "arrow.left.arrow.right.circle"),
+        (.inbox, "Inbox", "tray.full"),
     ]
 
     final class Coordinator: NSObject, UITabBarDelegate {

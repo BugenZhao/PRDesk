@@ -747,7 +747,7 @@ one out, with its own button, edge swipe and animation), the list its sidebar:
 
 ```
 900 pt and wider: the list beside the detail           narrower: the list floats over the detail
-┌ ▦  ≡8  ♢      ⌕  ⤢  ◧    ┬──────────── >_ ↗  ••• ┐   ┌ ◧  ⑂ [RF] Count …                >_ ↗  ••• ┐
+┌ ▤  ⇄8  ⊔      ⌕  ⤢  ◧    ┬──────────── >_ ↗  ••• ┐   ┌ ◧  ⑂ [RF] Count …                >_ ↗  ••• ┐
 ├ List (400–480 pt)        │ #69856 [RF] Count …   │   │    #69856 author · +90 −14  (once scrolled) │
 │ ▾ Good 5                 │ author · Open · CI    │   ├ Detail (the whole width) ───────────────────┤
 │  title              7h   │ opened 2d · x → main  │   │ #69856 [RF] Count …                         │
@@ -757,7 +757,7 @@ one out, with its own button, edge swipe and animation), the list its sidebar:
 └──────────────────────────┴───────────────────────┘   └─────────────────────────────────────────────┘
 ```
 
-▦ ≡ ♢ are Dashboard, Parity and Inbox as symbols, with a badge for what waits; ⌕ the filter,
+▤ ⇄ ⊔ are Dashboard, Parity and Inbox as symbols, with a badge for what waits; ⌕ the filter,
 ⤢ Full-Width List and ◧ the sidebar; `>_` the agent session and ↗ GitHub; ⟳ the sync status;
 ✎ the composer.
 
@@ -780,8 +780,8 @@ one out, with its own button, edge swipe and animation), the list its sidebar:
   (about where the list is) side by side. The lists are the system's own tab bar: a capsule of glass with the
   system's selection (the lens that follows a finger across it), the chosen one tinted and its
   symbol filled, and badges in the system's manner for what waits in Parity and the Inbox, in
-  the blue of the unread dots. A grid for Dashboard, an equals sign in a circle for Parity, a bell for the
-  Inbox: symbols alone, everywhere, each in the middle of its button, a badge on its symbol's
+  the blue of the unread dots. A list in a frame for Dashboard, two arrows passing in a circle for
+  Parity, a full tray for the Inbox: symbols alone, everywhere, each in the middle of its button, a badge on its symbol's
   corner. As tall as the bar's buttons;
   at its foot are the sync status button and ••• (rows, sorting, Settings), and on a phone,
   whose top bar has no room for it, the filter
