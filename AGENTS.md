@@ -218,6 +218,13 @@ are used off the main actor); no glass on content (cards, chips, rows).
   at once: `withAnimation` around the change animates nothing. `DeskView.dissolveWindow` adds a
   fade `CATransition` to the window's layer just before the change, which crossfades whatever
   that turn of the run loop changes (checked frame by frame in a simulator recording).
+- Known, not fixed: putting the list away with the split view's own button (an iPad on its side,
+  iOS 27.2 simulator) can leave the detail on a frame from the middle of the split view's
+  animation, 14 pt taller at each end than its column: once the page scrolls, the header shows
+  under the bar. UIKit's views are right; SwiftUI's frame stays wrong until the window is laid
+  out anew (turned). Not from the desk's writes (off, it still happens); a layout pass, a change
+  of the safe area or no animation for that change didn't help, only making the detail's views
+  again did. Look again after a system update.
 - The split view writes `columnVisibility` itself: `.detailOnly` when the window gets narrower
   or comes out of one column, and in the background (snapshots at other sizes), and it writes
   *before* the view sees the new width. Don't take a write for the viewer's choice at once, and
