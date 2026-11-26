@@ -2,7 +2,7 @@
 .md { font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
 .md > :first-child { margin-top: 0; }
 .md > :last-child { margin-bottom: 0; }
-.md p, .md ul, .md ol, .md pre, .md table, .md blockquote, .md details, .md .markdown-alert { margin: 0 0 8px; }
+.md p, .md ul, .md ol, .md pre, .md .tscroll, .md blockquote, .md details, .md .markdown-alert { margin: 0 0 8px; }
 .md ul, .md ol { padding-left: 22px; }
 .md li + li { margin-top: 2px; }
 .md a { color: -apple-system-control-accent; text-decoration: none; }
@@ -17,7 +17,16 @@
 .md .highlight { margin: 0 0 8px; }
 .md kbd { border: 0.5px solid rgba(127, 127, 127, .5); border-bottom-width: 1.5px; border-radius: 4px; padding: 0 4px; }
 .md img, .md video { max-width: 100%; height: auto; }
-.md table { border-collapse: collapse; display: block; overflow-x: auto; max-width: 100%; }
+/* A table too wide for the page scrolls sideways, in a box the script puts around it. Its words
+   stay whole: breaking anywhere, as the rest of a body may, lets every column shrink to a
+   letter's width, and the table then never is too wide (a column of single letters down a phone,
+   or a narrow pane on the Mac). And it is laid out as wide as it likes up to a width a table
+   reads well at, whatever the page's: left to the page's width, every column but the one with
+   the longest word wraps at each word. Code is the exception to whole words: a path or a
+   command is one word a line long, which would take that width for its column alone. */
+.md .tscroll { overflow-x: auto; }
+.md table { border-collapse: collapse; width: max-content; max-width: max(100%, 46em); overflow-wrap: normal; }
+.md table code { overflow-wrap: anywhere; }
 .md td, .md th { border: 1px solid rgba(127, 127, 127, .3); padding: 3px 8px; }
 .md blockquote { padding-left: 10px; border-left: 3px solid rgba(127, 127, 127, .35); color: -apple-system-secondary-label; }
 .md details summary { cursor: pointer; }

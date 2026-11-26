@@ -33,6 +33,13 @@ const PRDesk = (() => {
     const template = document.createElement("template");
     template.innerHTML = html;
     for (const image of template.content.querySelectorAll("img")) image.loading = "lazy";
+    // A table gets a box of its own to scroll sideways in (see `.tscroll`).
+    for (const table of template.content.querySelectorAll("table")) {
+      const box = document.createElement("div");
+      box.className = "tscroll";
+      table.replaceWith(box);
+      box.append(table);
+    }
     return template.content;
   }
 

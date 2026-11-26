@@ -289,6 +289,13 @@ are used off the main actor); no glass on content (cards, chips, rows).
   cards didn't fold and files didn't open on the iPad. `detail.js` listens on `document`, and
   `detail.css` gives the page's own controls a pointer cursor on iOS; give a new tappable
   element one too.
+- Bodies are `overflow-wrap: anywhere`, which also lets a table's columns shrink to a letter's
+  width: in a narrow pane a wide table was never too wide, just a column of single letters, so
+  `overflow-x: auto` on it never scrolled. `fragment()` puts each table in a `.tscroll` box
+  and `markdown.css` lays the table out at `max-content` up to `max(100%, 46em)` with words
+  whole (`overflow-wrap: normal`) and code breakable; `break-word` would be whole words too,
+  as it doesn't count for a column's minimum. Without the box (`display: block` on the table)
+  the table can only be as wide as the pane or its longest words.
 - A bottom-bar item taken out of `.toolbar` in the same change that brings the keyboard up left
   the detail pane laid out about a hundred points too high (header over the bar, composer under
   the keyboard). The composer's button stays in the toolbar and the bar is hidden with
