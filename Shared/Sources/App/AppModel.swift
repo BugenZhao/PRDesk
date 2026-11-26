@@ -1419,9 +1419,12 @@ final class AppModel {
                 }
                 detailState = .idle
                 recordSeenHead()
-                let actors = Set(fresh.entries.compactMap(\.actor))
-                // Merged counts too, for what hovering a login in the conversation shows.
-                Task { try? await self.affiliationEngine.refresh(logins: actors, authors: actors) }
+                // Merged counts too, for what hovering a login in the conversation shows. A companion
+                // imports the badges instead, so it doesn't spend the quota on who these people are.
+                if DeviceRole.current.computesAffiliations {
+                    let actors = Set(fresh.entries.compactMap(\.actor))
+                    Task { try? await self.affiliationEngine.refresh(logins: actors, authors: actors) }
+                }
             } catch is CancellationError {
             } catch {
                 guard !Task.isCancelled else { return }
