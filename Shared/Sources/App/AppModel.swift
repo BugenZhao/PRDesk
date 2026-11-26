@@ -122,6 +122,12 @@ final class AppModel {
 
     /// The selection when the app last quit, put back once the list first has rows.
     @ObservationIgnored private var restoredSelection: TableSelection? = Defaults.get(.selection)
+    /// The stored items have been read once.
+    @ObservationIgnored private var hasSnapshot = false
+    /// A link asked for before that (Handoff or the hot key starting the app), opened once they
+    /// have: opened at once it found nothing here yet, fetched the item and listed it as opened
+    /// from a link, on whichever tab the app last showed.
+    @ObservationIgnored private var pendingLink: ItemLink?
     /// Unread notifications for issues and PRs in the repository, newest first.
     private(set) var inbox: [InboxNote] = [] {
         didSet { updateBadge() }
@@ -450,6 +456,15 @@ final class AppModel {
                         updateBadge()
                     }
                     rebuild()
+                    if !hasSnapshot {
+                        hasSnapshot = true
+                        if let link = pendingLink {
+                            pendingLink = nil
+                            // It is what was asked for, not what was selected last time.
+                            restoredSelection = nil
+                            open(link)
+                        }
+                    }
                     restoreSelection()
                     if let item = selectedItem, let detail, detail.id == item.id, detail.itemUpdatedAt < item.updatedAt {
                         loadDetail()
@@ -843,6 +858,10 @@ final class AppModel {
     /// the tab the link shows (with the checks showing for `/checks`), scrolled to the comment it
     /// points to.
     func open(_ link: ItemLink) {
+        guard hasSnapshot else {
+            pendingLink = link
+            return
+        }
         switch link.page {
         case .conversation: detailTab = .conversation
         case .commits: detailTab = .commits
@@ -882,7 +901,13 @@ final class AppModel {
         openedItems.insert(item, at: 0)
         if openedItems.count > Self.openedLimit { openedItems.removeLast() }
         collapsed.remove(.opened)
-        rebuild()
+        // Among its own kind: a parity item not listed here (too new, or long closed) shows at
+        // the head of the Parity tab, as a listed one is gone to there.
+        if item.isParity, mode != .parity {
+            mode = .parity
+        } else {
+            rebuild()
+        }
         selection = TableSelection(section: .opened, itemID: item.id)
     }
 

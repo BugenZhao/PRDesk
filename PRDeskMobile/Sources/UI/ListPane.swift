@@ -9,6 +9,7 @@ struct ListPane: View {
     let highlightsSelection: Bool
     @Binding var showsSettings: Bool
     @FocusState private var isFilterFocused: Bool
+    @State private var isSearching = false
 
     var body: some View {
         @Bindable var model = model
@@ -20,8 +21,13 @@ struct ListPane: View {
             ItemListView(density: density, highlightsSelection: highlightsSelection)
                 .overlay { emptyState }
         }
-        .searchable(text: $model.filterText, prompt: "Filter")
+        .searchable(text: $model.filterText, isPresented: $isSearching, prompt: "Filter")
         .searchFocused($isFilterFocused)
+        // Return on a link, or on a `#n` nothing listed matches, opens the item (as the Mac's
+        // field does) and puts the field away; on a filter it only puts the keyboard away.
+        .onSubmit(of: .search) {
+            if model.submitFilter() { isSearching = false }
+        }
         .onChange(of: model.filterFocusRequest) { isFilterFocused = true }
         // Where the field would be a bar under the list (a phone), it is a button until used.
         .searchToolbarBehavior(.minimize)

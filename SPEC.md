@@ -653,12 +653,13 @@ the iPad to read rather than work out again (§9, Badges).
 - **Links within the repo**: links in the detail to issues / PRs in this repository open in the
   app: ones already in the list are jumped to (expanding their group and clearing the filter if
   needed); others are fetched on the spot into an **Opened from links** group at the top of the
-  list (kept only for this run, not stored), where they can be added with Add to Desk (`a`, into
+  list (kept only for this run, not stored; a parity item, §3.2, at the top of the Parity tab), where they can be added with Add to Desk (`a`, into
   Triage), and setting Status / Priority / Pin adds them as well. A link to a comment on the current
   item expands and scrolls to that comment. ⌘-click and the ↗ button still open the browser
 - **Handoff**: the item being looked at is offered on my other devices (the Mac's Dock, the
   iPad's, the phone's app switcher), and picking it there opens the same item on the same tab
-  (Conversation, Commits or Files), by the rules for links below. The activity is the item's
+  (Conversation, Commits or Files), by the rules for links below (also when it starts the app:
+  the link waits for the stored items to be read). The activity is the item's
   page on GitHub, so a device without the app opens it in a browser. Between the Mac, the iPad
   and the iPhone alike; it is the system's Handoff, which needs the apps signed by one team and
   the devices on one iCloud account (not a copy signed ad hoc)
@@ -837,7 +838,8 @@ lines or one (•••, two by default):
   the menu at all (the Mac's shows it dimmed). The Mac's row menu has the same groups in the same
   order, as one flat list with each command's key beside it, and the author's affiliation
 - The filter (§4.4) is the system's search field, behind a button: in the bar over the list on
-  an iPad, at the list's foot on a phone
+  an iPad, at the list's foot on a phone. Return on a link or a `#123` opens that item, as on
+  the Mac (§6)
 - At the list's foot, one button stands for the Mac's status bar. It says how things
   stand at a glance: the system's spinner while a sync or a write is on its way (nothing turns
   in the corner of the eye), a green check for a few seconds once a write is through, else two

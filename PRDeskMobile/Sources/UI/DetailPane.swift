@@ -397,11 +397,14 @@ private struct DetailPager<Conversation: View>: View {
         .onChange(of: position.viewID(type: AppModel.DetailTab.self)) { _, tab in
             if let tab, tab != model.detailTab { model.detailTab = tab }
         }
-        // Come to rest, the page showing is the tab, whatever was asked for: a touch that stops
-        // a slide half way leaves the position naming the page it was sliding to.
-        .onScrollPhaseChange { _, phase, context in
+        // Come to rest after a touch, the page showing is the tab, whatever was asked for: a
+        // touch that stops a slide half way leaves the position naming the page it was sliding
+        // to. Only after a touch: a pager just made is at rest on its first page for a moment
+        // before it goes to the tab asked for, which this then took back (a link to a PR's
+        // files opened its conversation on a phone).
+        .onScrollPhaseChange { old, phase, context in
             let width = context.geometry.containerSize.width
-            guard phase == .idle, width > 0 else { return }
+            guard phase == .idle, old != .idle, old != .animating, width > 0 else { return }
             let tabs: [AppModel.DetailTab] = [.conversation, .commits, .files]
             let index = Int((context.geometry.contentOffset.x / width).rounded())
             let tab = tabs[min(max(index, 0), tabs.count - 1)]

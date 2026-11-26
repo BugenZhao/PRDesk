@@ -323,8 +323,13 @@ are used off the main actor); no glass on content (cards, chips, rows).
   the keyboard). The composer's button stays in the toolbar and the bar is hidden with
   `toolbarVisibility` instead.
 - A touch on the detail's pager while it slides to a tab stops it at the nearest page with the
-  `ScrollPosition` still naming the tab asked for: once the scroll is idle, the tab is set from
-  the offset (`onScrollPhaseChange`).
+  `ScrollPosition` still naming the tab asked for: once the scroll is idle after a touch, the
+  tab is set from the offset (`onScrollPhaseChange`). Only after a touch: a pager just made
+  reports idle on its first page before it goes to the tab asked for, and setting the tab from
+  that took a link's Files back to Conversation on a phone.
+- A link can arrive before the stored items are read (Handoff or the hot key starting the
+  app): `AppModel.open` holds it until the first snapshot. Opened at once it found nothing,
+  fetched the item and listed it as opened from a link on the tab last shown.
 - Views in a `ScrollView` can't reach under the bars with `ignoresSafeArea`, and a
   `safeAreaInset` on the scroll view pushes its content down. The detail's pager (`DetailPager`)
   gives each page negative padding to the window's edges and `safeAreaPadding` back, and the
