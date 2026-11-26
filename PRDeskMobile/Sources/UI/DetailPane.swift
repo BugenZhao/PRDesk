@@ -166,27 +166,16 @@ struct DetailPane: View {
         scrolls.conversation.bottomRoom = isComposing ? composerHeight + 12 : ComposeButton.size + 8
     }
 
-    /// The composer, open: the Mac's, floating over the page (and over the keyboard) as glass: a
-    /// field and its buttons. One of them folds it away again; what is written stays as the
-    /// item's draft.
+    /// The composer, open: the Mac's, on one card of glass floating over the page (and over the
+    /// keyboard), its buttons the system's glass ones. One of them folds it away again; what is
+    /// written stays as the item's draft.
     private func composer(_ item: Item, _ detail: ItemDetail) -> some View {
         ComposerView(item: item, detail: detail) {
             withAnimation(.snappy(duration: 0.25)) { isComposing = false }
         }
+        .glassEffect(.regular, in: .rect(cornerRadius: 24))
         .padding(.horizontal, 10)
         .padding(.bottom, 8)
-        // The page fades out under it, as content does under a bar: glass over running text
-        // is hard to read, and a second sheet of glass behind it would be glass on glass.
-        .background {
-            let ground = Color(uiColor: .systemBackground)
-            LinearGradient(
-                stops: [.init(color: ground.opacity(0), location: 0), .init(color: ground.opacity(0.9), location: 0.3), .init(color: ground, location: 1)],
-                startPoint: .top, endPoint: .bottom
-            )
-            .padding(.top, -28)
-            .padding(.bottom, -40)
-            .allowsHitTesting(false)
-        }
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { composerHeight = $0 }
         .onAppear { model.requestComposerFocus() }
     }

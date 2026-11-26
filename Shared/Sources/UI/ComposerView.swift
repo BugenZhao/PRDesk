@@ -46,6 +46,23 @@ struct ComposerView: View {
     }
     private var isAuthor: Bool { sameLogin(item.author, model.viewer) }
 
+    /// The buttons' labels, of one height whatever they hold, so a row of them is one size: the
+    /// symbols in a square (a chevron and an eye are not the same shape), the words as tall.
+    private static let labelSize: CGFloat = 22
+    private static func icon(_ name: String) -> some View {
+        Image(systemName: name)
+            .font(.system(size: 16, weight: .medium))
+            .frame(width: labelSize, height: labelSize)
+    }
+
+    private static func title(_ text: LocalizedStringKey) -> some View {
+        #if os(iOS)
+            Text(text).frame(height: labelSize)
+        #else
+            Text(text)
+        #endif
+    }
+
     private var placeholder: String {
         #if os(macOS)
             item.kind == .pullRequest ? "Comment or review (Markdown, ⌘↩ to comment)" : "Comment (Markdown, ⌘↩ to send)"
@@ -93,14 +110,14 @@ struct ComposerView: View {
             HStack(spacing: 8) {
                 #if os(iOS)
                     if let onDismiss {
-                        Button("Hide Composer", systemImage: "chevron.down", action: onDismiss)
-                            .labelStyle(.iconOnly)
+                        Button(action: onDismiss) { Self.icon("chevron.down") }
                             .buttonBorderShape(.circle)
+                            .accessibilityLabel("Hide Composer")
                     }
                     // A glass button like its neighbors; the symbol says whether it is on.
-                    Button("Preview", systemImage: isPreviewing ? "eye.fill" : "eye") { isPreviewing.toggle() }
-                        .labelStyle(.iconOnly)
+                    Button { isPreviewing.toggle() } label: { Self.icon(isPreviewing ? "eye.fill" : "eye") }
                         .buttonBorderShape(.circle)
+                        .accessibilityLabel("Preview")
                         .disabled(trimmed.isEmpty)
                 #else
                     Toggle("Preview", systemImage: "eye", isOn: $isPreviewing)
@@ -122,15 +139,17 @@ struct ComposerView: View {
                 #if os(iOS)
                     // Too narrow for every button: the rarer actions go in a menu.
                     if item.isOpen {
-                        Menu("More", systemImage: "ellipsis") {
+                        Menu {
                             if item.kind == .pullRequest, !isAuthor {
                                 Button("Request changes") { send(.requestChanges) }
                                     .disabled(trimmed.isEmpty || isBusy)
                             }
                             closeButton
+                        } label: {
+                            Self.icon("ellipsis")
                         }
-                        .labelStyle(.iconOnly)
                         .buttonBorderShape(.circle)
+                        .accessibilityLabel("More")
                         .disabled(isBusy)
                     }
                 #else
@@ -144,11 +163,11 @@ struct ComposerView: View {
                     }
                 #endif
                 if item.kind == .pullRequest, item.isOpen, !isAuthor {
-                    Button("Approve") { send(.approve) }
+                    Button { send(.approve) } label: { Self.title("Approve") }
                         .disabled(isBusy)
                         .help("Submit an approving review, with the text as its comment")
                 }
-                Button("Comment") { send(.comment) }
+                Button { send(.comment) } label: { Self.title("Comment") }
                     .keyboardShortcut(.return, modifiers: .command)
                     #if os(iOS)
                         .buttonStyle(.glassProminent)
@@ -158,15 +177,17 @@ struct ComposerView: View {
                     .disabled(trimmed.isEmpty || isBusy)
             }
             #if os(iOS)
-                // The system's own glass buttons, with the labels it gives them: each a piece
-                // of glass over the page, beside the field's, never on another sheet of it.
+                // The system's own glass buttons, with the labels it gives them, on the
+                // composer's card.
                 .buttonStyle(.glass)
             #else
                 .controlSize(.small)
             #endif
         }
         #if os(iOS)
-            .composerGlass()
+            .padding(.horizontal, 10)
+            .padding(.top, 6)
+            .padding(.bottom, 10)
         #else
             .padding(8)
         #endif
@@ -327,20 +348,14 @@ struct ComposerView: View {
 }
 
 private extension View {
-    /// What the text is written on: a bordered field on the Mac, a sheet of glass on the iPad.
+    /// What the text is written on: a bordered field on the Mac. On the iPad the composer is one
+    /// card of glass and the text lies on it directly.
     @ViewBuilder func editorGround(focused: Bool) -> some View {
         #if os(macOS)
             background(Color.textBackground, in: RoundedRectangle(cornerRadius: 6))
                 .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(focused ? Color.accentColor.opacity(0.6) : Color.separator, lineWidth: 1))
         #else
-            glassEffect(.regular, in: .rect(cornerRadius: 22))
+            self
         #endif
     }
-
-    #if os(iOS)
-        /// The field and the buttons are glass side by side, drawn together.
-        func composerGlass() -> some View {
-            GlassEffectContainer(spacing: 8) { self }
-        }
-    #endif
 }

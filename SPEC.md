@@ -781,11 +781,11 @@ The page gets the whole pane:
   chevron
 - Pulled past its top the page gives as any scroll view does, and the header goes down with it
 - The composer is folded into a round glass button over the conversation's corner, which grows
-  the word Draft when one waits. Open, it floats over the page's foot, above the keyboard: the
-  text on a sheet of glass, and under it the system's own glass buttons (⌄ to fold it, preview,
-  •••, Approve, and Comment as the prominent one), with the labels the system gives them. They are
-  glass beside glass, never on another sheet of it; the page fades out underneath so they stay
-  readable. Sending folds it too. Scrolling the page puts the keyboard away
+  the word Draft when one waits. Open, it is one card of glass floating over the page's foot,
+  above the keyboard: the text lies on the card, and under it are the system's own glass buttons
+  with the labels the system gives them (⌄ to fold it, preview and ••• as circles of one size,
+  Approve, and Comment as the prominent one), all of one height. Sending folds it too. Scrolling
+  the page puts the keyboard away
 - The page runs to the window's foot, under the home indicator, with room left under its end
 
 **Text.** Secondary and tertiary text (authors, events, ages, a card's "commented 6d ago") are

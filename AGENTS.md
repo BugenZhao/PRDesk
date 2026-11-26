@@ -195,11 +195,12 @@ are used off the main actor); no glass on content (cards, chips, rows).
   header's own title has scrolled under the bar. The header is an overlay clipped at the bar's
   edge, or it shows through the bar's buttons.
 - Liquid Glass (read `SwiftUI-Implementing-Liquid-Glass-Design.md` first; the exported skills
-  don't cover it): controls over content are the system's glass buttons (`.buttonStyle(.glass)`,
-  `.glassProminent` for the one that matters) with the labels the system gives them, which are
-  the label color, not the tint. Don't tint them blue and don't draw bordered buttons on a card.
-  Several pieces of glass go in a `GlassEffectContainer`; none goes on another sheet of glass.
-  Where they float over running text, fade the page out underneath rather than adding a backing.
+  don't cover it): buttons are the system's glass ones (`.buttonStyle(.glass)`, `.glassProminent`
+  for the one that matters) with the labels the system gives them, which are the label color,
+  not the tint; never bordered or tinted-blue buttons. The composer is one card of glass with
+  those buttons on it, which the user chose over a field and buttons floating apart. Give the
+  buttons of a row labels of one height (symbols in a square frame), or a chevron and an eye come
+  out as circles of two sizes.
 - A foreground style set around a view takes over the labels of the buttons and menus inside it
   (a prominent button's white comes out black, a bar's `Menu` all but vanishes).
   `macTextStrength` (darker `.secondary` / `.tertiary` on iOS) goes only around text: a list row,
