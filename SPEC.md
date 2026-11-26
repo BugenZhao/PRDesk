@@ -743,13 +743,13 @@ one out, with its own button, edge swipe and animation), the list its sidebar:
 - The list keeps the desk's own white ground as a sidebar, not a sidebar's tint: the rows' colors
   say things
 - The bar over the list holds the lists, the filter, ⤢ and ◧, the last two (about where the
-  list is) side by side. The lists are one item of the bar, in the bar's own capsule of glass
-  and as tall as its buttons: a grid for Dashboard, an equals sign in a circle for Parity, a
-  bell for the Inbox, the chosen one tinted and filled on a pill that slides to it, and what
-  waits in Parity and the Inbox as a badge on the symbol's corner, in the blue of the unread
-  dots. Each has its name beside it at full width and on a phone (at ordinary text sizes);
-  as a sidebar, where the bar is short of room, the symbols alone. It lays itself out, at any
-  text size;
+  list is) side by side. The lists are the system's own tab bar: a capsule of glass with the
+  system's selection (the lens that follows a finger across it), the chosen one tinted and its
+  symbol filled, and the system's badges for what waits in Parity and the Inbox, in the blue of
+  the unread dots. A grid for Dashboard, an equals sign in a circle for Parity, a bell for the
+  Inbox; each with its name beside it at full width and on a phone (at ordinary text sizes), the
+  symbols alone as a sidebar, where the bar is short of room. As tall as the bar's buttons
+  either way;
   at its foot are the sync status button, the filter and ••• (rows, sorting, Settings)
 - Going from one to the other keeps the selection, the detail's tab, its pages (scroll position,
   loaded diffs) and a comment being written. Nothing remembers which layout came before

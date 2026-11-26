@@ -266,8 +266,13 @@ struct DeskView: View {
         // The segments are glass themselves: no second sheet of it behind them.
         // One item, so one capsule of the bar's glass around the three lists.
         ToolbarItem(placement: .topBarLeading) {
-            ListSwitcher(showsNames: switcherShowsNames ?? wantsNames(layout))
+            let names = switcherShowsNames ?? wantsNames(layout)
+            ListTabBar(
+                selection: $model.mode, parityCount: model.parityWaitingCount, inboxCount: model.unreadInboxCount,
+                showsNames: names
+            )
         }
+        .sharedBackgroundVisibility(.hidden)
         // Where the window isn't one column already: the filter, then the list the whole window
         // wide or back beside the detail, next to the split view's own button for the sidebar
         // (the two are about where the list is). The filter is placed here by name, with a

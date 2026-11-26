@@ -218,21 +218,29 @@ are used off the main actor); no glass on content (cards, chips, rows).
   by rules of its own, and CSS `zoom` on the root then moved the boxes and left the text at
   13 px. The zoom is set from Swift (`PRDesk.setTextScale`: 1.2 times the Dynamic Type factor).
   `@ScaledMetric` of 1 comes back rounded to 1 at every size; scale 100 and divide.
-- The list switcher (`ListSwitcher`) is plain SwiftUI in one `ToolbarItem`: the bar gives it
-  the glass capsule and its buttons' height, and it lays itself out at any text size. Don't go
-  back to the two things tried before it:
-  - A segmented `Picker`: a segment is text or an image, never both, draws an image small and
-    light whatever its font, and takes no badge.
-  - A `UITabBar` on its own. It does draw the system's glass, selection and badges (untitled
-    items, or titled with `traitOverrides.horizontalSizeClass = .regular` for names beside the
-    symbols), but it isn't made for a toolbar: it collapses unless given a frame, centers its
-    capsule in that with margins, draws it in the upper 44 pt of 54, needs its badges moved
-    through `UITabBarAppearance`, and with names its capsule is 33 pt, shorter than the bar's
-    buttons. Every one of those was a number set by eye.
+- The list switcher is a real `UITabBar` on its own (`ListTabBar`): the user requires the
+  system's selection lens, which only the real control has (a SwiftUI imitation in the bar's
+  glass was tried and rejected for lacking it, and felt slow). A tab bar isn't made for a
+  toolbar, so `TabBarHost` lays it out 1000 pt wide, finds where it drew its capsule (its first
+  subview's frame) and shows exactly that; `ListTabBar` sizes the item from the measure. Don't
+  put set frames, crops or offsets back. What was learned measuring it:
+  - `traitOverrides.horizontalSizeClass = .regular` always: there the capsule is as wide as
+    its items need and a title is beside its symbol. Compact, the capsule fills the bar's width.
+  - The capsule's height follows the bar's (54 → 34, 64 → 44): the host tries heights until the
+    capsule is 44, the bar buttons' height, with names as without.
+  - Measure only in a window. Before, the bar lays out otherwise (three even items, 274 pt),
+    and an item reported too wide is dropped from the bar for good, never to be measured again:
+    until measured the item is three buttons wide.
+  - UIKit doesn't fill the chosen item's symbol as a SwiftUI `TabView` does: `selectedImage`.
+    Once `standardAppearance` is set, `item.badgeColor` is ignored: set `badgeBackgroundColor`
+    on all three layout appearances of a copy of the bar's own appearance.
+  - `didSelect` hands the change to the model on the next turn of the run loop, so rebuilding
+    the list doesn't hold up the bar's own selection.
+  A segmented `Picker` could not do this either: a segment is text or an image, never both,
+  draws an image small and light whatever its font, and takes no badge.
 - A toolbar item is given its new size at once when its content changes size, and whatever is
-  still animating is centered in it: animating the switcher's names in or out showed the
-  symbols jumping to the middle of the capsule. The switcher's layout snaps, and `DeskView`
-  orders it around the full-width change (names away, then the change; the change, then names).
+  still animating is centered in it. The switcher's names come and go at once, and `DeskView`
+  orders them around the full-width change (names away, then the change; the change, then names).
 - The system's search button joins the capsule of whatever is at the bar's end unless it is
   placed by name (`DefaultToolbarItem(kind: .search, placement: .topBarTrailing)`) with a
   `ToolbarSpacer(.fixed)` on each side; in a compact window it is placed in the bottom bar.
