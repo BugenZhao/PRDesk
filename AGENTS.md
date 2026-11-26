@@ -289,14 +289,6 @@ are used off the main actor); no glass on content (cards, chips, rows).
   cards didn't fold and files didn't open on the iPad. `detail.js` listens on `document`, and
   `detail.css` gives the page's own controls a pointer cursor on iOS; give a new tappable
   element one too.
-- A page's web view lies under the detail's bar from its very top (the page leaves the room
-  itself), so to the system its content is always under the bar, and the bar's scroll edge
-  effect is always on: over a ground that isn't white it showed as a paler band above the
-  header. The effect is hidden for the pane (`scrollEdgeEffectHidden`, and `topEdgeEffect` on
-  the web view's scroll view) and the pane paints its ground behind the bar in an overlay,
-  which the pages' content leaves under. The overlay is `Color.ignoresSafeArea(edges: .top)`
-  *then* `.frame(height: 0)`: the other way round it has no height at all, and the bar's
-  title lay over the page's text.
 - The pages' colors are WebKit's system color keywords, and several are the Mac's alone
   (`-apple-system-control-accent`, `-control-background`, `-text-background`): on iOS a custom
   property holding one is invalid where it is used, quietly, so links had the text's color and

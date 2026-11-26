@@ -22,8 +22,8 @@ html[data-platform="phone"] { -webkit-text-size-adjust: 100%; zoom: 1.2; }
    (the same values as `Color.secondaryText`).
    The accent and the two grounds by value: their keywords above are the Mac's, and mean nothing
    to WebKit on iOS, where a link then had no color and a card no ground. The accent is the
-   system's blue; a card and a diff are the color of a grouped list's cells, on the pane's own
-   ground, which the app paints (`Color.pageGround`). */
+   system's blue; a card and a diff are the color of a grouped list's cells, on that list's
+   ground, which the app paints under the page, below the header (`Color.pageGround`). */
 html[data-platform="phone"] {
   --secondary: rgba(0, 0, 0, .5); --tertiary: rgba(0, 0, 0, .26);
   --accent: rgb(0, 122, 255); --card: #fff; --text-bg: #fff;

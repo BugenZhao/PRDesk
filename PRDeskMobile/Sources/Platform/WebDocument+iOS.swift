@@ -14,9 +14,6 @@ extension WebDocument {
         webView.scrollView.backgroundColor = .clear
         // Reading on puts the keyboard away: a phone's has no key for that.
         webView.scrollView.keyboardDismissMode = .onDrag
-        // No edge effect of the bar's over the page: see `DetailPane`, which covers the page
-        // behind the bar itself.
-        webView.scrollView.topEdgeEffect.isHidden = true
     }
 
     /// The page gives the point in its own coordinates, which are the web view's.
