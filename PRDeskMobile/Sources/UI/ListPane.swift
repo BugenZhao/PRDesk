@@ -19,16 +19,6 @@ struct ListPane: View {
             }
             ItemListView(density: density, highlightsSelection: highlightsSelection)
                 .overlay { emptyState }
-                // Over the list's foot rather than under it, so the rows run to the window's edge.
-                // On a phone it shows only with news: a write, or a sync that isn't idle.
-                .overlay(alignment: .bottomLeading) {
-                    if density.listWidth >= 450 || model.activity != nil || model.syncState != .idle {
-                        StatusLine(isBrief: density.listWidth < 450)
-                            .padding(.leading, 10)
-                            .padding(.bottom, 8)
-                            .transition(.opacity)
-                    }
-                }
         }
         .searchable(text: $model.filterText, prompt: "Filter")
         .searchFocused($isFilterFocused)
@@ -119,9 +109,11 @@ struct ItemListView: View {
             }
         }
         .listStyle(.plain)
+        // The desk's own ground rather than a sidebar's gray: the rows' tints are read against it.
+        .scrollContentBackground(.hidden)
+        .background(Color(uiColor: .systemBackground))
         .listSectionSpacing(0)
         .contentMargins(.top, 0, for: .scrollContent)
-        .contentMargins(.bottom, 44, for: .scrollContent)
         .environment(\.defaultMinListRowHeight, 0)
         .environment(\.defaultMinListHeaderHeight, 0)
         .refreshable { await model.sync() }
@@ -289,9 +281,9 @@ private struct ColumnTitles: View {
     }
 }
 
-/// A capsule of glass over the list's foot: the write under way (or just done), otherwise how
-/// many items, then when the desk last synced and what is left of GitHub's hourly budget.
-private struct StatusLine: View {
+/// In the bar at the list's foot: the write under way (or just done), otherwise how many items,
+/// then when the desk last synced and what is left of GitHub's hourly budget.
+struct StatusLine: View {
     @Environment(AppModel.self) private var model
     /// On a phone: the write or the sync alone.
     let isBrief: Bool
@@ -330,9 +322,7 @@ private struct StatusLine: View {
         .monospacedDigit()
         .foregroundStyle(.secondary)
         .lineLimit(1)
-        .padding(.horizontal, 12)
-        .frame(height: 30)
-        .glassEffect(.regular, in: .capsule)
+        .padding(.horizontal, 6)
     }
 
     @ViewBuilder private var sync: some View {

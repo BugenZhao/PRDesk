@@ -1,11 +1,14 @@
 import CoreGraphics
 
-/// How the desk is laid out: a pure function of the window's width and one preference, so a
+/// How the desk is laid out: a pure function of the window's width and two preferences, so a
 /// window that changes size at any time (rotation, multitasking, a resized window) always lands
 /// on the layout its new size calls for, whatever came before.
 struct DeskLayout: Equatable {
     /// The window's width; zero until it is measured.
     var width: CGFloat
+    /// The list's width as laid out, which beside the detail is the split view's to decide; zero
+    /// until it is measured.
+    var listWidth: CGFloat
     /// The viewer's choice where there is room for both: the list beside the detail, or put away
     /// like a sidebar, the detail having the window.
     var showsList: Bool
@@ -21,20 +24,10 @@ struct DeskLayout: Equatable {
     var isMeasured: Bool { width > 0 }
     /// The detail has a pane of its own, beside the list.
     var isSplit: Bool { width >= Self.splitMinWidth }
-    /// The list is put away. Only beside the detail: alone in the window it is all there is.
-    var isListHidden: Bool { isSplit && !showsList }
 
-    /// The bar over the list has room for the filter's button beside the lists and the menu. A
-    /// phone's hasn't: there the system keeps the filter at the window's foot.
-    var showsFilterInBar: Bool { width >= 560 }
-
-    /// Two fifths of the window beside the detail, within what the columns need and what the
-    /// detail can spare.
-    var listWidth: CGFloat {
-        isSplit ? min(480, max(400, (width * 0.4).rounded())) : width
+    var density: RowDensity {
+        RowDensity(listWidth: listWidth > 0 ? listWidth : (isSplit ? 460 : width), prefersTwoLines: prefersTwoLines)
     }
-
-    var density: RowDensity { RowDensity(listWidth: listWidth, prefersTwoLines: prefersTwoLines) }
 }
 
 /// Which of the Mac's columns a list this wide has room for, the title keeping the most of it:

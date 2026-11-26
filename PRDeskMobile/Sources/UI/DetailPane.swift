@@ -11,22 +11,12 @@ struct DetailPane: View {
     @Environment(AppModel.self) private var model
     let pages: DetailPages
     let isPushed: Bool
-    /// The list is put away: the pane has the window, and the bar over it only the desk's buttons.
-    var isAlone = false
     @AppStorage("showAutomated") private var showAutomated = false
     @State private var scroll = PageScroll()
     /// The composer is open under the conversation.
     @State private var isComposing = false
 
     typealias Tab = AppModel.DetailTab
-
-    /// The toolbar's row of buttons, which the bars over the pane end with.
-    private static let barHeight: CGFloat = 62
-    /// The desk's buttons at the bar's trailing end, which the title's line stops short of: the
-    /// filter and the menu, or the menu alone while the list is away.
-    private var trailingButtonsWidth: CGFloat { isAlone ? 64 : 124 }
-    /// The button that brings the list back, at the bar's leading end while the list is away.
-    private static let listButtonWidth: CGFloat = 60
 
     var body: some View {
         Group {
@@ -44,17 +34,13 @@ struct DetailPane: View {
                         .scrollsAway()
                     }
                     // Once the header has left with the page, a line of glass says what this is;
-                    // touching it goes back to the top.
-                    .overlay(alignment: isPushed ? .top : .topLeading) {
-                        CompactTitle(item: item, isShown: scroll.isChromeAway) {
-                            activePage(item).run("scrollTo({ top: 0, behavior: 'smooth' })")
+                    // touching it goes back to the top. Beside the list it is in the pane's own
+                    // bar (below); pushed, the bar holds the tabs, and the line sits under it.
+                    .overlay(alignment: .top) {
+                        if isPushed {
+                            CompactTitle(item: item, isShown: scroll.isChromeAway) { scrollToTop(item) }
+                                .offset(y: 6)
                         }
-                        // Beside the list the bar over this pane is empty up to the window's
-                        // buttons: the line goes there, level with them. Pushed, the bar holds
-                        // the way back and the tabs, and the line sits under it.
-                        .padding(.leading, isAlone ? Self.listButtonWidth : 0)
-                        .padding(.trailing, isPushed ? 0 : trailingButtonsWidth)
-                        .offset(y: isPushed ? 6 : -(Self.barHeight + CompactTitle.height) / 2)
                     }
                     .onChange(of: item.id) {
                         if item.kind == .issue { model.detailTab = .conversation }
@@ -67,10 +53,17 @@ struct DetailPane: View {
                         withAnimation(.snappy(duration: 0.25)) { isComposing = true }
                     }
                     .toolbar {
-                        if isPushed, item.kind == .pullRequest {
-                            // The segments are glass themselves: no second sheet of it behind.
-                            ToolbarItem(placement: .principal) { tabs.frame(maxWidth: 420) }
-                                .sharedBackgroundVisibility(.hidden)
+                        if isPushed {
+                            if item.kind == .pullRequest {
+                                // The segments are glass themselves: no second sheet of it behind.
+                                ToolbarItem(placement: .principal) { tabs.frame(maxWidth: 420) }
+                                    .sharedBackgroundVisibility(.hidden)
+                            }
+                        } else if scroll.isChromeAway {
+                            ToolbarItem(placement: .principal) {
+                                Button { scrollToTop(item) } label: { CompactTitle.Line(item: item) }
+                                    .accessibilityHint("Scrolls to the top")
+                            }
                         }
                     }
             } else {
@@ -80,6 +73,10 @@ struct DetailPane: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .environment(scroll)
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func scrollToTop(_ item: Item) {
+        activePage(item).run("scrollTo({ top: 0, behavior: 'smooth' })")
     }
 
     /// The page of the tab showing.
@@ -178,29 +175,38 @@ struct DetailPane: View {
 
 /// The item in one line of glass over the page's top, while the header is scrolled away.
 private struct CompactTitle: View {
-    @Environment(AppModel.self) private var model
     let item: Item
     let isShown: Bool
     let action: () -> Void
 
     static let height: CGFloat = 36
 
+    /// The line itself: state, number and title.
+    struct Line: View {
+        @Environment(AppModel.self) private var model
+        let item: Item
+
+        var body: some View {
+            HStack(spacing: 6) {
+                StateIconView(item: item, size: 14, isMerging: model.isMerging(item))
+                Text("#\(String(item.number))")
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                Text(itemTitle: item.title, shortenedTags: true, codeFont: .footnote.monospaced())
+                    .lineLimit(1)
+            }
+            .font(.subheadline.weight(.medium))
+        }
+    }
+
     var body: some View {
         ZStack {
             if isShown {
                 Button(action: action) {
-                    HStack(spacing: 6) {
-                        StateIconView(item: item, size: 14, isMerging: model.isMerging(item))
-                        Text("#\(String(item.number))")
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                        Text(itemTitle: item.title, shortenedTags: true, codeFont: .footnote.monospaced())
-                            .lineLimit(1)
-                    }
-                    .font(.subheadline.weight(.medium))
-                    .padding(.horizontal, 14)
-                    .frame(height: Self.height)
-                    .contentShape(Capsule())
+                    Line(item: item)
+                        .padding(.horizontal, 14)
+                        .frame(height: Self.height)
+                        .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
                 .glassEffect(.regular.interactive(), in: .capsule)

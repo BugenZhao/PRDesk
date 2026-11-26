@@ -10,35 +10,42 @@ final class DetailPages {
     var all: [WebDocument] { [timeline, files, commits] }
 }
 
-/// The desk: the list, and the selected item's detail beside it where the window is wide enough
-/// or pushed over it where it isn't (`DeskLayout`). Beside the detail the list can be put away,
-/// as a sidebar is. The selection is the model's, so every arrangement shows the same thing and
-/// nothing remembers which one came before.
+/// The desk: the list as the sidebar of a split view, and the selected item's detail beside it
+/// where the window is wide enough or pushed over it where it isn't (`DeskLayout`). Beside the
+/// detail the list can be put away, as any sidebar. The selection is the model's, so every
+/// arrangement shows the same thing and nothing remembers which one came before.
 struct DeskView: View {
     @Environment(AppModel.self) private var model
     @AppStorage(DeskLayout.showsListKey) private var showsList = true
     @AppStorage(RowLines.key) private var rowLines = RowLines.two
     @State private var width: CGFloat = 0
+    /// The list's own width, which the split view decides beside the detail.
+    @State private var listWidth: CGFloat = 0
     @State private var pages = DetailPages()
     @State private var showsSettings = false
     /// The menu a detail page asked for.
     @State private var pageMenu: PageMenu?
 
     var body: some View {
-        let layout = DeskLayout(width: width, showsList: showsList, prefersTwoLines: rowLines == .two)
-        NavigationStack {
-            Group {
-                if layout.isMeasured {
-                    panes(layout)
-                } else {
-                    Color.clear
+        let layout = DeskLayout(width: width, listWidth: listWidth, showsList: showsList, prefersTwoLines: rowLines == .two)
+        Group {
+            if layout.isMeasured {
+                NavigationSplitView(columnVisibility: columnVisibility, preferredCompactColumn: compactColumn) {
+                    ListPane(density: layout.density, highlightsSelection: layout.isSplit, showsSettings: $showsSettings)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { listWidth = $0 }
+                        .navigationSplitViewColumnWidth(min: 400, ideal: 460, max: 480)
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar { toolbar(layout) }
+                } detail: {
+                    DetailPane(pages: pages, isPushed: !layout.isSplit)
                 }
+                .navigationSplitViewStyle(.balanced)
+                // The split view goes by the size class: narrower than the desk splits at, it is
+                // to be one column whatever the device calls the width (an iPad mini upright).
+                .environment(\.horizontalSizeClass, layout.isSplit ? .regular : .compact)
+            } else {
+                Color.clear
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .navigationDestination(item: pushed(layout)) { _ in
-                DetailPane(pages: pages, isPushed: true)
-            }
-            .toolbar { toolbar(layout) }
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .popover(item: $pageMenu, attachmentAnchor: .rect(.rect(pageMenu?.anchor ?? .zero))) { menu in
@@ -48,7 +55,7 @@ struct DeskView: View {
         .modifier(ModelAlerts())
         // The filter is the list's: asked for by key while the list is away, it comes back.
         .onChange(of: model.filterFocusRequest) {
-            if !showsList { withAnimation(.snappy(duration: 0.3)) { showsList = true } }
+            if !showsList { withAnimation { showsList = true } }
         }
         .onAppear {
             // Start WebKit ahead of the first selection, and open the repository's own links here.
@@ -63,58 +70,48 @@ struct DeskView: View {
         }
     }
 
-    private func panes(_ layout: DeskLayout) -> some View {
-        HStack(spacing: 0) {
-            if !layout.isListHidden {
-                ListPane(density: layout.density, highlightsSelection: layout.isSplit, showsSettings: $showsSettings)
-                    .frame(width: layout.isSplit ? layout.listWidth : nil)
-                    .transition(.move(edge: .leading))
-            }
-            if layout.isSplit {
-                if !layout.isListHidden { Divider().ignoresSafeArea() }
-                DetailPane(pages: pages, isPushed: false, isAlone: layout.isListHidden)
-            }
-        }
-    }
-
-    /// The pushed detail, only where the layout pushes: side by side there is nothing to pop.
-    private func pushed(_ layout: DeskLayout) -> Binding<TableSelection?> {
+    /// The list beside the detail, or put away: the viewer's choice, which the split view's own
+    /// button and gestures change too.
+    private var columnVisibility: Binding<NavigationSplitViewVisibility> {
         Binding(
-            get: { layout.isMeasured && !layout.isSplit ? model.selection : nil },
-            set: { if $0 == nil, layout.isMeasured, !layout.isSplit { model.selection = nil } }
+            get: { showsList ? .all : .detailOnly },
+            set: { showsList = $0 != .detailOnly }
         )
     }
 
+    /// In one column, the detail is on top while there is a selection; going back drops it.
+    private var compactColumn: Binding<NavigationSplitViewColumn> {
+        Binding(
+            get: { model.selection == nil ? .sidebar : .detail },
+            set: { if $0 == .sidebar { model.selection = nil } }
+        )
+    }
+
+    /// Around the list: which list it is at its head (beside the split view's own button for
+    /// putting it away), and at its foot how things stand, the filter and the desk's menu.
     @ToolbarContentBuilder
     private func toolbar(_ layout: DeskLayout) -> some ToolbarContent {
         @Bindable var model = model
-        // The list's end of the bar: the way to put it away, and which list it is.
-        if layout.isSplit {
-            ToolbarItem(placement: .topBarLeading) {
-                Button(showsList ? "Hide List" : "Show List", systemImage: "sidebar.leading") {
-                    withAnimation(.snappy(duration: 0.3)) { showsList.toggle() }
-                }
+        // The segments are glass themselves: no second sheet of it behind them.
+        ToolbarItem(placement: .topBarLeading) {
+            Picker("View", selection: $model.mode) {
+                Text("Dashboard").tag(AppModel.ListMode.dashboard)
+                Text(model.parityWaitingCount == 0 ? "Parity" : "Parity \(model.parityWaitingCount)").tag(AppModel.ListMode.parity)
+                Text(model.unreadInboxCount == 0 ? "Inbox" : "Inbox \(model.unreadInboxCount)").tag(AppModel.ListMode.inbox)
             }
+            .pickerStyle(.segmented)
+            .fixedSize()
         }
-        if !layout.isListHidden {
-            // The segments are glass themselves: no second sheet of it behind them.
-            ToolbarItem(placement: .topBarLeading) {
-                Picker("View", selection: $model.mode) {
-                    Text("Dashboard").tag(AppModel.ListMode.dashboard)
-                    Text(model.parityWaitingCount == 0 ? "Parity" : "Parity \(model.parityWaitingCount)").tag(AppModel.ListMode.parity)
-                    Text(model.unreadInboxCount == 0 ? "Inbox" : "Inbox \(model.unreadInboxCount)").tag(AppModel.ListMode.inbox)
-                }
-                .pickerStyle(.segmented)
-                .fixedSize()
-            }
-            .sharedBackgroundVisibility(.hidden)
+        .sharedBackgroundVisibility(.hidden)
+        // On a phone the status shows only with news: a write, or a sync that isn't idle.
+        let isBrief = !layout.density.canUseOneLine
+        if !isBrief || model.activity != nil || model.syncState != .idle {
+            ToolbarItem(placement: .status) { StatusLine(isBrief: isBrief) }
         }
-        if !layout.isListHidden, layout.showsFilterInBar {
-            // The filter, apart from the menu.
-            DefaultToolbarItem(kind: .search, placement: .topBarTrailing)
-            ToolbarSpacer(.fixed, placement: .topBarTrailing)
-        }
-        ToolbarItem(placement: .topBarTrailing) {
+        ToolbarSpacer(.flexible, placement: .bottomBar)
+        DefaultToolbarItem(kind: .search, placement: .bottomBar)
+        ToolbarSpacer(.fixed, placement: .bottomBar)
+        ToolbarItem(placement: .bottomBar) {
             DeskMenu(rowLines: $rowLines, canChooseLines: layout.density.canUseOneLine, showsSettings: $showsSettings)
         }
     }
