@@ -6,6 +6,8 @@ iPhone.
 
 ![PR Desk](docs/screenshot.webp)
 
+![PR Desk on an iPad mini and an iPhone](docs/screenshot-mobile.webp)
+
 > [!NOTE]
 > This is a personal app, built around my own workflow. It's hard-wired to `vllm-project/vllm`,
 > to my triage board (GitHub Project #56), and to a few other tools I use. It isn't meant to be used
