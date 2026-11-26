@@ -227,19 +227,19 @@ struct DeskView: View {
             }
         }
         .sharedBackgroundVisibility(.hidden)
-        // Where the window isn't one column already: the list the whole window wide, or back
-        // beside the detail, and the filter, each a button of its own. The filter is placed here
-        // by name, between spacers: left to the system it joins whatever is at the bar's end.
+        // Where the window isn't one column already: the filter, then the list the whole window
+        // wide or back beside the detail, next to the split view's own button for the sidebar
+        // (the two are about where the list is). The filter is placed here by name, with a
+        // spacer: left to the system it joins whatever is at the bar's end.
         if !layout.isCompact {
+            DefaultToolbarItem(kind: .search, placement: .topBarTrailing)
+            ToolbarSpacer(.fixed, placement: .topBarTrailing)
             ToolbarItem(placement: .topBarTrailing) {
                 Button(
                     layout.isTable ? "List Beside the Detail" : "Full-Width List",
                     systemImage: layout.isTable ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right"
                 ) { setTable(!layout.isTable, layout) }
             }
-            ToolbarSpacer(.fixed, placement: .topBarTrailing)
-            DefaultToolbarItem(kind: .search, placement: .topBarTrailing)
-            ToolbarSpacer(.fixed, placement: .topBarTrailing)
         }
         ToolbarItem(placement: .bottomBar) { SyncStatusButton() }
         ToolbarSpacer(.flexible, placement: .bottomBar)

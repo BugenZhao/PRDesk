@@ -16,7 +16,7 @@ struct ListTabBar: UIViewRepresentable {
 
     private static let modes: [(AppModel.ListMode, String, String)] = [
         (.dashboard, "Dashboard", "square.grid.2x2"),
-        (.parity, "Parity", "arrow.left.arrow.right"),
+        (.parity, "Parity", "equal.circle"),
         (.inbox, "Inbox", "bell"),
     ]
 
@@ -33,9 +33,11 @@ struct ListTabBar: UIViewRepresentable {
     func makeUIView(context: Context) -> UITabBar {
         let bar = UITabBar()
         bar.items = Self.modes.enumerated().map { index, mode in
-            // At the size and weight of the bar's buttons beside it.
+            // At the size and weight of the bar's buttons beside it. The chosen list's symbol
+            // is filled, as SwiftUI's tab views have theirs; UIKit asks for it by name.
             let configuration = UIImage.SymbolConfiguration(pointSize: 17, weight: .medium)
             let item = UITabBarItem(title: nil, image: UIImage(systemName: mode.2, withConfiguration: configuration), tag: index)
+            item.selectedImage = UIImage(systemName: mode.2 + ".fill", withConfiguration: configuration)
             item.accessibilityLabel = mode.1
             return item
         }

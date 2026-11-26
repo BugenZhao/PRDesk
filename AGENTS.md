@@ -217,7 +217,8 @@ are used off the main actor); no glass on content (cards, chips, rows).
 - The sidebar's list switcher is a real `UITabBar` on its own (`ListTabBar`), not an imitation:
   built against this SDK it draws its glass capsule, the system's selection and badges by
   itself, and takes untitled items with a `SymbolConfiguration` (17 pt medium matches the bar's
-  buttons). In a toolbar it must be given its size (it collapses to nothing otherwise), and it
+  buttons). The filled symbol for the chosen item is not automatic in UIKit as it is in a
+  SwiftUI `TabView`: set `selectedImage`. In a toolbar it must be given its size (it collapses to nothing otherwise), and it
   draws its capsule in the upper 44 pt of a 54 pt height: `listTabBarFrame` lays it out by the
   capsule. A segmented `Picker` could not do this: a segment is text or an image, never both,
   draws an image small and light whatever its font, and takes no badge (`ListSwitcher`, used
