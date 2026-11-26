@@ -127,8 +127,8 @@ Both apps compile `Shared/`; each adds its own views and platform parts. Put new
 - `PRDesk/Sources` — the Mac: the app entry, `AppModel+Mac` (mouse buttons, Yab), the list (an
   `NSTableView` with drawn cells, `UI/ItemTable/`), the detail pane, `WebDocument+Mac` (find bar,
   menus), `WebImages+Mac`, `Yab/YabFrontTab` for ⌃⌥⌘D (SPEC §6)
-- `PRDeskMobile/Sources` — the iPad and iPhone (SPEC §9): `UI/DeskView` (the list beside the
-  detail or under it, by `DeskLayout`), `ListPane` and `ItemRowView` (a SwiftUI `List`; rows of
+- `PRDeskMobile/Sources` — the iPad and iPhone (SPEC §9): `UI/DeskView` (a split view: the list
+  alone or as the detail's sidebar, by `DeskLayout`), `ListPane` and `ItemRowView` (a SwiftUI `List`; rows of
   two lines or one, columns by `RowDensity`), `DetailPane` (its header scrolls away with the
   page, `Shared/Sources/UI/PageChrome`), `ItemMenu`, `PageMenu` (the pages' menus, as popovers),
   `SettingsView`, `DeskCommands` (the menu bar and the Mac's keys); and the
@@ -174,6 +174,17 @@ are used off the main actor); no glass on content (cards, chips, rows).
   observed state in it made the web view lay out at every step of a scroll, which put the offset
   back in bounds and killed the overscroll. Such callbacks write observed state and read only
   unobserved copies (`PageScroll`).
+- `NavigationSplitView` lays out by the horizontal size class, and an iPad mini upright is
+  regular: `DeskView` sets the class itself to say whether the list is a page (compact) or a
+  sidebar (regular). Don't lay anything else out by the class under it.
+- Views in a `ScrollView` can't reach under the bars with `ignoresSafeArea`, and a
+  `safeAreaInset` on the scroll view pushes its content down. The detail's pager (`DetailPager`)
+  gives each page negative padding to the window's edges and `safeAreaPadding` back, and the
+  header is an overlay. `scrollPosition(id:)` with a hand-made `Binding` scrolled one way only;
+  it uses a `ScrollPosition` and two `onChange`s.
+- A view whose body reads the detail's tab re-makes its toolbar items when the tab changes, which
+  cuts the segments' animation short: `DetailPane.body` leaves the tab to `ActivePage`,
+  `DetailTabs` and `DetailPager`.
 - A segmented `Picker` in a toolbar is glass itself: give its `ToolbarItem`
   `.sharedBackgroundVisibility(.hidden)`, or it sits in a second sheet of it. Items share one
   capsule unless a `ToolbarSpacer(.fixed)` parts them, and what doesn't fit a phone's bar is

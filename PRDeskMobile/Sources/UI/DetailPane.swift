@@ -12,34 +12,52 @@ struct DetailPane: View {
     let pages: DetailPages
     let isPushed: Bool
     @AppStorage("showAutomated") private var showAutomated = false
-    @State private var scroll = PageScroll()
+    @State private var scrolls = PaneScrolls()
+    /// How much of the pane the system's bars cover, which the pages reach under.
+    @State private var bars = EdgeInsets()
+    @State private var headerHeight: CGFloat = 0
     /// The composer is open under the conversation.
     @State private var isComposing = false
 
     typealias Tab = AppModel.DetailTab
 
+    // The body doesn't read the tab showing (the views that need it do): a change of tab then
+    // leaves the bar's items alone, and the segments' own animation runs to its end.
     var body: some View {
         Group {
             if let item = model.selectedItem {
                 content(item)
-                    .safeAreaInset(edge: .top, spacing: 0) {
-                        VStack(spacing: 0) {
-                            DetailHeader(item: item, pages: pages, showAutomated: $showAutomated)
-                            // Pushed, the tabs are in the navigation bar, beside the way back.
-                            if item.kind == .pullRequest, !isPushed {
-                                tabs.padding(.horizontal, 12).padding(.bottom, 8)
+                    // Laid over the pages rather than inset above them: a scroll view of pages
+                    // would start each below it, and every page leaves it room itself.
+                    .overlay(alignment: .top) {
+                        ActivePage(scrolls: scrolls, item: item) { scroll in
+                            VStack(spacing: 0) {
+                                DetailHeader(item: item, pages: pages, showAutomated: $showAutomated)
+                                // Pushed, the tabs are in the navigation bar, beside the way back.
+                                if item.kind == .pullRequest, !isPushed {
+                                    DetailTabs().padding(.horizontal, 12).padding(.bottom, 8)
+                                }
+                                Divider()
                             }
-                            Divider()
+                            .background(Color(uiColor: .systemBackground))
+                            // Over every tab's page, each of which leaves it room at its top.
+                            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
+                                headerHeight = $0
+                                scrolls.setHeader(height: $0)
+                            }
+                            // It goes with the page showing, up and away or down when pulled.
+                            .offset(y: -min(scroll.offset, 3000))
                         }
-                        .scrollsAway()
                     }
                     // Once the header has left with the page, a line of glass says what this is;
                     // touching it goes back to the top. Beside the list it is in the pane's own
                     // bar (below); pushed, the bar holds the tabs, and the line sits under it.
                     .overlay(alignment: .top) {
                         if isPushed {
-                            CompactTitle(item: item, isShown: scroll.isChromeAway) { scrollToTop(item) }
-                                .offset(y: 6)
+                            ActivePage(scrolls: scrolls, item: item) { scroll in
+                                CompactTitle(item: item, isShown: scroll.isChromeAway) { scrollToTop(item) }
+                                    .offset(y: 6)
+                            }
                         }
                     }
                     .onChange(of: item.id) {
@@ -56,13 +74,17 @@ struct DetailPane: View {
                         if isPushed {
                             if item.kind == .pullRequest {
                                 // The segments are glass themselves: no second sheet of it behind.
-                                ToolbarItem(placement: .principal) { tabs.frame(maxWidth: 420) }
+                                ToolbarItem(placement: .principal) { DetailTabs().frame(maxWidth: 420) }
                                     .sharedBackgroundVisibility(.hidden)
                             }
-                        } else if scroll.isChromeAway {
+                        } else {
                             ToolbarItem(placement: .principal) {
-                                Button { scrollToTop(item) } label: { CompactTitle.Line(item: item) }
-                                    .accessibilityHint("Scrolls to the top")
+                                ActivePage(scrolls: scrolls, item: item) { scroll in
+                                    if scroll.isChromeAway {
+                                        Button { scrollToTop(item) } label: { CompactTitle.Line(item: item) }
+                                            .accessibilityHint("Scrolls to the top")
+                                    }
+                                }
                             }
                         }
                     }
@@ -71,70 +93,30 @@ struct DetailPane: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .environment(scroll)
+        .onGeometryChange(for: EdgeInsets.self) { $0.safeAreaInsets } action: { bars = $0 }
         .navigationBarTitleDisplayMode(.inline)
     }
 
+    /// Read when touched, not by the body.
     private func scrollToTop(_ item: Item) {
-        activePage(item).run("scrollTo({ top: 0, behavior: 'smooth' })")
-    }
-
-    /// The page of the tab showing.
-    private func activePage(_ item: Item) -> WebDocument {
-        switch item.kind == .issue ? .conversation : model.detailTab {
+        let page = switch item.kind == .issue ? .conversation : model.detailTab {
         case .conversation: pages.timeline
         case .commits: pages.commits
         case .files: pages.files
         }
-    }
-
-    private var tabs: some View {
-        @Bindable var model = model
-        return Picker("View", selection: $model.detailTab) {
-            Text("Conversation").tag(Tab.conversation)
-            Text("Commits").tag(Tab.commits)
-            Text("Files").tag(Tab.files)
-        }
-        .pickerStyle(.segmented)
+        page.run("scrollTo({ top: 0, behavior: 'smooth' })")
     }
 
     @ViewBuilder
     private func content(_ item: Item) -> some View {
         if let detail = model.detail, detail.id == item.id {
-            switch item.kind == .issue ? .conversation : model.detailTab {
-            case .conversation:
-                // The composer under the conversation rather than over it, so the page ends
-                // where the composer begins; folded, the page runs to the window's foot.
-                VStack(spacing: 0) {
-                    Conversation(item: item, detail: detail, page: pages.timeline, showAutomated: showAutomated)
-                        .overlay(alignment: .bottomTrailing) {
-                            if !isComposing {
-                                ComposeButton(hasDraft: !model.draft(for: item.id).isEmpty) {
-                                    withAnimation(.snappy(duration: 0.25)) { isComposing = true }
-                                }
-                                .padding(.trailing, 16)
-                                .padding(.bottom, 12)
-                                .transition(.scale(scale: 0.6).combined(with: .opacity))
-                            }
-                        }
-                    if isComposing {
-                        composer(item, detail)
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
-                    }
+            if item.kind == .issue {
+                conversation(item, detail)
+                    .environment(scrolls.conversation)
+            } else {
+                DetailPager(item: item, detail: detail, pages: pages, scrolls: scrolls, bars: bars, headerHeight: headerHeight) {
+                    conversation(item, detail)
                 }
-                // Room under the last comment for the button over the corner.
-                .onChange(of: isComposing, initial: true) { scroll.bottomRoom = isComposing ? 0 : ComposeButton.size + 8 }
-                .onDisappear { scroll.bottomRoom = 0 }
-                // A comment that went out leaves nothing to keep the composer open for.
-                .onChange(of: detail.entries.count) {
-                    withAnimation(.snappy(duration: 0.25)) { isComposing = false }
-                }
-            case .commits:
-                // Its own per item, so the selection and the chosen range don't carry over.
-                CommitsView(item: item, detail: detail, page: pages.commits)
-                    .id(item.id)
-            case .files:
-                FilesView(item: item, page: pages.files)
             }
         } else if case let .failed(message) = model.detailState {
             ContentUnavailableView {
@@ -146,6 +128,34 @@ struct DetailPane: View {
             }
         } else {
             DelayedProgressView()
+        }
+    }
+
+    /// The conversation, with the composer under it rather than over it, so the page ends where
+    /// the composer begins; folded, the page runs to the window's foot.
+    private func conversation(_ item: Item, _ detail: ItemDetail) -> some View {
+        VStack(spacing: 0) {
+            Conversation(item: item, detail: detail, page: pages.timeline, showAutomated: showAutomated)
+                .overlay(alignment: .bottomTrailing) {
+                    if !isComposing {
+                        ComposeButton(hasDraft: !model.draft(for: item.id).isEmpty) {
+                            withAnimation(.snappy(duration: 0.25)) { isComposing = true }
+                        }
+                        .padding(.trailing, 16)
+                        .padding(.bottom, 12)
+                        .transition(.scale(scale: 0.6).combined(with: .opacity))
+                    }
+                }
+            if isComposing {
+                composer(item, detail)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        // Room under the last comment for the button over the corner.
+        .onChange(of: isComposing, initial: true) { scrolls.conversation.bottomRoom = isComposing ? 0 : ComposeButton.size + 8 }
+        // A comment that went out leaves nothing to keep the composer open for.
+        .onChange(of: detail.entries.count) {
+            withAnimation(.snappy(duration: 0.25)) { isComposing = false }
         }
     }
 
@@ -170,6 +180,128 @@ struct DetailPane: View {
         }
         .background(.bar)
         .onAppear { model.requestComposerFocus() }
+    }
+}
+
+/// How far each tab's page has scrolled: they are side by side, and each keeps its own place.
+@MainActor
+private final class PaneScrolls {
+    let conversation = PageScroll()
+    let commits = PageScroll()
+    let files = PageScroll()
+    private let headerID = UUID()
+
+    subscript(tab: AppModel.DetailTab) -> PageScroll {
+        switch tab {
+        case .conversation: conversation
+        case .commits: commits
+        case .files: files
+        }
+    }
+
+    /// The pane's header lies over all of them.
+    func setHeader(height: CGFloat) {
+        for scroll in [conversation, commits, files] { scroll.setChrome(headerID, height: height) }
+    }
+}
+
+/// Builds with the scroll of the page showing, so that only this view follows the tab.
+private struct ActivePage<Content: View>: View {
+    @Environment(AppModel.self) private var model
+    let scrolls: PaneScrolls
+    let item: Item
+    @ViewBuilder let content: (PageScroll) -> Content
+
+    var body: some View {
+        let tab = item.kind == .issue ? .conversation : model.detailTab
+        content(scrolls[tab])
+            // Between tabs the header moves to where the other page has it.
+            .animation(.snappy(duration: 0.25), value: tab)
+    }
+}
+
+/// Conversation, Commits and Files as segments. Picking one slides to it.
+private struct DetailTabs: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Picker("View", selection: Binding(
+            get: { model.detailTab },
+            set: { model.detailTab = $0 }
+        )) {
+            Text("Conversation").tag(AppModel.DetailTab.conversation)
+            Text("Commits").tag(AppModel.DetailTab.commits)
+            Text("Files").tag(AppModel.DetailTab.files)
+        }
+        .pickerStyle(.segmented)
+    }
+}
+
+/// A pull request's three pages side by side, turned like pages: by a swipe, or by the tabs.
+private struct DetailPager<Conversation: View>: View {
+    @Environment(AppModel.self) private var model
+    let item: Item
+    let detail: ItemDetail
+    let pages: DetailPages
+    let scrolls: PaneScrolls
+    let bars: EdgeInsets
+    /// The pane's header, laid over the pages' tops.
+    let headerHeight: CGFloat
+    @ViewBuilder let conversation: Conversation
+    /// The tabs shown for this item, or begun to be swiped to: the others load nothing yet.
+    @State private var opened: Set<AppModel.DetailTab> = []
+    @State private var position = ScrollPosition(idType: AppModel.DetailTab.self)
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 0) {
+                page(.conversation) { conversation }
+                // Its own per item, so the selection and the chosen range don't carry over.
+                page(.commits) { CommitsView(item: item, detail: detail, page: pages.commits).id(item.id) }
+                page(.files) { FilesView(item: item, page: pages.files) }
+            }
+            .scrollTargetLayout()
+        }
+        .scrollTargetBehavior(.paging)
+        .scrollPosition($position)
+        .scrollIndicators(.hidden)
+        // A scroll view keeps its content clear of the bars; the pages reach under them
+        // (`page`), so nothing is clipped there, only at the pane's sides.
+        .scrollClipDisabled()
+        .clipShape(SideClip())
+        .onChange(of: item.id, initial: true) {
+            opened = [model.detailTab]
+            position.scrollTo(id: model.detailTab)
+        }
+        // A tab picked (a segment, a key): slide to its page.
+        .onChange(of: model.detailTab) { _, tab in
+            opened.insert(tab)
+            if position.viewID(type: AppModel.DetailTab.self) != tab {
+                withAnimation(.snappy(duration: 0.3)) { position.scrollTo(id: tab) }
+            }
+        }
+        // A page swiped to: that is the tab now.
+        .onChange(of: position.viewID(type: AppModel.DetailTab.self)) { _, tab in
+            if let tab, tab != model.detailTab { model.detailTab = tab }
+        }
+    }
+
+    private func page(_ tab: AppModel.DetailTab, @ViewBuilder _ content: () -> some View) -> some View {
+        ZStack {
+            if opened.contains(tab) { content() }
+        }
+        // The page fills the pane from the window's top to its foot. What it lays out by the
+        // safe area (a tab's own bar, the composer) keeps clear of the bars and the header; its
+        // web view ignores that and lies under them all.
+        .safeAreaPadding(.top, bars.top + headerHeight)
+        .safeAreaPadding(.bottom, bars.bottom)
+        .frame(maxHeight: .infinity)
+        .padding(.top, -bars.top)
+        .padding(.bottom, -bars.bottom)
+        .containerRelativeFrame(.horizontal)
+        .environment(scrolls[tab])
+        .onScrollVisibilityChange(threshold: 0.02) { if $0 { opened.insert(tab) } }
+        .id(tab)
     }
 }
 
@@ -535,5 +667,12 @@ private struct DetailHeader: View {
             .accessibilityLabel("More")
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// As wide as the view and far taller: clips what leaves by its sides, not by its top or foot.
+private struct SideClip: Shape {
+    func path(in rect: CGRect) -> Path {
+        Path(rect.insetBy(dx: 0, dy: -2000))
     }
 }

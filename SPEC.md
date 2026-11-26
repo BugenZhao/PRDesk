@@ -710,27 +710,34 @@ server and nothing syncs between the devices. The Mac alone follows the board wi
 writes what I do on it, and the Mac follows up as it would after an edit on the web. It keeps its
 own database and its own token (a PAT in Settings, in the Keychain; there is no `gh`).
 
-**Layout.** A pure function of the window's width, two preferences and the selection, so
-rotation, multitasking and a resized window always land on the layout the new size calls for:
+**Layout.** A pure function of the window's width, my choices and the selection, so rotation,
+multitasking and a resized window always land on the layout the new size calls for. The list is
+not a switcher beside the real thing but half of the desk, so it can have the window to itself at
+any width; the detail can too.
 
 ```
-900 pt and wider                                     narrower
-┌ ◧ Dashboard | Parity n | Inbox n          🔍 ••• ┐   ┌ Dashboard | Parity n | Inbox n     🔍 ••• ┐
-├ List (2/5, 400–480 pt) ┬ Detail ───────────────┤   ├ List (the whole width) ─────────────────┤
-│ ▾ Good 5               │ #69856 [RF] Count …   │   │ ▾ Good 5                                │
-│  title            7h   │ author · Open · CI    │   │  title …                           7h   │
-│  author · event  me ✓● │ [Triage Desk …] [HML–]│   │  #n author · event      me ✓ ● +90 −14  │
-│ ▾ Desk 24              │ Conversation|Commits|…│   │ (a row pushes its detail, with the tabs │
-│ 582 items · Synced 12s │ …                   ✎ │   │  in the navigation bar)                 │
-└────────────────────────┴───────────────────────┘   └─────────────────────────────────────────┘
+the list beside the detail (900 pt and wider)        the list alone (any width)
+┌ Dashboard | Parity n | Inbox n  ◧ ┬───────────────┐   ┌ Dashboard | Parity n | Inbox n          ┐
+├ List (400–480 pt)        │ #69856 [RF] Count …   │   ├ List (the whole width) ─────────────────┤
+│ ▾ Good 5                 │ author · Open · CI    │   │ ▾ Good 5                                │
+│  title              7h   │ [Triage Desk …] [HML–]│   │  title …                           7h   │
+│  author · event    me ✓● │ Conversation|Commits|…│   │  #n author · event      me ✓ ● +90 −14  │
+│ ⤢  582 items · 12s  🔍 ••• │ …                   ✎ │   │ ◫  582 items · Synced 12s        🔍 ••• │
+└──────────────────────────┴───────────────────────┘   └─────────────────────────────────────────┘
 ```
 
-- An iPad mini on its side is the first; upright, and any iPhone, the second. ◧ (⌘B) puts the
-  list away as a sidebar goes, the detail having the window, and brings it back; asking for the
-  filter by key brings it back too
-- The bar holds little, each thing a glass of its own: ◧, the lists (the segments are the glass,
-  with none behind them), the filter and ••• (rows, sorting, Sync Now, Settings). A phone's bar
-  has no room for the filter, which the system keeps at the window's foot there
+- The list is one of two things, chosen at its foot (⤢ / ◫, ⇧⌘B) and kept for wide and for
+  narrower windows apart (beside the detail on an iPad on its side, alone upright, to begin with):
+  - **Alone**: a page the whole window wide, with every column; a row pushes its detail over it,
+    the tabs in the navigation bar beside the way back. A phone's width has only this
+  - **The detail's sidebar** (a `NavigationSplitView`, so the system's own button, edge swipe and
+    animation): beside the detail from 900 pt, where ◧ (⌘B) puts it away and the detail has the
+    window; floating over the detail in a narrower window (an iPad upright), where picking a row
+    puts it away again
+- The list keeps the desk's own white ground as a sidebar too, not a sidebar's tint: the rows'
+  colors say things
+- The bar over the list holds only the lists (the segments are the glass, with none behind
+  them) and ◧; at its foot are the status, the filter and ••• (rows, sorting, Sync Now, Settings)
 - Going from one to the other keeps the selection, the detail's tab, its pages (scroll position,
   loaded diffs) and a comment being written. Nothing remembers which layout came before
 
@@ -751,11 +758,9 @@ lines or one (•••, two by default):
   Status, Desk nearest the edge, without the one it has. Holding a row opens the Mac's row menu:
   open, copy link, read, Status, Priority, pin, add to Desk, ready / draft, linked PR, agent
   session, author, Grok Bot
-- The filter (§4.4) is the system's search field: a button in the toolbar on an iPad, at the
-  window's foot on an iPhone
-- A capsule of glass over the list's foot shows the write under way as the Mac's status bar does,
-  otherwise the item count, the last sync and the quota; on an iPhone only while there is
-  something to say
+- The filter (§4.4) is the system's search field, a button at the list's foot
+- The list's foot shows the write under way as the Mac's status bar does, otherwise the item
+  count, the last sync and the quota; on an iPhone only while there is something to say
 
 **Detail.** As §6, with Status and Priority as segmented controls (one touch; Triage and – clear),
 the checks in a popover from the CI status, and round glass buttons of one size for the pin,
@@ -765,13 +770,16 @@ Commits a tap picks one commit (again for the preset) and a row's menu extends t
 A diff's options (Wrap Lines, Expand All, Collapse All) are behind ••• at the end of its bar, which
 has to fit a phone.
 
+A pull request's Conversation, Commits and Files are pages side by side: a swipe turns them, as do
+the tabs, and each keeps its own place. Commits and Files load when first shown or swiped towards.
+
 The page gets the whole pane:
 
 - The header, the tabs and a tab's own bars (the commits and their options, the files' counts) lie
   over the page's top and scroll away with it, as if they were its beginning; the page then runs
   up under the window's toolbar. While they are away a line of glass names the item (its state
-  icon, number and title): in the empty stretch of the toolbar over the pane beside the list,
-  under the toolbar when the detail is pushed. Touching it scrolls back to the top. The header's
+  icon, number and title): in the bar over the pane beside the list, under the tabs when the
+  detail is pushed. Touching it scrolls back to the top. The header's
   stack, labels, dates and the board's Comment also fold away under a chevron
 - Pulled past its top the page gives as any scroll view does, and the header goes down with it
 - The composer is folded into a round glass button over the conversation's corner, which grows
