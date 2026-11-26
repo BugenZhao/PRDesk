@@ -217,14 +217,13 @@ struct DeskView: View {
         @Bindable var model = model
         // The segments are glass themselves: no second sheet of it behind them.
         ToolbarItem(placement: .topBarLeading) {
-            // As a sidebar the bar is short of room: the lists by their symbols, in the
-            // system's own tab bar.
-            if layout.isListPage {
-                ListSwitcher()
-            } else {
-                ListTabBar(selection: $model.mode, parityCount: model.parityWaitingCount, inboxCount: model.unreadInboxCount)
-                    .listTabBarFrame()
-            }
+            // The system's own tab bar. As a sidebar the bar is short of room: the lists by
+            // their symbols alone.
+            ListTabBar(
+                selection: $model.mode, parityCount: model.parityWaitingCount, inboxCount: model.unreadInboxCount,
+                showsNames: layout.isListPage
+            )
+            .listTabBarFrame(showsNames: layout.isListPage)
         }
         .sharedBackgroundVisibility(.hidden)
         // Where the window isn't one column already: the filter, then the list the whole window
@@ -253,60 +252,6 @@ struct DeskView: View {
                 showsSettings: $showsSettings
             )
         }
-    }
-}
-
-/// Which list shows, by name: Dashboard, Parity or Inbox as segments, where the bar has room
-/// (the list at full width, a phone). As a sidebar it is `ListTabBar`, by symbol. What waits in
-/// Parity and the Inbox is a badge on its name's corner.
-private struct ListSwitcher: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        @Bindable var model = model
-        Picker("View", selection: $model.mode) {
-            Text("Dashboard").tag(AppModel.ListMode.dashboard)
-            Text("Parity").tag(AppModel.ListMode.parity)
-            Text("Inbox").tag(AppModel.ListMode.inbox)
-        }
-        .pickerStyle(.segmented)
-        .fixedSize()
-        // A segment takes no badge. The segments are of one width, so each name is in the
-        // middle of a third of the control: a hidden copy of it there gives the badge the
-        // name's corner to sit on.
-        .overlay {
-            HStack(spacing: 0) {
-                badge(0, on: "Dashboard")
-                badge(model.parityWaitingCount, on: "Parity")
-                badge(model.unreadInboxCount, on: "Inbox")
-            }
-            .allowsHitTesting(false)
-        }
-    }
-
-    private func badge(_ count: Int, on name: String) -> some View {
-        Text(name)
-            .font(.subheadline.weight(.medium))
-            .hidden()
-            // From the name's upper trailing corner outwards, a little over it.
-            .overlay(alignment: .topTrailing) {
-                Color.clear.frame(width: 0, height: 0).overlay(alignment: .bottomLeading) {
-                    if count > 0 {
-                        Text(count > 99 ? "99+" : String(count))
-                            .font(.system(size: 10.5, weight: .semibold))
-                            .monospacedDigit()
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 4.5)
-                            .frame(minWidth: 16, minHeight: 16)
-                            // The color of the list's unread dots, not an alarm's red.
-                            .background(Color.accentColor, in: .capsule)
-                            .fixedSize()
-                            .offset(x: 3, y: 6)
-                            .accessibilityLabel("\(count) waiting")
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

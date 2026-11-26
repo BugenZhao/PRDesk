@@ -214,15 +214,23 @@ are used off the main actor); no glass on content (cards, chips, rows).
   by rules of its own, and CSS `zoom` on the root then moved the boxes and left the text at
   13 px. The zoom is set from Swift (`PRDesk.setTextScale`: 1.2 times the Dynamic Type factor).
   `@ScaledMetric` of 1 comes back rounded to 1 at every size; scale 100 and divide.
-- The sidebar's list switcher is a real `UITabBar` on its own (`ListTabBar`), not an imitation:
-  built against this SDK it draws its glass capsule, the system's selection and badges by
-  itself, and takes untitled items with a `SymbolConfiguration` (17 pt medium matches the bar's
-  buttons). The filled symbol for the chosen item is not automatic in UIKit as it is in a
-  SwiftUI `TabView`: set `selectedImage`. In a toolbar it must be given its size (it collapses to nothing otherwise), and it
-  draws its capsule in the upper 44 pt of a 54 pt height: `listTabBarFrame` lays it out by the
-  capsule. A segmented `Picker` could not do this: a segment is text or an image, never both,
-  draws an image small and light whatever its font, and takes no badge (`ListSwitcher`, used
-  where the lists are named, overlays its own).
+- The list switcher is a real `UITabBar` on its own (`ListTabBar`), not an imitation: built
+  against this SDK it draws its glass capsule, the system's selection and badges by itself.
+  What it needs by hand:
+  - Symbols alone: untitled items. A name beside each symbol: titled items and
+    `traitOverrides.horizontalSizeClass = .regular` on the bar (the inline layout of a wide
+    window's tab bar, also on a phone).
+  - A `SymbolConfiguration` (17 pt medium matches the bar's buttons) and a `selectedImage` with
+    the `.fill` symbol: UIKit doesn't fill the chosen item's symbol as a SwiftUI `TabView` does.
+  - Its size, or it collapses to nothing in a toolbar. It centers its capsule in the width
+    given and wants margins, and draws it in the upper 44 pt of a 54 pt height
+    (`listTabBarFrame` crops to the capsule).
+  - Badges: once `standardAppearance` is set, `item.badgeColor` is ignored (red again); set
+    `badgeBackgroundColor` and `badgePositionAdjustment` on all three layout appearances of a
+    *copy* of the bar's own appearance (a new `UITabBarAppearance()` lays the items out
+    tighter). A positive horizontal adjustment moves the badge back over the name.
+  A segmented `Picker` could not do this: a segment is text or an image, never both, draws an
+  image small and light whatever its font, and takes no badge.
 - The system's search button joins the capsule of whatever is at the bar's end unless it is
   placed by name (`DefaultToolbarItem(kind: .search, placement: .topBarTrailing)`) with a
   `ToolbarSpacer(.fixed)` on each side; in a compact window it is placed in the bottom bar.
