@@ -737,8 +737,8 @@ rotation, multitasking and a resized window always land on the layout the new si
 **List.** The Mac's sections, tints, fading, stacks' rails and marks (§4.1–§4.3), in rows of two
 lines or one (•••, two by default):
 
-- A section's title and count sit on a capsule of glass, which floats over the rows once the
-  section's top has scrolled away; touching it folds the section
+- A section's title and count are a band of glass from edge to edge (not a capsule): pinned at
+  the list's top, rows pass under it as under the bar above. Touching it folds the section
 
 - Two lines: the title with its tags and the age; under it the number, author and marks of trust,
   the latest event (or the board's Comment), then Turn, Review, CI and Size in columns

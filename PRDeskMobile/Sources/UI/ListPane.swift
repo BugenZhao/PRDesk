@@ -132,8 +132,8 @@ struct ItemListView: View {
     }
 }
 
-/// A section's title and count, on a capsule of glass; tapping folds it. Pinned at the list's
-/// top it floats over the rows, which pass under and around it.
+/// A section's title and count; tapping folds it. A band of glass from edge to edge: pinned at
+/// the list's top, rows pass under it as they do under the bar above.
 private struct SectionHeader: View {
     @Environment(AppModel.self) private var model
     let group: ItemListView.Group
@@ -145,28 +145,27 @@ private struct SectionHeader: View {
             HStack(spacing: 6) {
                 Image(systemName: "chevron.right")
                     .font(.caption2.weight(.bold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.tertiary)
                     .rotationEffect(.degrees(group.collapsed ? 0 : 90))
+                    .frame(width: 14)
                 Text(group.section.title)
                     .foregroundStyle(Color.primary)
                 Text(String(group.count))
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
                 if group.inParity > 0 {
-                    Text("+\(group.inParity) in Parity").foregroundStyle(.secondary)
+                    Text("+\(group.inParity) in Parity").foregroundStyle(.tertiary)
                 }
+                Spacer(minLength: 0)
             }
             .font(.footnote.weight(.semibold))
             .textCase(nil)
-            .padding(.horizontal, 11)
-            .frame(height: 26)
-            .contentShape(Capsule())
-            .glassEffect(.regular.interactive(), in: .capsule)
+            .padding(.horizontal, 10)
+            .frame(height: 30)
+            .contentShape(Rectangle())
+            .glassEffect(.regular, in: .rect)
         }
         .buttonStyle(.plain)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
         .listRowInsets(EdgeInsets())
         .accessibilityHint(group.section.help)
     }
