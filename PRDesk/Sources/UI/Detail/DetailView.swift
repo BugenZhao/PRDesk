@@ -126,7 +126,8 @@ private struct DetailHeader: View {
                 if titleEdit?.item.id == item.id {
                     titleField
                 } else {
-                    titleText
+                    // SF Mono a point smaller looks the same size as the title's 15-point text.
+                    Text(itemTitle: item.title, shortenedTags: false, codeFont: .system(size: 14, weight: .semibold, design: .monospaced), tagStyle: .secondaryText)
                         .lineLimit(3)
                         .textSelection(.enabled)
                         // Double-clicking also selects a word; the field then selects the lot.
@@ -140,9 +141,10 @@ private struct DetailHeader: View {
                 LoginText(login: item.author)
                 BadgeIcons(login: item.author)
                 StateIconView(item: item, isMerging: item.isOpen && model.board(for: item)?.triage == .merging)
-                stateChip
+                ItemStateChip(item: item)
                 if let ci = item.ci {
-                    Button { model.checksShownFor = isShowingChecks.wrappedValue ? nil : item.repoNumber } label: { CISummary(ci: ci) }
+                    let isShowingChecks = model.checksBinding(for: item)
+                    Button { isShowingChecks.wrappedValue.toggle() } label: { CISummary(ci: ci) }
                         .buttonStyle(.plain)
                         .help("Show checks")
                         .popover(isPresented: isShowingChecks, arrowEdge: .bottom) {
@@ -167,19 +169,7 @@ private struct DetailHeader: View {
             }
             .font(.callout)
 
-            HStack(spacing: 6) {
-                Text("opened \(item.createdAt.compactAge()) ago · updated \(item.updatedAt.compactAge()) ago")
-                if let detail = model.detail, detail.id == item.id, let head = detail.headRef, let base = detail.baseRef {
-                    Text("·")
-                    Text("\(head) → \(base)")
-                        .font(.caption.monospaced())
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .textSelection(.enabled)
-                }
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            ItemDatesLine(item: item)
 
             AdoptionNote(item: item)
 
@@ -222,34 +212,6 @@ private struct DetailHeader: View {
         model.rename(edit.item, to: edit.text)
     }
 
-    /// The title with its leading tags ("[Core] ", "fix(x): ") dimmed and its inline code monospaced.
-    private var titleText: Text {
-        TitleMarkup.pieces(item.title).reduce(Text(verbatim: "")) { text, piece in
-            var part = Text(verbatim: piece.text)
-            // SF Mono a point smaller looks the same size as the title's 15-point text.
-            if piece.isCode { part = part.font(.system(size: 14, weight: .semibold, design: .monospaced)) }
-            if piece.isPrefix { part = part.foregroundStyle(.secondary) }
-            return Text("\(text)\(part)")
-        }
-    }
-
-    /// The checks popover, open while the model names this item.
-    private var isShowingChecks: Binding<Bool> {
-        Binding(
-            get: { model.checksShownFor == item.repoNumber },
-            set: { model.checksShownFor = $0 ? item.repoNumber : nil }
-        )
-    }
-
-    private var stateChip: some View {
-        switch (item.state, item.isDraft) {
-        case (.open, true): Chip(text: "Draft")
-        case (.open, false): Chip(text: "Open", color: .green)
-        case (.merged, _): Chip(text: "Merged", color: .purple)
-        case (.closed, _): Chip(text: "Closed", color: item.kind == .issue ? .purple : .red)
-        }
-    }
-
     private var controls: some View {
         HStack(spacing: 8) {
             // Staging PRs aren't on the board (SPEC §3.2).
@@ -259,38 +221,15 @@ private struct DetailHeader: View {
             if model.detailState == .loading || isSettingDraft {
                 ProgressView().controlSize(.small)
             }
-            sessionButton
+            SessionButton(item: item) { iconLabel("Agent Session", icon: .symbol("terminal")) }
+                .menuIndicator(.visible)
+                .fixedSize()
             iconButton("Refresh", symbol: "arrow.clockwise") { model.loadDetail(force: true) }
                 .disabled(model.detailState == .loading)
             iconButton("Open", symbol: "arrow.up.right") { model.perform(.openInBrowser, on: item.id) }
                 .help("Open on GitHub (o)")
         }
         .controlSize(.small)
-    }
-
-    /// Opens the agent sessions the assistant bot wrote to the board's Session field: the latest
-    /// one, or any of them from a menu when there are several.
-    @ViewBuilder private var sessionButton: some View {
-        let links = model.board(for: item)?.sessionLinks ?? []
-        if links.count == 1 {
-            iconButton("Agent Session", symbol: "terminal") { AgentSession.open(links[0]) }
-                .help("Open the \(AgentSession.agentName(for: links[0])) session (t)")
-        } else if links.count > 1 {
-            Menu {
-                ForEach(Array(links.enumerated().reversed()), id: \.offset) { index, link in
-                    Button("\(AgentSession.agentName(for: link)) session \(index + 1)\(index == links.count - 1 ? " (latest)" : "")") {
-                        AgentSession.open(link)
-                    }
-                }
-            } label: {
-                Image(systemName: "terminal")
-            } primaryAction: {
-                AgentSession.open(links[links.count - 1])
-            }
-            .menuIndicator(.visible)
-            .fixedSize()
-            .help("Open the latest agent session (t); the menu lists all \(links.count)")
-        }
     }
 
     /// Draft ⇄ ready for review; Park / Resume on a staging PR, which the parity agent reads as
@@ -315,17 +254,7 @@ private struct DetailHeader: View {
         let board = model.board(for: item)
         let triage = model.triage(for: item)
         Group {
-            Picker("Status", selection: Binding(
-                get: { model.listedTriage(for: item) },
-                set: { status in
-                    if let status {
-                        if status != triage { model.perform(.triage(status), on: item.id) }
-                    } else if let current = triage {
-                        // Choosing the current status again clears it.
-                        model.perform(.triage(current), on: item.id)
-                    }
-                }
-            )) {
+            Picker("Status", selection: model.statusBinding(for: item)) {
                 Text("Triage").tag(TriageStatus?.none)
                 Divider()
                 ForEach(TriageStatus.settable, id: \.self) { Text($0.rawValue).tag(Optional($0)) }
@@ -338,10 +267,7 @@ private struct DetailHeader: View {
             .fixedSize()
             .help("Status on the board (w/b/s/m)")
 
-            Picker("Priority", selection: Binding(
-                get: { board?.priorityValue },
-                set: { model.perform(.priority($0), on: item.id) }
-            )) {
+            Picker("Priority", selection: model.priorityBinding(for: item)) {
                 Text("No Priority").tag(Priority?.none)
                 Divider()
                 ForEach(Priority.allCases, id: \.self) { priority in
@@ -371,7 +297,11 @@ private struct DetailHeader: View {
     }
 
     private func iconButton(_ title: String, icon: StateIcon, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+        Button(action: action) { iconLabel(title, icon: icon) }
+    }
+
+    private func iconLabel(_ title: String, icon: StateIcon) -> some View {
+        Group {
             switch icon {
             // The PR glyphs are drawn on a 16 px grid; scaled down they match the symbols' weight.
             case .asset: icon.image.resizable().scaledToFit().frame(width: 13, height: 13).frame(width: 14, height: 14)

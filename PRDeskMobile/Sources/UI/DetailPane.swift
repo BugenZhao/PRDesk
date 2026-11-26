@@ -125,7 +125,7 @@ struct DetailPane: View {
         // of its own.
         if showsLinks {
             ToolbarItemGroup(placement: .topBarTrailing) {
-                SessionButton(item: item)
+                SessionButton(item: item) { Label("Open Agent Session", systemImage: "terminal") }
                 Button("Open on GitHub", systemImage: "arrow.up.right") { model.perform(.openInBrowser, on: item.id) }
             }
             ToolbarSpacer(.fixed, placement: .topBarTrailing)
@@ -434,32 +434,6 @@ private struct ComposeButton: View {
     }
 }
 
-/// Opens the agent sessions written to the board's Session field: the latest one, or any of them
-/// from a menu when there are several (as the Mac's button).
-private struct SessionButton: View {
-    @Environment(AppModel.self) private var model
-    let item: Item
-
-    var body: some View {
-        let links = model.board(for: item)?.sessionLinks ?? []
-        if links.count == 1 {
-            Button("Open \(AgentSession.agentName(for: links[0])) Session", systemImage: "terminal") {
-                AgentSession.open(links[0])
-            }
-        } else if let latest = links.last {
-            Menu("Open Agent Session", systemImage: "terminal") {
-                ForEach(Array(links.enumerated().reversed()), id: \.offset) { index, link in
-                    Button("\(AgentSession.agentName(for: link)) session \(index + 1)\(index == links.count - 1 ? " (latest)" : "")") {
-                        AgentSession.open(link)
-                    }
-                }
-            } primaryAction: {
-                AgentSession.open(latest)
-            }
-        }
-    }
-}
-
 /// The face of a menu in the header: what is set, on a glass capsule as tall as the round buttons.
 private struct GlassMenuLabel: View {
     let text: String
@@ -545,21 +519,15 @@ private struct DetailHeader: View {
 
     private var title: some View {
         // One text, so a title that wraps continues under its number.
-        Text("\(Text("#\(String(item.number))").foregroundStyle(.secondaryText).monospacedDigit()) \(titleText)")
+        let text = Text(
+            itemTitle: item.title, shortenedTags: false, codeFont: .system(.title3, design: .monospaced).weight(.semibold),
+            tagStyle: .secondaryText
+        )
+        return Text("\(Text("#\(String(item.number))").foregroundStyle(.secondaryText).monospacedDigit()) \(text)")
             .lineLimit(3)
             .fixedSize(horizontal: false, vertical: true)
             .textSelection(.enabled)
             .font(.title3.weight(.semibold))
-    }
-
-    /// The title with its leading tags ("[Core] ", "fix(x): ") dimmed and its inline code monospaced.
-    private var titleText: Text {
-        TitleMarkup.pieces(item.title).reduce(Text(verbatim: "")) { text, piece in
-            var part = Text(verbatim: piece.text)
-            if piece.isCode { part = part.font(.system(.title3, design: .monospaced).weight(.semibold)) }
-            if piece.isPrefix { part = part.foregroundStyle(.secondaryText) }
-            return Text("\(text)\(part)")
-        }
     }
 
     private var people: some View {
@@ -569,11 +537,11 @@ private struct DetailHeader: View {
                 .lineLimit(1)
             BadgeIcons(login: item.author)
             StateIconView(item: item, isMerging: item.isOpen && model.board(for: item)?.triage == .merging)
-            stateChip
+            ItemStateChip(item: item)
             if let ci = item.ci {
                 Button { model.checksShownFor = item.repoNumber } label: { CISummary(ci: ci).lineLimit(1) }
                     .buttonStyle(.plain)
-                    .popover(isPresented: isShowingChecks) {
+                    .popover(isPresented: model.checksBinding(for: item)) {
                         VStack(spacing: 0) {
                             ItemChecksView(item: item, maxHeight: 460)
                             Divider()
@@ -607,19 +575,7 @@ private struct DetailHeader: View {
     /// What folds away: dates and branches, the adoption, the stack, the labels and the board's
     /// Comment.
     @ViewBuilder private var more: some View {
-        HStack(spacing: 6) {
-            Text("opened \(item.createdAt.compactAge()) ago · updated \(item.updatedAt.compactAge()) ago")
-                .lineLimit(1)
-            if let detail = model.detail, detail.id == item.id, let head = detail.headRef, let base = detail.baseRef {
-                Text("·")
-                Text("\(head) → \(base)")
-                    .font(.caption.monospaced())
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-        }
-        .font(.caption)
-        .foregroundStyle(.secondaryText)
+        ItemDatesLine(item: item)
 
         AdoptionNote(item: item)
 
@@ -637,22 +593,6 @@ private struct DetailHeader: View {
             Label(comment, systemImage: "text.bubble")
                 .font(.caption)
                 .foregroundStyle(.secondaryText)
-        }
-    }
-
-    private var isShowingChecks: Binding<Bool> {
-        Binding(
-            get: { model.checksShownFor == item.repoNumber },
-            set: { model.checksShownFor = $0 ? item.repoNumber : nil }
-        )
-    }
-
-    private var stateChip: some View {
-        switch (item.state, item.isDraft) {
-        case (.open, true): Chip(text: "Draft")
-        case (.open, false): Chip(text: "Open", color: .green)
-        case (.merged, _): Chip(text: "Merged", color: .purple)
-        case (.closed, _): Chip(text: "Closed", color: item.kind == .issue ? .purple : .red)
         }
     }
 
@@ -704,17 +644,7 @@ private struct DetailHeader: View {
     /// `spelledOut`: in a menu, where there is room for words and its title says what it sets.
     private func statusPicker(spelledOut: Bool) -> some View {
         let triage = model.triage(for: item)
-        return Picker("Status", selection: Binding(
-            get: { model.listedTriage(for: item) },
-            set: { status in
-                if let status {
-                    if status != triage { model.perform(.triage(status), on: item.id) }
-                } else if let triage {
-                    // Back to Triage: setting the current Status again clears it.
-                    model.perform(.triage(triage), on: item.id)
-                }
-            }
-        )) {
+        return Picker("Status", selection: model.statusBinding(for: item)) {
             Text("Triage").tag(TriageStatus?.none)
             ForEach(TriageStatus.settable, id: \.self) { status in
                 if spelledOut {
@@ -731,14 +661,7 @@ private struct DetailHeader: View {
     }
 
     private func priorityPicker(spelledOut: Bool) -> some View {
-        Picker("Priority", selection: Binding(
-            get: { model.board(for: item)?.priorityValue },
-            set: { priority in
-                // Setting the current Priority again clears it, so nil goes by the current one.
-                let current = model.board(for: item)?.priorityValue
-                if priority != current { model.perform(.priority(priority ?? current), on: item.id) }
-            }
-        )) {
+        Picker("Priority", selection: model.priorityBinding(for: item)) {
             ForEach(Priority.allCases, id: \.self) { Text(spelledOut ? Self.name($0) : $0.letter).tag(Optional($0)) }
             Text(spelledOut ? "None" : "–").tag(Priority?.none)
         }
