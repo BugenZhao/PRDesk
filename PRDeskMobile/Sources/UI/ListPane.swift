@@ -351,18 +351,7 @@ struct SyncStatusButton: View {
         }
     }
 
-    private var syncLine: String {
-        switch model.syncState {
-        case .syncing: return "Syncing…"
-        case .failed: return "Sync failed"
-        case let .rateLimited(until):
-            return "Rate limited until \(until.formatted(date: .omitted, time: .shortened))"
-        case .idle:
-            guard let last = model.lastSyncedAt else { return "Not synced yet" }
-            let age = last.compactAge()
-            return age == "now" ? "Synced just now" : "Synced \(age) ago"
-        }
-    }
+    private var syncLine: String { model.syncLine() ?? "Not synced yet" }
 }
 
 extension Priority {

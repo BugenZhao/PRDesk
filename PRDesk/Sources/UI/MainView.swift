@@ -214,22 +214,21 @@ private struct SyncStatus: View {
             switch model.syncState {
             case .syncing:
                 ProgressView().controlSize(.mini)
-                Text("Syncing…")
+                Text(model.syncLine() ?? "")
             case let .failed(message):
-                Label("Sync failed", systemImage: "exclamationmark.triangle.fill")
+                Label(model.syncLine() ?? "", systemImage: "exclamationmark.triangle.fill")
                     .labelStyle(.titleAndIcon)
                     .foregroundStyle(.red)
                     .help(message)
-            case let .rateLimited(until):
-                Label("Rate limited until \(until.formatted(date: .omitted, time: .shortened))", systemImage: "hourglass")
+            case .rateLimited:
+                Label(model.syncLine() ?? "", systemImage: "hourglass")
                     .labelStyle(.titleAndIcon)
                     .foregroundStyle(.orange)
                     .help("GitHub refused a sync for its GraphQL budget. The next one waits until then; ⌘R and what you do are still tried.")
             case .idle:
-                if let last = model.lastSyncedAt {
+                if model.lastSyncedAt != nil {
                     TimelineView(.periodic(from: .now, by: 5)) { context in
-                        let age = last.compactAge(relativeTo: context.date)
-                        Text(age == "now" ? "Synced just now" : "Synced \(age) ago")
+                        Text(model.syncLine(at: context.date) ?? "")
                     }
                 }
             }
