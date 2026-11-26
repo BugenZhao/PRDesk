@@ -329,8 +329,10 @@ struct ItemRowView: View {
         }
     }
 
+    /// The row's one time: when the item was last updated, or how long ago it was opened while
+    /// the list is sorted by that (the Mac's Age and Upd columns in the room for one).
     private var updated: some View {
-        Text(item.updatedAt.compactAge())
+        Text((model.sort.key == .age ? item.createdAt : item.updatedAt).compactAge())
             .font(.caption.monospacedDigit())
             .foregroundStyle(.secondaryText)
             .lineLimit(1)

@@ -800,7 +800,7 @@ lines or one (•••, two by default):
   glints as rows pass under it): pinned at the list's top, rows show dimly under it. Touching it
   folds the section
 
-- Two lines: the title with its tags and the age; under it the number, author and marks of trust,
+- Two lines: the title with its tags and that time; under it the number, author and marks of trust,
   the latest event (or the board's Comment; purple in place of a woken item's tag when it is
   what woke it, as on the Mac; what the author did goes without "author", right after the
   author's name: `pushed 9d`), then the size (+n −n, at any width: a sidebar or a
@@ -811,6 +811,9 @@ lines or one (•••, two by default):
   too, so everywhere but a table on an iPad on its side
 - Narrower than 450 pt rows are always two lines, and ••• doesn't offer the choice
 - ••• also sorts (the same keys as the Mac's columns). Pulling down syncs
+- A row has room for one time, at its end: when the item was last updated (the Mac's Upd), or
+  how long ago it was opened (Age) while the list is sorted by that. The other is in the
+  detail's header
 - A swipe does one thing, all the way across or by its button. Right: read / unread. Left: the
   item's next place on the board, by the Status it has (not the section the row is in, since an
   item is in several): onto the Desk from Tray, Shelf or Attic, off the Desk to the Shelf (Good
