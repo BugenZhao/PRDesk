@@ -241,19 +241,21 @@ are used off the main actor); no glass on content (cards, chips, rows).
       of the symbols with that room (twice the shift) added after them. An alignment rectangle
       on the symbol does the same for `image` only: the bar drops it from `selectedImage`.
       `imageInsets` does nothing in this bar.
-    - A badge is in the air past its symbol (it goes at the end of the name). `placeBadges`
-      moves the view all the badges are in (its bounds' origin) so a badge's middle is on its
-      symbol's trailing edge. `badgePositionAdjustment` does nothing in this bar, and a
-      transform on the badge's own view is gone once the badge has appeared. The bar makes a
-      badge's view some time after it is given the count: placed on the bar's layout and again
-      a turn of the run loop later.
+    - The bar's own badge (`badgeValue`) is in the air past its symbol: it goes at the end of
+      the name. It can't be moved: `badgePositionAdjustment` does nothing in this bar, a
+      transform on the badge's view is gone once the badge has appeared, and a move of the
+      view the badges are in the bar makes up for at its next layout (it lays a badge out by
+      converting from its item), so the badge jumped back and forth between symbols at every
+      selection. The badges are the host's own views instead (`placeBadges`), over the bar:
+      middle on the symbol's trailing edge, top at the button's top, in the system badge's
+      measures, with a rim in the ground's color (a blue badge on a chosen list's blue
+      symbol ran into it). They draw themselves: a `UILabel` in a bar's glass is drawn in one
+      color with the glass's other content and came out a white disc.
   - Under a finger the lens draws the chosen item at 1.16 times its size and animates it back.
     Taken out of its window meanwhile (⤢ right after picking a list: the split view rebuilds
     its columns), the bar loses the animation and the item stays large: `settleLens` puts the
     buttons' transforms back when the host is in a window again.
   - UIKit doesn't fill the chosen item's symbol as a SwiftUI `TabView` does: `selectedImage`.
-    Once `standardAppearance` is set, `item.badgeColor` is ignored: set `badgeBackgroundColor`
-    on all three layout appearances of a copy of the bar's own appearance.
   - `didSelect` hands the change to the model on the next turn of the run loop, so rebuilding
     the list doesn't hold up the bar's own selection.
   - A simulator's pixels are antialiased where its window, shown smaller than the device, is

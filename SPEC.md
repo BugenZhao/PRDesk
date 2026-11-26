@@ -744,8 +744,8 @@ one out, with its own button, edge swipe and animation), the list its sidebar:
 - The bar over the list holds the lists, the filter, ⤢ and ◧, the last two (about where the
   list is) side by side. The lists are the system's own tab bar: a capsule of glass with the
   system's selection (the lens that follows a finger across it), the chosen one tinted and its
-  symbol filled, and the system's badges for what waits in Parity and the Inbox, in the blue of
-  the unread dots. A grid for Dashboard, an equals sign in a circle for Parity, a bell for the
+  symbol filled, and badges in the system's manner for what waits in Parity and the Inbox, in
+  the blue of the unread dots. A grid for Dashboard, an equals sign in a circle for Parity, a bell for the
   Inbox: symbols alone, everywhere, each in the middle of its button, a badge on its symbol's
   corner. As tall as the bar's buttons;
   at its foot are the sync status button, the filter and ••• (rows, sorting, Settings)

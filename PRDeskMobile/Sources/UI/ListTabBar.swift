@@ -2,8 +2,9 @@ import SwiftUI
 import UIKit
 
 /// Which list shows, as the system's own tab bar: a `UITabBar` on its own, which draws itself
-/// in glass with the system's selection (the lens that follows a finger across it) and badges.
-/// Symbols alone, always: which list it is the list itself says, and the menus.
+/// in glass with the system's selection (the lens that follows a finger across it). Symbols
+/// alone, always: which list it is the list itself says, and the menus. What waits in a list is
+/// a badge on its symbol's corner, drawn here in the system's manner (`TabBarHost.placeBadges`).
 ///
 /// A tab bar isn't made to sit in a toolbar: it has no size of its own there, and draws its
 /// capsule somewhere inside whatever bounds it is given. So it is laid out with room to spare
@@ -78,24 +79,13 @@ private struct TabBarView: UIViewRepresentable {
             // tab bar's capsule is as wide as its items need (in a narrow one it fills the
             // bar).
             bar.traitOverrides.horizontalSizeClass = .regular
-            // Badges in the color of the list's unread dots. On the bar's own appearance, a
-            // copy: a new one lays the items out tighter.
-            let appearance = bar.standardAppearance.copy()
-            for layout in [appearance.stackedLayoutAppearance, appearance.inlineLayoutAppearance, appearance.compactInlineLayoutAppearance] {
-                for state in [layout.normal, layout.selected] { state.badgeBackgroundColor = .tintColor }
-            }
-            bar.standardAppearance = appearance
             host.setItems(items())
         }
         let index = Self.modes.firstIndex { $0.0 == selection } ?? 0
         if bar.selectedItem?.tag != index { bar.selectedItem = bar.items?[index] }
-        for (item, count) in zip(bar.items ?? [], [0, parityCount, inboxCount]) {
-            let value = count > 0 ? (count > 99 ? "99+" : String(count)) : nil
-            if item.badgeValue != value {
-                item.badgeValue = value
-                host.setNeedsBadges()
-            }
-        }
+        let counts = [0, parityCount, inboxCount].map { $0 > 0 ? ($0 > 99 ? "99+" : String($0)) : nil }
+        for (item, count) in zip(bar.items ?? [], counts) { item.accessibilityValue = count }
+        host.counts = counts
     }
 
     /// Whatever it is given: the size is `ListTabBar`'s to set, from what the host measured.
@@ -112,21 +102,16 @@ private struct TabBarView: UIViewRepresentable {
 /// Measured only in a window: before, the bar doesn't lay out as it will.
 ///
 /// A tab bar's items have names wherever the system uses one, and two things come out wrong
-/// without: the symbols are off the middle of their buttons, and a badge is in the air past its
-/// symbol. Both are measured in the bar as it laid itself out and made up for (`centerSymbols`,
-/// `placeBadges`); should the system lay them out right one day, there is nothing to make up.
+/// without. The symbols are off the middle of their buttons: how far is measured in the bar as
+/// it laid itself out and made up for (`centerSymbols`); should the system center them one day,
+/// there is nothing to make up. And a badge of the bar's own is in the air past its symbol,
+/// where the name would end: the badges are views of the host's instead (`placeBadges`).
 final class TabBarHost: UIView {
-    /// Tells when it has laid itself out, which is when it puts its badges where it wants them.
-    final class Bar: UITabBar {
-        var onLayout: (() -> Void)?
-
-        override func layoutSubviews() {
-            super.layoutSubviews()
-            onLayout?()
-        }
+    let bar = UITabBar()
+    /// What waits in each list, as a badge shows it; nil for none.
+    var counts: [String?] = [] {
+        didSet { if counts != oldValue { setNeedsLayout() } }
     }
-
-    let bar = Bar()
     /// Told the capsule's size when it is measured or changes.
     var onMeasure: ((CGSize) -> Void)?
     /// The height of a navigation bar's buttons, which the capsule is to match.
@@ -136,7 +121,7 @@ final class TabBarHost: UIView {
     /// Where the bar drew its capsule, in the bar's bounds.
     private var capsule: CGRect?
     private var needsMeasure = true
-    private var needsBadges = false
+    private var badges: [Badge] = []
     /// The items' symbols as they were given, plain and chosen.
     private var symbols: [(UIImage?, UIImage?)] = []
     /// The room added beside the symbols to bring them to the middle (`centerSymbols`).
@@ -145,10 +130,6 @@ final class TabBarHost: UIView {
     override init(frame: CGRect) {
         super.init(frame: frame)
         addSubview(bar)
-        bar.onLayout = { [weak self] in
-            self?.placeBadges()
-            self?.setNeedsBadges()
-        }
         // Another text size is another capsule, and other symbols to draw (bold text too).
         registerForTraitChanges([UITraitPreferredContentSizeCategory.self, UITraitLegibilityWeight.self]) { (host: TabBarHost, _) in
             host.redrawSymbols()
@@ -275,42 +256,84 @@ final class TabBarHost: UIView {
 
     // MARK: Badges
 
-    /// Places the badges once more on the next turn of the run loop: the bar makes a badge's
-    /// view some time after it is given the count, with no layout of its own to tell by.
-    func setNeedsBadges() {
-        guard !needsBadges else { return }
-        needsBadges = true
-        DispatchQueue.main.async { [weak self] in
-            if self?.needsBadges == true { self?.placeBadges() }
+    /// A badge on its symbol's corner, where one sits on an icon: its middle on the symbol's
+    /// trailing edge, its top at the top of the symbol's button. The bar's own badges
+    /// (`badgeValue`) go where an item's name ends, which with no name is in the air past the
+    /// symbol, and the bar puts them back there whatever is done to them or to the view they are
+    /// in (`badgePositionAdjustment` moves nothing in this bar; a move of their view the bar
+    /// makes up for at its next layout, so they jumped). So these are the host's own, over the
+    /// bar, in the measures of the system's: 16 pt tall, a count in white on the tint.
+    private func placeBadges() {
+        let symbols = symbolViews().suffix(counts.count)
+        for label in badges.dropFirst(counts.count) { label.isHidden = true }
+        for (index, count) in counts.enumerated() {
+            if badges.count <= index {
+                badges.append(Badge())
+                addSubview(badges[index])
+            }
+            let label = badges[index]
+            // Of the bar's two pictures of each symbol the later ones: the lens draws the
+            // others larger under a finger.
+            guard let count, symbols.count == counts.count else {
+                label.isHidden = true
+                continue
+            }
+            let symbol = symbols[symbols.startIndex + index]
+            let frame = symbol.convert(symbol.bounds, to: self)
+            let top = symbol.superview.map { $0.convert($0.bounds, to: self).minY } ?? frame.minY
+            label.text = count
+            let width = max(Badge.height, ceil(label.textSize.width) + Badge.height / 2)
+            label.frame = CGRect(x: frame.maxX - max(symbolRoom, 0) - width / 2, y: top, width: width, height: Badge.height)
+                .insetBy(dx: -Badge.rim, dy: -Badge.rim)
+            label.isHidden = false
         }
     }
 
-    /// A badge the bar puts at the end of its item's name; with no name that is in the air
-    /// past the symbol. The badges are moved onto the symbols' corners instead, a badge's
-    /// middle on its symbol's trailing edge, where a badge sits on an icon. The bar offers no way
-    /// to say so (`badgePositionAdjustment` moves nothing in this bar), and puts a badge's own
-    /// view back where it wants it (a transform is gone once the badge has appeared): so the
-    /// view all the badges are in is moved, which the bar only ever resizes.
-    private func placeBadges() {
-        needsBadges = false
-        guard let platter = bar.subviews.first, let items = bar.items else { return }
-        // The capsule lays its badges out in its own turn, after the bar's.
-        platter.layoutIfNeeded()
-        let counts = Set(items.compactMap(\.badgeValue))
-        var found: UIView?
-        func visit(_ view: UIView) {
-            if found == nil, let label = view as? UILabel, let text = label.text, counts.contains(text) { found = label.superview }
-            view.subviews.forEach(visit)
+    /// A count in white on the tint, with a rim in the ground's color around it, which keeps it
+    /// apart from a chosen list's symbol, filled in the same tint. It draws itself: a label or
+    /// an image view in a bar's glass is drawn in one color with the rest of the glass's content
+    /// (this came out a white disc).
+    private final class Badge: UIView {
+        static let height: CGFloat = 16
+        static let rim: CGFloat = 1.5
+        private static let attributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 11, weight: .medium), .foregroundColor: UIColor.white,
+        ]
+
+        var text = "" {
+            didSet { if text != oldValue { setNeedsDisplay() } }
         }
-        visit(platter)
-        guard let badge = found, let badges = badge.superview else { return }
-        // Where the bar has the badge, apart from the move made here, and its own symbol: the
-        // last that begins before the badge does.
-        let place = badge.frame.offsetBy(dx: badges.frame.minX, dy: 0)
-        let edges = symbolViews().map { $0.convert($0.bounds, to: platter) }.filter { $0.minX < place.minX }.map(\.maxX)
-        guard let edge = edges.max() else { return }
-        let shift = edge - max(symbolRoom, 0) - place.midX
-        if abs(badges.bounds.origin.x + shift) > 0.1 { badges.bounds.origin.x = -shift }
+
+        var textSize: CGSize { (text as NSString).size(withAttributes: Self.attributes) }
+
+        override init(frame: CGRect) {
+            super.init(frame: frame)
+            isOpaque = false
+            isUserInteractionEnabled = false
+            contentMode = .redraw
+            // The rim is the ground's color, light or dark.
+            registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (badge: Badge, _) in badge.setNeedsDisplay() }
+        }
+
+        @available(*, unavailable)
+        required init?(coder _: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+        override func tintColorDidChange() {
+            super.tintColorDidChange()
+            setNeedsDisplay()
+        }
+
+        override func draw(_: CGRect) {
+            UIColor.systemBackground.setFill()
+            UIBezierPath(roundedRect: bounds, cornerRadius: bounds.height / 2).fill()
+            tintColor.setFill()
+            let face = bounds.insetBy(dx: Self.rim, dy: Self.rim)
+            UIBezierPath(roundedRect: face, cornerRadius: face.height / 2).fill()
+            let size = textSize
+            (text as NSString).draw(
+                at: CGPoint(x: (bounds.width - size.width) / 2, y: (bounds.height - size.height) / 2), withAttributes: Self.attributes
+            )
+        }
     }
 
     // MARK: Layout
@@ -319,6 +342,7 @@ final class TabBarHost: UIView {
         super.layoutSubviews()
         if needsMeasure, window != nil { measure() }
         placeBar()
+        placeBadges()
     }
 
     /// At the host's leading end, whatever the host's width is just then.
