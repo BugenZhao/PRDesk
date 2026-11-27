@@ -40,6 +40,11 @@ enum Platform {
         #endif
     }
 
+    #if os(macOS)
+        /// Whether the app is the one in front.
+        static var isFrontmost: Bool { NSApp.isActive }
+    #endif
+
     /// Asks for the silent pushes CloudKit sends when another device wrote a hint
     /// (`CloudHints`); they need no permission, being shown to nobody.
     static func registerForRemoteNotifications() {

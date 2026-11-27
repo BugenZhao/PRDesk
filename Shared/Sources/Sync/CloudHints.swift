@@ -79,6 +79,8 @@ actor CloudHints: CKSyncEngineDelegate {
 
     /// Hints already handed on, by record name: `poll` and the engine may both bring one.
     private var handedOn: Set<String> = []
+    /// When CloudKit asked `poll` to wait until (a limit, a busy zone).
+    private var pollNotBefore: Date?
 
     /// Nil where the app isn't signed for iCloud (test copies, simulators, a Mac without a
     /// development certificate).
@@ -173,7 +175,7 @@ actor CloudHints: CKSyncEngineDelegate {
     /// push came, the app was brought to the front), so this reads the zone's changes itself, from
     /// a change token of its own: one small request, nothing when nothing changed.
     func poll() async {
-        guard let engine else { return }
+        guard let engine, pollNotBefore.map({ Date() >= $0 }) ?? true else { return }
         let database = CKContainer(identifier: Self.containerID).privateCloudDatabase
         var token = saved.pollToken.flatMap { try? NSKeyedUnarchiver.unarchivedObject(ofClass: CKServerChangeToken.self, from: $0) }
         do {
@@ -198,6 +200,10 @@ actor CloudHints: CKSyncEngineDelegate {
             // Read again from the start; a missing zone is made again with the next hint sent.
             saved.pollToken = nil
             save()
+        } catch let error as CKError where [.requestRateLimited, .zoneBusy, .serviceUnavailable].contains(error.code) {
+            let wait = error.retryAfterSeconds ?? 60
+            pollNotBefore = Date().addingTimeInterval(wait)
+            note("poll waits \(Int(wait)) s: \(error.code.rawValue)")
         } catch {
             await failed("Looking for hints", error)
         }

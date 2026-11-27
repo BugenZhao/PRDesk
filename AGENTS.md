@@ -330,7 +330,9 @@ are used off the main actor); no glass on content (cards, chips, rows).
   iPhone and the Mac: CloudKit's work at its default priority is discretionary, and on the phone
   it never ran (hints pending, no request in the container's log), hence the user-initiated
   operation group on every send and fetch; and a push reached the phone within a second but the
-  Mac 40 s late or not at all, hence the Mac's look every 30 s (`CloudHints.poll`, which reads the
+  Mac 40 s to 20 minutes late, held on Apple's (sandbox) server until the Mac's push connection
+  next showed activity (`apsd`'s keep-alive, every 20–25 minutes, or another push), the app in
+  front or not; hence the Mac's own look every 10 s in front, 30 s behind (`CloudHints.poll`, which reads the
   zone's changes itself: the engine's `fetchChanges` asks the server only after a push or the app
   coming to the front, and otherwise says there is nothing to fetch). A device's own log needs root;
   each copy keeps a short trace in `cloud-hints.json` (`devicectl device copy from` the app's

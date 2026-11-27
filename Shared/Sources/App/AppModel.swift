@@ -469,12 +469,17 @@ final class AppModel {
             Platform.registerForRemoteNotifications()
             tasks.append(Task { await hints.start() })
             #if os(macOS)
-                // CloudKit's pushes reach a Mac late (40 s and more) or not at all, where an
-                // iPhone's came within a second: the Mac also looks every half minute, which
-                // costs one small CloudKit request and nothing of GitHub's quota.
+                // CloudKit's pushes are low priority, which Apple's servers hold for a Mac until its
+                // push connection next shows activity: 40 s to 20 minutes, the app in front or
+                // not. The Mac also looks itself, every 10 s while it is in front and every 30 s
+                // otherwise: one small CloudKit request, nothing of GitHub's quota.
                 tasks.append(Task {
+                    var lastPoll = ContinuousClock.now
                     while !Task.isCancelled {
-                        try? await Task.sleep(for: Self.hintsPollInterval)
+                        try? await Task.sleep(for: Self.hintsPollInFront)
+                        let interval = Platform.isFrontmost ? Self.hintsPollInFront : Self.hintsPollBehind
+                        guard ContinuousClock.now - lastPoll >= interval - .seconds(1) else { continue }
+                        lastPoll = .now
                         await hints.poll()
                     }
                 })
@@ -676,7 +681,8 @@ final class AppModel {
     private(set) var hintsStatus = HintsStatus()
 
     #if os(macOS)
-        private static let hintsPollInterval: Duration = .seconds(30)
+        private static let hintsPollInFront: Duration = .seconds(10)
+        private static let hintsPollBehind: Duration = .seconds(30)
     #endif
 
     /// What this device is called in the others' Settings.
