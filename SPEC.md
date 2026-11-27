@@ -281,7 +281,7 @@ workflow may turn a Merging PR back to Good if someone approves it mid-merge; th
 later), and it appends the link to the board's **Session** text field (space-separated, oldest
 first; for 👀 and 🫴 it adds the item to the board if it isn't there, without setting Status). The app only
 reads this field: items with a session have a `terminal` mark in the corner of their state icon
-(cut out of the icon around it), listing the links on hover; a button at the top of the detail opens the newest (with a menu of all of them when
+(cut out of the icon around it), naming the agent on hover (the links are ids, which say nothing); a button at the top of the detail opens the newest (with a menu of all of them when
 there are several), and `t` (or Open Agent Session in the context menu) opens the newest for each
 selected item. Links can be from any agent, web links or a desktop app's own deep links: agents the
 app knows (`AgentSession.known`: Claude Code, Codex, Kimi Code, T3 Code) show their name; Claude Code web

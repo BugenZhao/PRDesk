@@ -739,11 +739,12 @@ struct ItemTableView: NSViewRepresentable {
                         let others = (truncated ?? "").split(separator: "\n").map(String.init).filter { $0 != shortened }
                         truncated = ([itemRow.item.title] + others).joined(separator: "\n")
                     }
-                    let sessions = (itemRow.board?.sessionLinks ?? []).map { "\(AgentSession.agentName(for: $0)) session: \($0.absoluteString)" }
+                    let links = itemRow.board?.sessionLinks ?? []
+                    let sessions = AgentSession.summary(of: links).map { "\($0) (t to open\(links.count > 1 ? " the latest" : ""))" }
                     let adoption = ItemColumn.showsAdoption(itemRow) ? itemRow.adoption.map { adoption in
                         "Adopted by the parity agent in \(adoption.staging.repo)#\(adoption.staging.number): \(adoption.stage) (l to go there)"
                     } : nil
-                    let lines = [truncated].compactMap(\.self) + sessions + [adoption].compactMap(\.self)
+                    let lines = [truncated, sessions, adoption].compactMap(\.self)
                     return lines.isEmpty ? nil : lines.joined(separator: "\n")
                 case .author, .avatar: return authorTooltip(itemRow.item.author)
                 case .link:

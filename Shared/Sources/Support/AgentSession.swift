@@ -42,6 +42,18 @@ enum AgentSession {
         return url.scheme ?? url.absoluteString
     }
 
+    /// What an item's sessions are, in words, for a tooltip: "T3 Code session", "2 Claude Code
+    /// sessions", "3 sessions: Claude Code, T3 Code". The links themselves are ids, which say
+    /// nothing to a reader.
+    static func summary(of links: [URL]) -> String? {
+        guard !links.isEmpty else { return nil }
+        var names: [String] = []
+        for name in links.map(agentName(for:)) where !names.contains(name) { names.append(name) }
+        if links.count == 1 { return "\(names[0]) session" }
+        if names.count == 1 { return "\(links.count) \(names[0]) sessions" }
+        return "\(links.count) sessions: \(names.joined(separator: ", "))"
+    }
+
     /// Opens the session in the agent's app when one is installed to take the app link, else the
     /// link as it is (a web link still works without the app).
     @MainActor
