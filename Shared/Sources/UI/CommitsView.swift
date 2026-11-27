@@ -418,15 +418,17 @@ private struct CommitRow: View {
         #else
             line
                 .contextMenu { menu } preview: {
-                    CommitMessageCard(commit: commit, byline: byline)
+                    CommitMessageCard(commit: commit)
                 }
         #endif
     }
 
-    /// Who made it and how big it is.
-    private var byline: String {
-        "\(commit.shortOid) · \(commit.authorName ?? commit.author ?? "Unknown") · +\(commit.additions) −\(commit.deletions)"
-    }
+    #if os(macOS)
+        /// Who made it and how big it is, under the message in the tooltip.
+        private var byline: String {
+            "\(commit.shortOid) · \(commit.authorName ?? commit.author ?? "Unknown") · +\(commit.additions) −\(commit.deletions)"
+        }
+    #endif
 
     @ViewBuilder
     private var menu: some View {
@@ -548,35 +550,47 @@ private struct PushButtons: View {
     /// (its paragraphs reflowed), cut short where the room ends.
     private struct CommitMessageCard: View {
         let commit: PRCommit
-        let byline: String
 
         var body: some View {
             VStack(alignment: .leading, spacing: 10) {
+                // The name gives way to the numbers, which a long bot's name cut off.
                 HStack(spacing: 6) {
                     AvatarView(login: commit.author, size: 20)
-                    Text(byline)
-                        .font(.footnote.monospacedDigit())
-                        .foregroundStyle(.secondaryText)
-                        .lineLimit(1)
-                    Spacer(minLength: 0)
+                    Text(commit.shortOid).monospaced()
+                    Text("·")
+                    Text(commit.authorName ?? commit.author ?? "Unknown")
+                        .truncationMode(.middle)
+                        .layoutPriority(-1)
+                    Text("·")
+                    Text("+\(commit.additions) −\(commit.deletions)")
+                    Spacer(minLength: 4)
                     Text(commit.committedAt.compactAge())
-                        .font(.footnote.monospacedDigit())
-                        .foregroundStyle(.secondaryText)
                 }
-                Text(commit.messageTitle)
+                .font(.footnote.monospacedDigit())
+                .foregroundStyle(.secondaryText)
+                .lineLimit(1)
+                // Its tags in gray, as the rows show them.
+                Text(itemTitle: commit.messageTitle, shortenedTags: false)
                     .font(.headline)
+                    .lineLimit(4)
                     .layoutPriority(1)
                 let body = commit.reflowedBody
                 if !body.isEmpty {
                     Text(body)
                         .font(.subheadline)
-                        .lineLimit(40)
+                        .lineLimit(18)
                 }
             }
             .padding(16)
-            // Flexible: the system gives the preview what room is left beside the menu, often
-            // less than it asked for, and a card of fixed size was clipped on every side.
-            .frame(maxWidth: 400, maxHeight: .infinity, alignment: .topLeading)
+            // The system measures the preview with no width proposed, where text is one line a
+            // paragraph: the ideal width makes it wrap, so the card asks for the height it needs.
+            // It is about the width the system then gives a preview (342 pt on an iPad mini):
+            // measured wider, the text took more lines than it had asked room for and the last
+            // ones were dropped. At most 18 lines of body, or the system shrinks a tall card to
+            // fit, narrower too (it keeps the card's proportions). Flexible below that: given less
+            // room than it asked for, it wraps narrower and cuts the body short rather than
+            // being clipped.
+            .frame(idealWidth: 340, maxWidth: 400, maxHeight: .infinity, alignment: .topLeading)
         }
     }
 #endif
