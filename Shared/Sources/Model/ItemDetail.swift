@@ -73,6 +73,51 @@ struct ReviewComment: Codable, Equatable, Identifiable, Sendable {
     var outdated: Bool
     var url: String
     var reactions: [Reaction] = []
+    /// The thread's later comments, oldest first; nil in details cached before threads were fetched.
+    var replies: [ReviewReply]? = nil
+    var isResolved: Bool? = nil
+}
+
+/// A reply in a review comment's thread.
+struct ReviewReply: Codable, Equatable, Identifiable, Sendable {
+    var id: String
+    var actor: String?
+    var isAutomated: Bool
+    var at: Date
+    var bodyHTML: String
+    var url: String
+    var reactions: [Reaction]
+}
+
+/// A review thread as fetched apart from the timeline: its root comment (one of a review's) and
+/// the replies after it.
+struct ReviewThread: Equatable, Sendable {
+    var rootID: String
+    var isResolved: Bool
+    var replies: [ReviewReply]
+}
+
+extension [TimelineEntry] {
+    /// The entries with each review comment's thread. A reply that came in a review of its own
+    /// moves under the comment it answers, as on GitHub; a bodiless review left with nothing goes.
+    func threaded(_ threads: [ReviewThread]) -> [TimelineEntry] {
+        let byRoot = Dictionary(threads.map { ($0.rootID, $0) }, uniquingKeysWith: { first, _ in first })
+        let replyIDs = Set(threads.flatMap { $0.replies.map(\.id) })
+        return compactMap { entry in
+            guard !entry.reviewComments.isEmpty else { return entry }
+            var entry = entry
+            entry.reviewComments = entry.reviewComments.compactMap { comment in
+                guard !replyIDs.contains(comment.id) else { return nil }
+                var comment = comment
+                let thread = byRoot[comment.id]
+                comment.replies = thread?.replies ?? []
+                comment.isResolved = thread?.isResolved ?? false
+                return comment
+            }
+            if entry.kind == .reviewed, !entry.hasBody { return nil }
+            return entry
+        }
+    }
 }
 
 /// One kind of reaction to a comment, review or description, as GitHub groups them.
@@ -186,7 +231,10 @@ extension ItemDetail {
         if subjectID == id { return reactions }
         for entry in entries {
             if entry.id == subjectID { return entry.reactions }
-            if let comment = entry.reviewComments.first(where: { $0.id == subjectID }) { return comment.reactions }
+            for comment in entry.reviewComments {
+                if comment.id == subjectID { return comment.reactions }
+                if let reply = comment.replies?.first(where: { $0.id == subjectID }) { return reply.reactions }
+            }
         }
         return nil
     }
@@ -201,9 +249,15 @@ extension ItemDetail {
                 entries[index].reactions = reactions
                 return
             }
-            if let commentIndex = entries[index].reviewComments.firstIndex(where: { $0.id == subjectID }) {
-                entries[index].reviewComments[commentIndex].reactions = reactions
-                return
+            for commentIndex in entries[index].reviewComments.indices {
+                if entries[index].reviewComments[commentIndex].id == subjectID {
+                    entries[index].reviewComments[commentIndex].reactions = reactions
+                    return
+                }
+                if let replyIndex = entries[index].reviewComments[commentIndex].replies?.firstIndex(where: { $0.id == subjectID }) {
+                    entries[index].reviewComments[commentIndex].replies?[replyIndex].reactions = reactions
+                    return
+                }
             }
         }
     }

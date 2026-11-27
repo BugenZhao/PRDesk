@@ -87,11 +87,26 @@ enum DetailQuery {
     }
     """
 
-    /// A page of the checks on a PR's latest commit.
+    /// A review thread's comments, the first its root: what the timeline leaves out are the
+    /// replies, whose reviews it doesn't list at all.
+    private static let threadFragment = """
+    fragment ThreadFields on PullRequestReviewThread {
+      isResolved
+      comments(first: 50) { nodes { id state author \(actor) createdAt bodyHTML url \(reactionCounts) } }
+    }
+    """
+
+    /// A page of the checks on a PR's latest commit, and on the first the first page of its review
+    /// threads: GitHub prices this query at a point with or without them, where the timeline's
+    /// page went from 2 to 3.
     static let checks = """
-    query($owner: String!, $name: String!, $number: Int!, $after: String) {
+    query($owner: String!, $name: String!, $number: Int!, $after: String, $withThreads: Boolean!) {
       repository(owner: $owner, name: $name) {
         pullRequest(number: $number) {
+          reviewThreads(first: 100) @include(if: $withThreads) {
+            pageInfo { hasNextPage endCursor }
+            nodes { ...ThreadFields }
+          }
           commits(last: 1) {
             nodes {
               commit {
@@ -108,6 +123,22 @@ enum DetailQuery {
       }
     }
     \(contextFragment)
+    \(threadFragment)
+    """
+
+    /// Review threads past the first hundred.
+    static let threads = """
+    query($owner: String!, $name: String!, $number: Int!, $after: String) {
+      repository(owner: $owner, name: $name) {
+        pullRequest(number: $number) {
+          reviewThreads(first: 100, after: $after) {
+            pageInfo { hasNextPage endCursor }
+            nodes { ...ThreadFields }
+          }
+        }
+      }
+    }
+    \(threadFragment)
     """
 
     /// A PR's latest commits, oldest first, for the Commits tab.
@@ -171,11 +202,57 @@ enum DetailQuery {
 
     struct ChecksResponse: Decodable, Sendable {
         struct Repository: Decodable, Sendable {
-            struct PullRequest: Decodable, Sendable { let commits: Nodes<Subject.Commit> }
+            struct PullRequest: Decodable, Sendable {
+                let commits: Nodes<Subject.Commit>
+                /// Only on the first page.
+                let reviewThreads: Threads?
+            }
+
             let pullRequest: PullRequest?
         }
 
         let repository: Repository?
+    }
+
+    struct ThreadsResponse: Decodable, Sendable {
+        struct Repository: Decodable, Sendable {
+            struct PullRequest: Decodable, Sendable { let reviewThreads: Threads }
+            let pullRequest: PullRequest?
+        }
+
+        let repository: Repository?
+    }
+
+    struct Threads: Decodable, Sendable {
+        struct Thread: Decodable, Sendable {
+            struct Comment: Decodable, Sendable {
+                let id: String
+                let state: String?
+                let author: TypedActor?
+                let createdAt: Date
+                let bodyHTML: String
+                let url: String
+                let reactionGroups: [ReactionGroup]?
+            }
+
+            let isResolved: Bool
+            let comments: Nodes<Comment>
+
+            var thread: ReviewThread? {
+                // A pending comment is the viewer's own, not yet sent.
+                let comments = comments.values.filter { $0.state != "PENDING" }
+                guard let root = comments.first else { return nil }
+                return ReviewThread(rootID: root.id, isResolved: isResolved, replies: comments.dropFirst().map {
+                    ReviewReply(id: $0.id, actor: $0.author?.login, isAutomated: $0.author?.isAutomated ?? false, at: $0.createdAt,
+                                bodyHTML: $0.bodyHTML, url: $0.url, reactions: ReactionGroup.reactions($0.reactionGroups))
+                })
+            }
+        }
+
+        let pageInfo: ItemQuery.Connection.PageInfo
+        let nodes: [Thread?]
+
+        var threads: [ReviewThread] { nodes.compactMap { $0?.thread } }
     }
 
     struct Variables: Encodable, Sendable {
@@ -183,6 +260,14 @@ enum DetailQuery {
         var name: String
         var number: Int
         var after: String?
+    }
+
+    struct ChecksVariables: Encodable, Sendable {
+        var owner: String
+        var name: String
+        var number: Int
+        var after: String?
+        var withThreads: Bool
     }
 
     struct TimelineVariables: Encodable, Sendable {
@@ -503,7 +588,8 @@ extension SyncEngine {
     func fetchDetail(of item: Item) async throws -> (detail: ItemDetail, item: Item?) {
         let (owner, name) = Self.split(item.repo)
         let number = item.number
-        async let checks = item.kind == .pullRequest ? fetchChecks(owner: owner, name: name, number: number) : []
+        async let checksAndThreads = item.kind == .pullRequest
+            ? fetchChecksAndThreads(owner: owner, name: name, number: number) : ([], [])
         async let commits = item.kind == .pullRequest ? fetchCommits(owner: owner, name: name, number: number) : []
         var after: String?
         var entries: [TimelineEntry] = []
@@ -524,6 +610,8 @@ extension SyncEngine {
 
         let subject = first!
         if let fresh { try await db.refreshStored(fresh) }
+        let (checks, threads) = try await checksAndThreads
+        if item.kind == .pullRequest { entries = entries.threaded(threads) }
         let detail = try await ItemDetail(
             number: number,
             id: subject.id,
@@ -552,20 +640,38 @@ extension SyncEngine {
         return response.repository?.pullRequest?.commits.values.map(\.prCommit) ?? []
     }
 
-    /// The checks on a PR's latest commit, following pages.
-    private func fetchChecks(owner: String, name: String, number: Int) async throws -> [Check] {
+    /// The checks on a PR's latest commit and its review threads, following pages of each.
+    private func fetchChecksAndThreads(owner: String, name: String, number: Int) async throws -> ([Check], [ReviewThread]) {
         var checks: [Check] = []
+        var threads: [ReviewThread] = []
+        var threadsAfter: String?
         var after: String?
         repeat {
             let response = try await client.query(
                 DetailQuery.checks,
-                variables: DetailQuery.Variables(owner: owner, name: name, number: number, after: after),
+                variables: DetailQuery.ChecksVariables(owner: owner, name: name, number: number, after: after, withThreads: after == nil),
                 as: DetailQuery.ChecksResponse.self
             )
-            let contexts = response.repository?.pullRequest?.commits.values.last?.commit.statusCheckRollup?.contexts
+            let pullRequest = response.repository?.pullRequest
+            if let page = pullRequest?.reviewThreads {
+                threads = page.threads
+                threadsAfter = page.pageInfo.hasNextPage ? page.pageInfo.endCursor : nil
+            }
+            let contexts = pullRequest?.commits.values.last?.commit.statusCheckRollup?.contexts
             checks += contexts?.checks ?? []
             after = contexts.flatMap { $0.pageInfo.hasNextPage ? $0.pageInfo.endCursor : nil }
         } while after != nil && checks.count < 1000
-        return checks
+        // Rare: a PR with more than a hundred threads.
+        while let cursor = threadsAfter, threads.count < 500 {
+            let response = try await client.query(
+                DetailQuery.threads,
+                variables: DetailQuery.Variables(owner: owner, name: name, number: number, after: cursor),
+                as: DetailQuery.ThreadsResponse.self
+            )
+            guard let page = response.repository?.pullRequest?.reviewThreads else { break }
+            threads += page.threads
+            threadsAfter = page.pageInfo.hasNextPage ? page.pageInfo.endCursor : nil
+        }
+        return (checks, threads)
     }
 }

@@ -685,7 +685,7 @@ const PRDesk = (() => {
     if (!card) return false;
     timeline.expanded.set(card.dataset.id, true);
     applyExpansion(card);
-    scrollToElement(anchor.closest(".rc") || card);
+    scrollToElement(anchor.closest(".rc-reply, .rc") || card);
     return true;
   }
 

@@ -29,8 +29,15 @@ struct TimelineDocument {
     init(item: Item, detail: ItemDetail, previousSeenAt: Date?, showAutomated: Bool, people: some TimelinePeople) {
         let builder = Builder(people: people, previousSeenAt: previousSeenAt)
         // On a staging PR the parity agent is who the viewer is talking to.
-        let groups = Self.group(detail.entries.filter { entry in
-            showAutomated || !entry.isAutomated || item.isParityStaging && Parity.isBot(entry.actor)
+        func shows(_ actor: String?, automated: Bool) -> Bool {
+            showAutomated || !automated || item.isParityStaging && Parity.isBot(actor)
+        }
+        let groups = Self.group(detail.entries.filter { shows($0.actor, automated: $0.isAutomated) }.map { entry in
+            var entry = entry
+            for index in entry.reviewComments.indices {
+                entry.reviewComments[index].replies?.removeAll { !shows($0.actor, automated: $0.isAutomated) }
+            }
+            return entry
         })
         let cards = groups.compactMap { if case let .card(entry) = $0 { entry } else { nil } }
         // Cards without a body (most approvals) have nothing to expand, so don't use up the tail.
@@ -47,7 +54,7 @@ struct TimelineDocument {
         }
         var firstNew: String?
         for group in groups {
-            let isNew = group.entries.contains(where: builder.isNew)
+            let isNew = group.entries.contains { builder.isNew($0) || builder.hasNewReply($0) }
             if isNew, firstNew == nil { firstNew = group.id }
             switch group {
             case let .card(entry):
@@ -163,6 +170,15 @@ struct TimelineDocument {
             return entry.at > previousSeenAt && !sameLogin(entry.actor, people.viewer)
         }
 
+        func isNew(_ reply: ReviewReply) -> Bool {
+            guard let previousSeenAt else { return false }
+            return reply.at > previousSeenAt && !sameLogin(reply.actor, people.viewer)
+        }
+
+        func hasNewReply(_ entry: TimelineEntry) -> Bool {
+            entry.reviewComments.contains { $0.replies?.contains(where: isNew) ?? false }
+        }
+
         func card(
             id: String, subjectID: String, login: String?, verb: String, verbClass: String, at: Date, url: String?,
             bodyHTML: String, bodyText: String, reviewComments: [ReviewComment], reactions: [Reaction],
@@ -208,6 +224,7 @@ struct TimelineDocument {
             let location = comment.line.map { "\(comment.path):\($0)" } ?? comment.path
             var html = #"<div class="rc"><div class="rc-head">\#(symbol("doc.text"))"#
             html += #"<span class="rc-path" title="\#(location.htmlEscaped)"><bdi>\#(location.htmlEscaped)</bdi></span>"#
+            if comment.isResolved == true { html += #"<span class="chip">Resolved</span>"# }
             if comment.outdated { html += #"<span class="chip">Outdated</span>"# }
             html += #"<span class="spacer"></span>"# + reactButton(comment.id)
             html += #"<a class="icon-link" href="\#(comment.url.htmlEscaped)" title="Open on GitHub">\#(symbol("arrow.up.right"))</a></div>"#
@@ -218,7 +235,21 @@ struct TimelineDocument {
                 html += #"<div class="\#(cls)">\#(String(line).htmlEscaped)</div>"#
             }
             html += #"</div><div class="md">\#(comment.bodyHTML)</div>"#
-            return html + reactionBar(comment.reactions, subjectID: comment.id) + "</div>"
+            html += reactionBar(comment.reactions, subjectID: comment.id)
+            for reply in comment.replies ?? [] {
+                html += self.reply(reply)
+            }
+            return html + "</div>"
+        }
+
+        private func reply(_ reply: ReviewReply) -> String {
+            var html = #"<div class="rc-reply\#(isNew(reply) ? " new" : "")"><div class="rc-reply-head">"#
+            html += avatar(reply.actor, small: true) + person(reply.actor) + age(reply.at, cls: "c-secondary")
+            if isNew(reply) { html += #"<span class="chip accent">New</span>"# }
+            html += #"<span class="spacer"></span>"# + reactButton(reply.id)
+            html += #"<a class="icon-link" href="\#(reply.url.htmlEscaped)" title="Open on GitHub">\#(symbol("arrow.up.right"))</a></div>"#
+            html += #"<div class="md">\#(reply.bodyHTML)</div>"#
+            return html + reactionBar(reply.reactions, subjectID: reply.id) + "</div>"
         }
 
         func event(_ entry: TimelineEntry, isNew: Bool) -> Block {

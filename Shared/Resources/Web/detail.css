@@ -94,8 +94,9 @@ button.icon-link:hover { background: color-mix(in srgb, currentColor 12%, transp
 /* Still clickable while hidden, so a click there never toggles the card instead. */
 /* Shown on the card under the pointer; always, where there is none to hover with. */
 @media (hover: hover) {
-  :is(.card, .rc):not(:hover) .react-add { opacity: 0; }
+  :is(.card, .rc, .rc-reply):not(:hover) .react-add { opacity: 0; }
   .card:hover .rc:not(:hover) .react-add { opacity: 0; }
+  .rc:hover .rc-reply:not(:hover) .react-add { opacity: 0; }
 }
 
 .reactions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
@@ -141,6 +142,9 @@ button.icon-link:hover { background: color-mix(in srgb, currentColor 12%, transp
 .rc-hunk > div { white-space: pre; overflow: hidden; text-overflow: ellipsis; padding: 0 4px; }
 .rc-hunk > .a { background: rgba(46, 160, 67, .15); }
 .rc-hunk > .d { background: rgba(248, 81, 73, .15); }
+/* A thread's replies, under the comment they answer. */
+.rc-reply { border-top: 0.5px solid var(--separator); margin-top: 8px; padding-top: 8px; }
+.rc-reply-head { display: flex; align-items: center; gap: 4px; font-size: 11px; white-space: nowrap; margin-bottom: 2px; }
 
 .row {
   display: flex; align-items: center; gap: 6px; font-size: 11px; padding: 1px 10px; white-space: nowrap;
