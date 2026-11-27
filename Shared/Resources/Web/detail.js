@@ -94,7 +94,9 @@ const PRDesk = (() => {
       if (!drawnDiagrams.has(key)) {
         const id = `diagram-${++diagramCount}`;
         try {
-          mermaid.initialize({ startOnLoad: false, theme, fontFamily: "-apple-system, system-ui, sans-serif" });
+          // Labels in the body's own type, not mermaid's 16px.
+          const fontFamily = "-apple-system, system-ui, sans-serif";
+          mermaid.initialize({ startOnLoad: false, theme, fontFamily, themeVariables: { fontFamily, fontSize: "13px" } });
           const { svg } = await mermaid.render(id, diagram.dataset.source, measuringBox());
           remember(drawnDiagrams, key, { svg, id });
         } catch (error) {
