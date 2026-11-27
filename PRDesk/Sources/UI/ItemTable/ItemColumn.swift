@@ -56,13 +56,15 @@ enum ItemColumn: String, CaseIterable {
         }
     }
 
-    /// Fits "+8888 −8888" with just the cell's run spacing between, so four-digit sizes never
-    /// truncate; also the column's minimum, which overrides a narrower width saved from before.
+    /// Fits "+8888 −8888" with a little room to spare, so four-digit sizes never truncate; also
+    /// the column's minimum, which overrides a narrower width saved from before.
     private static let sizeWidth: CGFloat = {
         let texts = ["+8888", "−8888"].map { ceil($0.size(withAttributes: [.font: CellFont.digits]).width) }
-        // The spring between the two runs adds a spacing on each side.
         return texts.reduce(0, +) + 2 * RunsCellView.spacing + 2 * RunsCellView.inset
     }()
+
+    /// The deletions' slot in the Size column: "−888" (the digits are all one width).
+    private static let deletionSlot: CGFloat = ceil("−888".size(withAttributes: [.font: CellFont.digits]).width)
 
     var alignment: RunsCellView.Alignment {
         switch self {
@@ -169,12 +171,14 @@ enum ItemColumn: String, CaseIterable {
 
         case .size:
             guard let additions = item.additions, let deletions = item.deletions else { return [] }
-            // Additions to the left, deletions to the right, in deeper shades than the green and
-            // red of Review and CI.
+            // Deletions right-aligned in a slot as wide as "−888", additions just before them, so
+            // the minus signs of sizes up to three digits line up down the list (the iPad's and
+            // iPhone's rows do the same). In deeper shades than the green and red of Review and CI.
+            let removed = "−\(deletions)"
+            let slot = deletions < 1000 ? Self.deletionSlot : ceil(removed.size(withAttributes: [.font: CellFont.digits]).width)
             return [
                 .text("+\(additions)", color: .diffAdded, font: CellFont.digits),
-                .spring,
-                .text("−\(deletions)", color: .diffRemoved, font: CellFont.digits),
+                .slot(.text(removed, color: .diffRemoved, font: CellFont.digits), width: slot, trailing: true),
             ]
 
         case .age:

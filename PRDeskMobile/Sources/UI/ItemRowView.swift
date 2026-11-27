@@ -102,7 +102,7 @@ struct ItemRowView: View {
         review.column(columns.review)
         turn.column(columns.turn, alignment: .leading)
         ci.column(columns.ci)
-        if density.showsSize { size.column(columns.size) }
+        if density.showsSize { size.column(columns.size, alignment: .trailing) }
         if density.showsAge {
             Text(item.createdAt.compactAge())
                 .font(.caption.monospacedDigit())
@@ -360,12 +360,16 @@ struct ItemRowView: View {
         .frame(width: 9 * scale, height: 9 * scale)
     }
 
+    /// Deletions right-aligned in a slot as wide as "−888", additions just before them, so the
+    /// minus signs of sizes up to three digits line up down the list, as on the Mac.
     @ViewBuilder private var size: some View {
         if let additions = item.additions, let deletions = item.deletions {
-            HStack(spacing: 0) {
-                Text("+\(additions)").foregroundStyle(Color.diffAdded)
-                Spacer(minLength: 5)
-                Text("−\(deletions)").foregroundStyle(Color.diffRemoved)
+            HStack(spacing: 5) {
+                Text(verbatim: "+\(additions)").foregroundStyle(Color.diffAdded)
+                AtLeastAsWide {
+                    Text(verbatim: "−\(deletions)").foregroundStyle(Color.diffRemoved)
+                    Text("−888").hidden()
+                }
             }
             .font(.caption.monospacedDigit())
             .lineLimit(1)
@@ -392,6 +396,24 @@ struct ItemRowView: View {
             .fixedSize()
             .layoutPriority(2)
             .accessibilityValue(mark.map { $0.isMine ? "Your turn" : "Their turn" } ?? "")
+    }
+}
+
+/// Its first view at its own width or the second's, whichever is wider, at the trailing end;
+/// the second is only a measure (hide it).
+private struct AtLeastAsWide: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let view = subviews.first else { return .zero }
+        let own = view.sizeThatFits(.unspecified)
+        let floor = subviews.dropFirst().first?.sizeThatFits(.unspecified).width ?? 0
+        return CGSize(width: max(own.width, floor), height: own.height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        for view in subviews {
+            let size = view.sizeThatFits(.unspecified)
+            view.place(at: CGPoint(x: bounds.maxX - size.width, y: bounds.minY), proposal: ProposedViewSize(size))
+        }
     }
 }
 
