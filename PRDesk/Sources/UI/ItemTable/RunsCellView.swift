@@ -14,6 +14,10 @@ indirect enum CellRun {
     case symbol(String, color: NSColor, pointSize: CGFloat = 11)
     /// An item state icon (asset template or SF Symbol), tinted.
     case icon(StateIcon, color: NSColor)
+    /// A state icon with a symbol in its bottom-trailing corner (an agent session), cut out of
+    /// the icon around the mark so it reads on any row's color, as the iPad's and iPhone's rows
+    /// draw it. Laid out as wide as the icon alone: the mark reaches into the spacing after it.
+    case markedIcon(StateIcon, color: NSColor, mark: String, markColor: NSColor)
     /// Differently styled pieces of one string that truncate together, e.g. a dimmed title prefix.
     case segments([TextSegment], font: NSFont = CellFont.regular, flexible: Bool = false)
     /// Small rounded image, e.g. an org avatar.
@@ -219,7 +223,7 @@ final class RunsCellView: NSTableCellView {
             width
         case let .optional(run, _, _):
             naturalWidth(run)
-        case .symbol, .icon:
+        case .symbol, .icon, .markedIcon:
             Self.symbolSize
         case .image, .tile, .avatar:
             Self.imageSize
@@ -402,6 +406,62 @@ final class RunsCellView: NSTableCellView {
                 tint.setFill()
                 bounds.fill(using: .sourceIn)
             }
+
+        case let .markedIcon(icon, color, mark, markColor):
+            let size = Self.symbolSize
+            let tint = emphasized ? NSColor.alternateSelectedControlTextColor : color
+            let markTint = emphasized ? NSColor.alternateSelectedControlTextColor : markColor
+            let m = Self.cornerMark
+            // The bitmap reaches past the icon by the mark's offset, to the right and down.
+            let target = NSRect(
+                x: rect.minX + (rect.width - size) / 2, y: rect.midY - size / 2,
+                width: size + m.offset.width, height: size + m.offset.height
+            )
+            drawRaster(.marked(icon, mark: mark, color: markTint), color: tint, shape: .none, in: target) { bounds in
+                // Unflipped: the icon at the top left, the mark's corner at the bitmap's.
+                let iconRect = NSRect(x: 0, y: bounds.height - size, width: size, height: size)
+                Self.drawStateIcon(icon, tint: tint, in: iconRect)
+                let markRect = NSRect(x: bounds.width - m.size.width, y: 0, width: m.size.width, height: m.size.height)
+                if let context = NSGraphicsContext.current?.cgContext {
+                    context.saveGState()
+                    context.setBlendMode(.clear)
+                    let cut = markRect.insetBy(dx: -m.gap, dy: -m.gap)
+                    context.addPath(CGPath(roundedRect: cut, cornerWidth: m.radius, cornerHeight: m.radius, transform: nil))
+                    context.fillPath()
+                    context.restoreGState()
+                }
+                guard let image = NSImage(systemSymbolName: mark, accessibilityDescription: nil)?
+                    .withSymbolConfiguration(.init(paletteColors: [markTint])) else { return }
+                // Fitted into the mark's box, centered, as `scaledToFit` does on iOS.
+                let scale = min(markRect.width / image.size.width, markRect.height / image.size.height)
+                let fitted = NSSize(width: image.size.width * scale, height: image.size.height * scale)
+                image.draw(in: NSRect(
+                    x: markRect.midX - fitted.width / 2, y: markRect.midY - fitted.height / 2,
+                    width: fitted.width, height: fitted.height
+                ))
+            }
+        }
+    }
+
+    /// The corner mark's measures: the iPad's and iPhone's (`ItemRowView.stateIcon`, at a 15-point
+    /// icon), the gap scaled to this 13-point one and the mark a little larger than that, as small
+    /// as the icon is. `offset` is how far the mark's corner is past the icon's.
+    private static let cornerMark = (
+        size: NSSize(width: 9.25, height: 7.75), offset: NSSize(width: 3.25, height: 2.75), gap: CGFloat(1.25), radius: CGFloat(2.5)
+    )
+
+    /// A state icon tinted, into the current (bitmap) context.
+    private static func drawStateIcon(_ icon: StateIcon, tint: NSColor, in rect: NSRect) {
+        switch icon {
+        case let .asset(name):
+            guard let image = NSImage(named: name) else { return }
+            image.draw(in: rect)
+            tint.setFill()
+            rect.fill(using: .sourceIn)
+        case let .symbol(name):
+            guard let image = symbol(name, color: tint, pointSize: 11) else { return }
+            let size = image.size
+            image.draw(in: NSRect(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2, width: size.width, height: size.height))
         }
     }
 
@@ -415,6 +475,7 @@ final class RunsCellView: NSTableCellView {
         case image(ObjectIdentifier)
         case asset(String)
         case symbol(String, CGFloat)
+        case marked(StateIcon, mark: String, color: NSColor)
     }
 
     private enum RasterShape: Hashable { case none, circle, rounded }
