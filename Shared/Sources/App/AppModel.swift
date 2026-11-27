@@ -1,6 +1,9 @@
 import Foundation
 import Observation
 import os
+#if !os(macOS)
+    import UIKit
+#endif
 
 enum ItemAction {
     /// Sets the board Status; choosing the current one again clears it (back to Triage).
@@ -342,6 +345,10 @@ final class AppModel {
         badgeShare = BadgeShare(client: client, db: db)
         sort = Defaults.get(.sort) ?? ItemSort()
         collapsed = Self.loadCollapsed()
+        hints = CloudHints.make(directory: AppDatabase.directory) { [weak self] hints in
+            await self?.receive(hints)
+        }
+        hintsStatus.isOn = hints != nil
     }
 
     /// The saved collapsed sections, skipping any that no longer exist; sections added since they
@@ -454,6 +461,11 @@ final class AppModel {
         #if os(macOS)
             installMouseMonitor()
         #endif
+        if let hints {
+            // CloudKit's silent pushes say when another device wrote a hint.
+            Platform.registerForRemoteNotifications()
+            tasks.append(Task { await hints.start() })
+        }
         tasks.append(Task { [weak self, db] in
             do {
                 for try await snapshot in db.observeSnapshot() {
@@ -620,13 +632,86 @@ final class AppModel {
         // Keep the row in place so the selection doesn't jump; the next sync drops it.
         inbox[index].isRead = true
         rebuild()
-        Task { [engine, logger] in
+        Task { [weak self, engine, logger] in
             do {
                 try await engine.markThreadRead(note.threadID)
+                self?.hint(.inbox, [item.id])
             } catch {
                 logger.error("Failed to mark thread read: \(String(describing: error), privacy: .public)")
             }
         }
+    }
+
+    // MARK: Other devices
+
+    /// Hints to and from the viewer's other devices (`CloudHints`); nil in a copy not signed for
+    /// iCloud.
+    @ObservationIgnored private var hints: CloudHints?
+
+    /// How hints between the devices go, for Settings.
+    struct HintsStatus: Equatable {
+        var isOn = false
+        var lastSent: Date?
+        var lastReceived: Date?
+        /// The kind of device the last hint came from ("iPad").
+        var lastSender: String?
+    }
+
+    private(set) var hintsStatus = HintsStatus()
+
+    /// What this device is called in the others' Settings.
+    private static var deviceKind: String {
+        #if os(macOS)
+            "Mac"
+        #else
+            UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone"
+        #endif
+    }
+
+    /// Tells the other devices that a write to GitHub went through, so that they fetch these
+    /// items' `parts` again now rather than at their next sync.
+    private func hint(_ parts: ChangeHint.Parts, _ itemIDs: [Item.ID]) {
+        guard let hints, !itemIDs.isEmpty else { return }
+        let hint = ChangeHint(itemIDs: itemIDs, parts: parts, device: CloudHints.deviceID, deviceKind: Self.deviceKind, at: Date())
+        hintsStatus.lastSent = hint.at
+        Task { await hints.send(hint) }
+    }
+
+    /// Fetches the others' hints now, for an app back in front.
+    func fetchHints() {
+        guard let hints else { return }
+        Task { await hints.fetchNow() }
+    }
+
+    /// Fetches again what other devices changed: the stored items (and items another device put
+    /// on the board, as a sync would), their board entries, the inbox, the shown detail and its
+    /// files' marks. Left to the next sync while GitHub refuses for its budget.
+    private func receive(_ hints: [ChangeHint]) async {
+        if let last = hints.max(by: { $0.at < $1.at }) {
+            hintsStatus.lastReceived = Date()
+            hintsStatus.lastSender = last.deviceKind
+        }
+        guard !syncState.isRateLimited else { return }
+        func ids(_ part: ChangeHint.Parts) -> Set<Item.ID> {
+            Set(hints.filter { $0.parts.contains(part) }.flatMap(\.itemIDs))
+        }
+        let all = Set(hints.flatMap(\.itemIDs))
+        let stored = Set(snapshot.items.map(\.id))
+        let board = ids(.board)
+        // Only what is stored: an item opened from a link isn't on the desk, unless it went on the board.
+        let refresh = all.filter { stored.contains($0) || board.contains($0) }
+        do {
+            if !board.isEmpty { try await engine.refreshBoardEntries(contentIDs: Array(board)) }
+            if !refresh.isEmpty { _ = try await engine.refresh(ids: Array(refresh)) }
+        } catch {
+            logger.error("Following another device's change failed: \(String(describing: error), privacy: .public)")
+        }
+        if !ids(.inbox).isEmpty { await syncInbox() }
+        if let item = selectedItem, all.contains(item.id) {
+            if ids(.timeline).contains(item.id) { loadDetail(force: true) }
+            if ids(.files).contains(item.id), viewedFiles[item.id] != nil { await loadViewedFiles(for: item) }
+        }
+        prefetchDetails()
     }
 
     // MARK: Writing
@@ -672,9 +757,10 @@ final class AppModel {
             try await engine.submit(submission, body: body, subjectID: detail.id)
         }
         setDraft("", for: item.id)
+        hint([.item, .timeline], [item.id])
         if DeviceRole.current.runsRules, submission == .approve, item.kind == .pullRequest, item.isUpstream, item.isOpen,
            board(for: item).map({ $0.isArchived && !$0.isForeign }) ?? true {
-            writeBoard("add #\(item.number) to the board as Good", activity: "#\(item.number) → Good", numbers: [item.number]) { engine in
+            writeBoard("add #\(item.number) to the board as Good", activity: "#\(item.number) → Good", items: [item]) { engine in
                 try await engine.addApproved(number: item.number, contentID: item.id)
             }
         }
@@ -694,6 +780,7 @@ final class AppModel {
         Task { [weak self, engine] in
             do {
                 try await engine.setReaction(content, on: subjectID, reacted: reacted)
+                self?.hint(.timeline, [changed.id])
             } catch {
                 guard let self else { return }
                 logger.error("Reacting to \(subjectID, privacy: .public) failed: \(String(describing: error), privacy: .public)")
@@ -714,6 +801,7 @@ final class AppModel {
             }
             try await engine.close(subjectID: detail.id, isPullRequest: item.kind == .pullRequest, reason: reason)
         }
+        hint([.item, .timeline], [item.id])
         updateState(item) { $0.seenAt = Date() }
         _ = try? await engine.refresh(ids: [item.id])
         loadDetail(force: true)
@@ -732,6 +820,7 @@ final class AppModel {
             writeError = "Couldn't \(toggle.verb) #\(item.number): \(error.localizedDescription)"
             return
         }
+        hint([.item, .timeline], [item.id])
         updateState(item) { $0.seenAt = Date() }
         _ = try? await engine.refresh(ids: [item.id])
         loadDetail(force: true)
@@ -754,6 +843,7 @@ final class AppModel {
                 try await withActivity("Rename #\(item.number)") {
                     try await engine.setTitle(title, subjectID: item.id, isPullRequest: item.kind == .pullRequest)
                 }
+                hint([.item, .timeline], [item.id])
             } catch {
                 try? await db.setTitle(old, id: item.id, expected: title)
                 writeError = "Couldn't rename #\(item.number): \(error.localizedDescription)"
@@ -829,6 +919,7 @@ final class AppModel {
         Task { [weak self, engine] in
             do {
                 try await engine.setFileViewed(viewed, path: path, pullRequestID: itemID)
+                self?.hint(.files, [itemID])
             } catch {
                 guard let self else { return }
                 logger.error("Marking \(path, privacy: .public) viewed failed: \(String(describing: error), privacy: .public)")
@@ -1223,7 +1314,7 @@ final class AppModel {
         let what = changes.count == 1 ? "#\(changes[0].item.number)" : "\(changes.count) items"
         let statuses = Set(changes.map(\.status))
         let to = statuses.count == 1 ? (statuses.first!?.rawValue ?? "Triage") : "Status"
-        writeBoard("set the status of \(what)", activity: "\(what) → \(to)", numbers: changes.map(\.item.number)) { engine in
+        writeBoard("set the status of \(what)", activity: "\(what) → \(to)", items: changes.map(\.item)) { engine in
             for change in changes {
                 try await engine.setTriage(change.status, number: change.item.number, contentID: change.item.id)
             }
@@ -1236,7 +1327,7 @@ final class AppModel {
         let items = items.filter { board(for: $0)?.isForeign != true && board(for: $0)?.triage != .merging }
         guard !items.isEmpty else { return }
         let what = items.count == 1 ? "#\(items[0].number)" : "\(items.count) items"
-        writeBoard("set \(what) to Merging", activity: "\(what) → Merging", numbers: items.map(\.number)) { engine in
+        writeBoard("set \(what) to Merging", activity: "\(what) → Merging", items: items) { engine in
             for item in items {
                 try await engine.setMerging(number: item.number, contentID: item.id)
             }
@@ -1250,7 +1341,7 @@ final class AppModel {
         let what = changes.count == 1 ? "#\(changes[0].item.number)" : "\(changes.count) items"
         let priorities = Set(changes.map(\.priority))
         let to = priorities.count == 1 ? (priorities.first!.map { "\($0.optionName) priority" } ?? "no priority") : "Priority"
-        writeBoard("set the priority of \(what)", activity: "\(what) → \(to)", numbers: changes.map(\.item.number)) { engine in
+        writeBoard("set the priority of \(what)", activity: "\(what) → \(to)", items: changes.map(\.item)) { engine in
             for change in changes {
                 try await engine.setPriority(change.priority, number: change.item.number, contentID: change.item.id)
             }
@@ -1264,7 +1355,7 @@ final class AppModel {
         registerUndo(pins ? "Pin" : "Unpin") { $0.setPins(previous) }
         let what = changes.count == 1 ? "#\(changes[0].item.number)" : "\(changes.count) items"
         let verb = Set(changes.map(\.pinned)).count > 1 ? "pin / unpin" : pins ? "pin" : "unpin"
-        writeBoard("\(verb) \(what)", activity: "\(verb.capitalized) \(what)", numbers: changes.map(\.item.number)) { engine in
+        writeBoard("\(verb) \(what)", activity: "\(verb.capitalized) \(what)", items: changes.map(\.item)) { engine in
             for change in changes {
                 try await engine.setPinned(change.pinned, number: change.item.number, contentID: change.item.id)
             }
@@ -1276,12 +1367,14 @@ final class AppModel {
     @ObservationIgnored private var pendingBoardWrites: [Int: Task<Void, Never>] = [:]
 
     /// `activity` is what the status bar says meanwhile.
-    private func writeBoard(_ what: String, activity: String, numbers: [Int], _ write: @escaping @Sendable (SyncEngine) async throws -> Void) {
+    private func writeBoard(_ what: String, activity: String, items: [Item], _ write: @escaping @Sendable (SyncEngine) async throws -> Void) {
+        let numbers = items.map(\.number)
         let earlier = numbers.compactMap { pendingBoardWrites[$0] }
         let task = Task { [engine, logger] in
             for task in earlier { await task.value }
             do {
                 try await withActivity(activity) { try await write(engine) }
+                hint(.board, items.map(\.id))
             } catch {
                 logger.error("Failed to \(what, privacy: .public): \(String(describing: error), privacy: .public)")
                 self.writeError = if case BoardError.subscription = error {

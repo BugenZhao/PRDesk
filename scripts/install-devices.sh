@@ -10,8 +10,10 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 BUNDLE=com.bugenzhao.PRDesk.mobile
-# The team of this Mac's development certificate; never written into the project.
-TEAM=$(security find-certificate -c "Apple Development" -p | openssl x509 -noout -subject -nameopt multiline | awk -F'= ' '/organizationalUnitName/ {print $2; exit}')
+# The team of this Mac's development certificate; never written into the project. Found by its
+# full name: an expired one may come first by "Apple Development".
+IDENTITY=$(security find-identity -v -p codesigning | awk -F'"' '/Apple Development/ {print $2; exit}')
+TEAM=$([[ -n "$IDENTITY" ]] && security find-certificate -c "$IDENTITY" -p | openssl x509 -noout -subject -nameopt multiline | awk -F'= ' '/organizationalUnitName/ {print $2; exit}' || true)
 [[ -n "$TEAM" ]] || { echo "No Apple Development certificate in the keychain." >&2; exit 1; }
 
 # Which devices, before the build: with none in reach there is nothing to build for.
@@ -39,10 +41,22 @@ DD=.build/DerivedDataDevice
 COMMIT="$(git rev-parse --short=7 HEAD)$(git diff --quiet HEAD -- || echo +)"
 tuist generate --no-open >/dev/null
 # For any device: the profile Xcode keeps for the team has every device registered with it.
-xcodebuild -workspace PRDesk.xcworkspace -scheme PRDeskMobile -configuration Release \
-  -derivedDataPath "$DD" -destination 'generic/platform=iOS' -allowProvisioningUpdates \
-  CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM="$TEAM" PRDESK_COMMIT="$COMMIT" build 2>&1 \
-  | grep -E 'warning:|error:|BUILD (SUCCEEDED|FAILED)' | grep -v appintents | sort -u
+build() {
+  xcodebuild -workspace PRDesk.xcworkspace -scheme PRDeskMobile -configuration Release \
+    -derivedDataPath "$DD" -destination 'generic/platform=iOS' -allowProvisioningUpdates \
+    CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM="$TEAM" PRDESK_COMMIT="$COMMIT" "$@" build 2>&1 \
+    | grep -E 'warning:|error:|BUILD (SUCCEEDED|FAILED)' | grep -v appintents | sort -u
+}
+# iCloud and pushes, for the hints between devices, need a profile for this app alone, which
+# Xcode makes with the account in its settings; without one, built without them, and said so.
+if ! build >/dev/null; then
+  echo "No provisioning profile with iCloud (is an account signed in to Xcode?): installing without hints between devices." >&2
+  # An empty file: an empty setting leaves the target's own in place.
+  PLAIN=$(mktemp -d)/plain.entitlements
+  plutil -create xml1 "$PLAIN"
+  build CODE_SIGN_ENTITLEMENTS="$PLAIN"
+  rm -rf "$(dirname "$PLAIN")"
+fi
 APP="$DD/Build/Products/Release-iphoneos/PRDeskMobile.app"
 
 failed=0

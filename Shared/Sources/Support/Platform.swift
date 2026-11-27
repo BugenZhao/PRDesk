@@ -39,6 +39,16 @@ enum Platform {
             NSApp.dockTile.badgeLabel = count == 0 ? nil : String(count)
         #endif
     }
+
+    /// Asks for the silent pushes CloudKit sends when another device wrote a hint
+    /// (`CloudHints`); they need no permission, being shown to nobody.
+    static func registerForRemoteNotifications() {
+        #if os(macOS)
+            NSApplication.shared.registerForRemoteNotifications()
+        #else
+            UIApplication.shared.registerForRemoteNotifications()
+        #endif
+    }
 }
 
 #if !os(macOS)

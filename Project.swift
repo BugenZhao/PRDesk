@@ -68,10 +68,15 @@ let project = Project(
                 "CFBundleURLTypes": [
                     ["CFBundleURLName": "com.bugenzhao.PRDesk.mobile", "CFBundleURLSchemes": ["prdesk"]],
                 ],
+                // CloudKit's silent pushes, for another device's hints (`CloudHints`).
+                "UIBackgroundModes": ["remote-notification"],
                 "PRDeskCommit": "$(PRDESK_COMMIT)",
             ]),
             sources: ["PRDeskMobile/Sources/**", "Shared/Sources/**"],
             resources: ["Shared/Resources/AppIcon.icon", "Shared/Resources/Assets.xcassets", "Shared/Resources/Web/**"],
+            // iCloud and pushes for the hints between devices; signed by the device scripts,
+            // left out of a simulator's unsigned build.
+            entitlements: .file(path: "PRDeskMobile/PRDeskMobile.entitlements"),
             dependencies: [
                 .package(product: "GRDB"),
                 .target(name: "PRDeskMobileOpen"),

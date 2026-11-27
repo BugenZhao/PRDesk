@@ -22,33 +22,89 @@ enum BoardQuery {
           items(first: 100, after: $after) {
             pageInfo { hasNextPage endCursor }
             nodes {
-              id isArchived
-              content {
-                __typename
-                ... on PullRequest { id number repository { nameWithOwner } }
-                ... on Issue { id number repository { nameWithOwner } }
-              }
-              status: fieldValueByName(name: "Status") {
-                ... on ProjectV2ItemFieldSingleSelectValue { name updatedAt }
-              }
-              priority: fieldValueByName(name: "Priority") {
-                ... on ProjectV2ItemFieldSingleSelectValue { name }
-              }
-              comment: fieldValueByName(name: "Comment") {
-                ... on ProjectV2ItemFieldTextValue { text }
-              }
-              session: fieldValueByName(name: "Session") {
-                ... on ProjectV2ItemFieldTextValue { text }
-              }
-              pinned: fieldValueByName(name: "Pinned") {
-                ... on ProjectV2ItemFieldSingleSelectValue { name }
-              }
+              ...BoardItemFields
             }
           }
         }
       }
     }
+    \(itemFields)
     """
+
+    /// What the app reads of a board item: its content and the fields it cares about.
+    private static let itemFields = """
+    fragment BoardItemFields on ProjectV2Item {
+      id isArchived
+      content {
+        __typename
+        ... on PullRequest { id number repository { nameWithOwner } }
+        ... on Issue { id number repository { nameWithOwner } }
+      }
+      status: fieldValueByName(name: "Status") {
+        ... on ProjectV2ItemFieldSingleSelectValue { name updatedAt }
+      }
+      priority: fieldValueByName(name: "Priority") {
+        ... on ProjectV2ItemFieldSingleSelectValue { name }
+      }
+      comment: fieldValueByName(name: "Comment") {
+        ... on ProjectV2ItemFieldTextValue { text }
+      }
+      session: fieldValueByName(name: "Session") {
+        ... on ProjectV2ItemFieldTextValue { text }
+      }
+      pinned: fieldValueByName(name: "Pinned") {
+        ... on ProjectV2ItemFieldSingleSelectValue { name }
+      }
+    }
+    """
+
+    /// The board items of some issues and PRs, read alone when another device changed them
+    /// (`SyncEngine.refreshBoardEntries`); they may be on other projects too.
+    static let entries = """
+    query($ids: [ID!]!) {
+      nodes(ids: $ids) {
+        ... on PullRequest { id projectItems(first: 20) { nodes { ...BoardItemFields project { number owner { ... on Organization { login } } } } } }
+        ... on Issue { id projectItems(first: 20) { nodes { ...BoardItemFields project { number owner { ... on Organization { login } } } } } }
+      }
+    }
+    \(itemFields)
+    """
+
+    struct EntriesVariables: Encodable, Sendable {
+        var ids: [String]
+    }
+
+    struct EntriesResponse: Decodable, Sendable {
+        struct Content: Decodable, Sendable {
+            let id: String?
+            let projectItems: Nodes<ProjectItem>?
+        }
+
+        /// A board item, with the project it is on.
+        struct ProjectItem: Decodable, Sendable {
+            struct Project: Decodable, Sendable {
+                struct Owner: Decodable, Sendable { let login: String? }
+                let number: Int
+                let owner: Owner?
+            }
+
+            let project: Project
+            let node: BoardQuery.Project.Node
+
+            var isOnBoard: Bool {
+                project.number == BoardQuery.number && project.owner?.login == BoardQuery.owner
+            }
+
+            private enum CodingKeys: CodingKey { case project }
+
+            init(from decoder: any Decoder) throws {
+                project = try decoder.container(keyedBy: CodingKeys.self).decode(Project.self, forKey: .project)
+                node = try BoardQuery.Project.Node(from: decoder)
+            }
+        }
+
+        let nodes: [Content?]
+    }
 
     struct Variables: Encodable, Sendable {
         var owner = BoardQuery.owner
@@ -197,6 +253,35 @@ extension SyncEngine {
     }
 
     private static let boardWriteGrace: TimeInterval = 10
+
+    /// Reads the board entries of these items alone, for another device's change to them
+    /// (`CloudHints`), rather than the whole board; the primary device follows a new Status as it
+    /// would after a read of the whole board. An item no longer on the board is left to that.
+    func refreshBoardEntries(contentIDs: [String]) async throws {
+        let response = try await client.query(
+            BoardQuery.entries, variables: BoardQuery.EntriesVariables(ids: contentIDs), as: BoardQuery.EntriesResponse.self
+        )
+        let recent = boardWrites.filter { $0.value > Date().addingTimeInterval(-Self.boardWriteGrace) }
+        var entries: [BoardEntry] = []
+        var previous: [Int: BoardEntry] = [:]
+        for case let content? in response.nodes {
+            for case let item? in content.projectItems?.nodes ?? [] where item.isOnBoard {
+                guard var entry = item.node.entry, recent[entry.number] == nil else { continue }
+                let old = try await db.boardEntry(number: entry.number)
+                // As `AppDatabase.replaceBoard`: the same option set again may leave GitHub's time.
+                if let old, old.status == entry.status, let at = old.statusAt, at > entry.statusAt ?? .distantPast {
+                    entry.statusAt = at
+                }
+                guard entry != old else { continue }
+                previous[entry.number] = old
+                try await db.saveBoardEntry(entry)
+                entries.append(entry)
+            }
+        }
+        if !entries.isEmpty, DeviceRole.current.runsRules {
+            await followStatusChanges(entries, previous: previous)
+        }
+    }
 
     private func schema() async throws -> BoardQuery.Schema {
         if let boardSchema { return boardSchema }

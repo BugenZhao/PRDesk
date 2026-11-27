@@ -15,11 +15,16 @@ open .build/DerivedData/Build/Products/Debug/PRDesk.app
 running copy first) — that is the copy for daily use. Keep the build free of warnings.
 The project signs ad hoc; `install.sh` signs the installed copy with this Mac's Apple Development
 certificate where there is one (the team is read from the certificate, never written here: the
-repo is public), so macOS takes each install for the same app. It also gives it its identifier and
-team as entitlements (`PRDesk/PRDesk.entitlements`), with the provisioning profile they need,
-which Xcode makes with the account in its settings; without either it signs as before and says
-so. Test copies stay ad hoc, and must not take that entitlements file: without a profile macOS
-won't start an app that has them.
+repo is public), so macOS takes each install for the same app (found by its full name: an expired
+certificate of the same team may come first by "Apple Development"). It also gives it entitlements,
+with the provisioning profile they need, which Xcode makes with the account in its settings:
+iCloud and pushes for the hints between devices (`PRDesk/PRDesk-iCloud.entitlements`, which need a
+profile for this app alone), or failing that only its identifier and team for Handoff
+(`PRDesk/PRDesk.entitlements`, which the team's wildcard profile covers); it says what it left
+out. Test copies stay ad hoc, and must not take either file: without a profile macOS won't start
+an app that has them. The iOS target names its own (`PRDeskMobile/PRDeskMobile.entitlements`); a
+simulator's unsigned build leaves it out, and the device scripts sign without it, saying so, when
+no profile has iCloud.
 
 The iPad and iPhone are installed apart, with `scripts/install-devices.sh`: one Release build,
 installed on every paired device in reach (by cable, or over the network at home; an office's
@@ -35,7 +40,7 @@ and ⌘R), `-PRDeskCompanion YES` to run the Mac as a companion (a first sync of
 prefetched details, affiliation work or board rules: for a second Mac starting from an empty
 database), and
 `-PRDeskDryRunWrites YES` to log writes to GitHub (comments, reviews, marking notifications read,
-board fields, subscriptions, files marked viewed, the badges file, messages to Grok Bots) instead of sending them — use it whenever a test could trigger a write.
+board fields, subscriptions, files marked viewed, the badges file, messages to Grok Bots, hints to the other devices) instead of sending them — use it whenever a test could trigger a write.
 `-PRDeskBadgesFile <path>` shares badges through that local file instead of the repository in
 Settings (the Mac writes it at launch, a simulator reads it), with no request. These flags are
 compiled out of Release builds: a Release test copy writes to GitHub for real, so only measure with
@@ -129,7 +134,8 @@ Both apps compile `Shared/`; each adds its own views and platform parts. Put new
 - `Shared/Sources/GitHub` — `GitHubClient` (GraphQL + REST, retries), queries and mutations
 - `Shared/Sources/Sync` — `SyncEngine` (tracked items, details, inbox, the triage board),
   `AffiliationEngine` (badges), `BadgeShare` (the Mac publishes what its badges come from to a
-  private repository, the iPad imports it, SPEC §9)
+  private repository, the iPad imports it, SPEC §9), `CloudHints` (what the other devices should
+  fetch again after a write here, through iCloud, SPEC §9)
 - `Shared/Sources/Store` — GRDB records and migrations (`AppDatabase`); migrations are append-only
 - `Shared/Sources/Model` — pure logic: `ItemInsight` (Turn, unread, review-request classification),
   `RowMarks` (what the Turn, Review and CI columns show, for both lists), filter parsing, sections
@@ -310,6 +316,18 @@ are used off the main actor); no glass on content (cards, chips, rows).
   cards didn't fold and files didn't open on the iPad. `detail.js` listens on `document`, and
   `detail.css` gives the page's own controls a pointer cursor on iOS; give a new tappable
   element one too.
+- Hints between devices (`CloudHints`, SPEC §9 Other devices) run only in a copy signed for
+  iCloud: `make` checks the Mac's own entitlements, and on iOS the container in the
+  `embedded.mobileprovision` (iOS has no call for its entitlements); a copy without them would
+  crash at its first CloudKit call. So they can't be tried in a test copy or a simulator, only in
+  installed copies, which use CloudKit's Development environment (all are development-signed, so
+  they see each other's records; a copy signed for distribution would be in Production, apart).
+  The container (`iCloud.com.bugenzhao.PRDesk`) and the App IDs with iCloud and pushes are made by
+  Xcode's automatic signing in the install scripts, which needs an account in Xcode › Settings ›
+  Accounts; a container can't be deleted once made. `xcodebuild` takes an empty
+  `CODE_SIGN_ENTITLEMENTS=` as no override at all: the scripts sign without iCloud by giving it
+  an empty file. With `-PRDeskDryRunWrites YES` hints are logged, not sent. A hint names items and
+  parts only; never put a change's content in one (GitHub is the one source of truth).
 - Handoff (`ItemHandoff`, a view of no size in each app's root background) can't be tried in a
   simulator or a test copy: the system hands off only between apps signed by one team on
   devices of one iCloud account. Both apps declare the type in `NSUserActivityTypes` (the Mac's

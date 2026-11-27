@@ -61,10 +61,11 @@ private struct TokenSettingsView: View {
                         Text(seconds < 60 ? "\(seconds) seconds" : seconds == 60 ? "1 minute" : "\(seconds / 60) minutes").tag(seconds)
                     }
                 }
+                OtherDevicesRow()
             } header: {
                 Text("Sync")
             } footer: {
-                Text("Each round costs a few of GitHub's 5,000 hourly API points; the triage board is read at most every 3 minutes. ⌘R syncs everything at once.")
+                Text("Each round costs a few of GitHub's 5,000 hourly API points; the triage board is read at most every 3 minutes. ⌘R syncs everything at once. What you change here and on your iPad or iPhone, the others fetch within seconds, told through iCloud.")
                     .foregroundStyle(.secondary)
             }
 

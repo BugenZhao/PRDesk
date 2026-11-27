@@ -741,7 +741,8 @@ app, and usable on an iPhone. iOS 27, SwiftUI throughout, with the detail's page
 only what differs.
 
 **Authority.** GitHub is the only source of truth: the board and notifications. There is no
-server and nothing syncs between the devices. The Mac alone follows the board with rules
+server and no state syncs between the devices; they only tell each other what to fetch again
+(Other devices, below). The Mac alone follows the board with rules
 (subscriptions for Shelf and Attic, approved PRs added as Good) and prefetches details; the iPad
 writes what I do on it, and the Mac follows up as it would after an edit on the web. It keeps its
 own database and its own token (a PAT in Settings, in the Keychain; there is no `gh`).
@@ -760,6 +761,22 @@ copy some commits behind is as good as it was.
 **While it is open.** The app syncs on its timer while it is open, and when the list is pulled or
 ⌘R asks. It doesn't sync in the background and sends no notifications, so the unread count is on
 the Inbox's symbol in the app, not on the app's icon (which takes the permission to notify).
+
+**Other devices.** When a write of mine to GitHub has gone through on one device (a comment, a
+review, closing, a rename, draft or ready, a reaction, a file marked viewed, Status, Priority or a
+pin on the board, a notification marked read), it tells my other devices which items to fetch
+again and which parts of them: the row, the board entry, the conversation, the files' marks, the
+inbox. Never the change itself, which they read from GitHub as they would at their next sync,
+only sooner: within seconds instead of minutes. A board entry is read alone, and the Mac follows
+a new Status with the subscription at once rather than at its next read of the board; an item
+another device put on the board is fetched as a sync would. The hint is a small record in my
+iCloud's private database (`CloudHints`, with `CKSyncEngine`), and CloudKit's silent push says
+there is one. A push missed while the app was stopped or in the background is caught up when it
+comes back to the front; a hint older than a quarter of an hour is left to the regular sync, and
+every hint is deleted after a day. Nothing local is shared: what I have seen or read, Recently
+viewed, Grok Bot marks and badges set by hand stay on each device. Only an installed copy signed
+for iCloud has this (Settings shows Other Devices: when this copy last told the others and last
+heard from one).
 
 **Layout.** A pure function of the window (its width and size class), my choices and the
 selection, so rotation, multitasking and a resized window always land on the layout the new size

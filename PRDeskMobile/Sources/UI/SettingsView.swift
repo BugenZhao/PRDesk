@@ -28,10 +28,11 @@ struct SettingsView: View {
                     } else if let rate = model.rateLimit {
                         LabeledContent("API Quota", value: "\(rate.remaining.formatted()) left")
                     }
+                    OtherDevicesRow()
                 } header: {
                     Text("Syncing")
                 } footer: {
-                    Text("The quota is GitHub's hourly budget, shared with the Mac. Your Mac follows up what you change here: notifications for Shelf and Attic items, approved PRs on the board.")
+                    Text("The quota is GitHub's hourly budget, shared with the Mac. What you change here, your Mac and other devices fetch within seconds, told through iCloud, and the Mac follows it up: notifications for Shelf and Attic items, approved PRs on the board.")
                 }
 
                 Section {

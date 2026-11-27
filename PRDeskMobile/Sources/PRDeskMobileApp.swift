@@ -5,6 +5,7 @@ import SwiftUI
 @main
 struct PRDeskMobileApp: App {
     @State private var model: AppModel
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         SetupImport.run()
@@ -20,6 +21,8 @@ struct PRDeskMobileApp: App {
             DeskView()
                 .environment(model)
                 .task { model.start() }
+                // A push that came while the app was suspended may have been dropped.
+                .onChange(of: scenePhase) { if scenePhase == .active { model.fetchHints() } }
         }
         .commands { DeskCommands(model: model) }
     }

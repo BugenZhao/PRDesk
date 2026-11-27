@@ -96,3 +96,38 @@ struct BadgeShareStatus: View {
         }
     }
 }
+
+/// In Settings: whether this copy tells the viewer's other devices about its writes and hears of
+/// theirs (`CloudHints`), and when it last did.
+struct OtherDevicesRow: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        LabeledContent("Other Devices") {
+            TimelineView(.periodic(from: .now, by: 30)) { _ in
+                Text(text).foregroundStyle(.secondaryText)
+            }
+        }
+    }
+
+    private var text: String {
+        let status = model.hintsStatus
+        guard status.isOn else { return "Not signed for iCloud" }
+        var parts: [String] = []
+        if let sent = status.lastSent { parts.append("sent \(Self.age(sent))") }
+        if let received = status.lastReceived {
+            let from = status.lastSender.flatMap { $0.isEmpty ? nil : " from the \($0)" } ?? ""
+            parts.append("heard \(Self.age(received))\(from)")
+        }
+        return parts.isEmpty ? "Through iCloud" : parts.joined(separator: " · ").capitalizedFirst
+    }
+
+    private static func age(_ date: Date) -> String {
+        let age = date.compactAge()
+        return age == "now" ? "just now" : "\(age) ago"
+    }
+}
+
+private extension String {
+    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
+}
