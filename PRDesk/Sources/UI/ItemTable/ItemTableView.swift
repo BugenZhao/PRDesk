@@ -750,7 +750,7 @@ struct ItemTableView: NSViewRepresentable {
                     return itemRow.paired.map { paired in
                         let line = Self.linkTooltip(paired)
                         // An adopted PR's own row: Link stands in for its author.
-                        guard paired.isParityStaging, let author = ItemColumn.outsideAuthor(itemRow, viewer: viewer) else { return line }
+                        guard paired.isParityStaging, let author = Parity.outsideAuthor(of: itemRow, viewer: viewer) else { return line }
                         return "\(line)\nAdopted from @\(author)"
                     }
                 case .stack: return Self.stackTooltip(itemRow)

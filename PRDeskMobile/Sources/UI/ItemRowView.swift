@@ -132,7 +132,10 @@ struct ItemRowView: View {
     /// and what happened, then the size and the marks, which keep their columns so they line up
     /// down the list.
     private func twoLineCells(_ columns: RowColumns) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        // In the Parity tab, an adopted PR's author in place of the agent's or the viewer's name,
+        // as the Mac's Link column shows their face.
+        let person = isParity ? Parity.outsideAuthor(of: row, viewer: model.viewer) ?? item.author : item.author
+        return VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 5) {
                 titleCell(showsEvent: secondLineIsEvent)
                 if density.showsNotes { comment }
@@ -143,11 +146,11 @@ struct ItemRowView: View {
                 if density.showsNumber {
                     Text("#\(String(item.number))").monospacedDigit()
                 }
-                AvatarView(login: item.author, size: 15 * scale)
-                Text(item.author ?? "ghost")
+                AvatarView(login: person, size: 15 * scale)
+                Text(person ?? "ghost")
                     .lineLimit(1)
                     .layoutPriority(1)
-                BadgeIcons(login: item.author, size: 12 * scale)
+                BadgeIcons(login: person, size: 12 * scale)
                 if isParity { link }
                 if let text = secondLineNote {
                     Text(text).foregroundStyle(secondLineIsEvent ? eventStyle : .tertiaryText).lineLimit(1)

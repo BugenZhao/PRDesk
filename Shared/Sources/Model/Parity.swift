@@ -16,6 +16,12 @@ enum Parity {
         return sameLogin(login, bot) || sameLogin(login, "\(bot)[bot]")
     }
 
+    /// In the Parity tab, whose PR a row's pair is when it is neither the agent's nor the viewer's:
+    /// an adopted PR's author, on its row or its staging PR's.
+    static func outsideAuthor(of row: ItemRow, viewer: String?) -> String? {
+        [row.item.author, row.paired?.author].compactMap(\.self).first { !isBot($0) && !sameLogin($0, viewer) }
+    }
+
     private static let stagingPrefix = "richard/parity-"
     private static let upstreamPrefix = "bz/rust-parity-"
 
