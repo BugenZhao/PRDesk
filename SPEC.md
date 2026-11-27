@@ -352,7 +352,9 @@ Top to bottom:
   selecting the neighbor when a row leaves the list, or restoring the selection at launch).
   Selecting inside Recently viewed only marks read and doesn't reorder it, so `j` doesn't bounce
   between the top two rows
-- **Pinned**: items pinned with `p` (the board's Pinned field, §3.1)
+- **Pinned**: items pinned with `p` (the board's Pinned field, §3.1). A pinned item that would be
+  in Good or Desk, right under it, shows here alone; one of another group (Triage, which still waits
+  on a decision, or a collapsed one, which says where it goes back to) shows in both
 - **Good**: open items with Status = Desk (or Merging), plus open items I opened that have no
   Status, that are approved PRs; mine first, then PRs Merger is merging (Status = Merging) last, so
   what waits for 🚀 comes first. A Merging PR draws its icon purple (the merge color): the open
@@ -365,7 +367,8 @@ Top to bottom:
 - **Recently closed**: items merged / closed in the last 14 days, collapsed by default
 - **Shelf**, **Attic**: open items with that Status, collapsed by default
 
-Apart from Recently viewed and Pinned, each item appears in exactly one group. All groups always
+Apart from Recently viewed and Pinned, each item appears in exactly one group (Pinned counting as
+its group when it stands in for Good or Desk), and the counts of Good and Desk leave pinned items out. All groups always
 show, empty ones too (with a count of 0); a group header's tooltip explains what the group holds
 and how it relates to the board. Collapsed state persists, and expanding / collapsing doesn't move
 the scroll position. While filtering, all matches show regardless of collapsing. An item whose

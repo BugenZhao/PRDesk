@@ -1211,7 +1211,7 @@ final class AppModel {
             requestTableFocus()
             return
         }
-        guard let section = ListSection.triageSection(of: row(for: item)) else { return }
+        guard let section = ListSection.dashboardSection(of: row(for: item)) else { return }
         mode = .dashboard
         filterText = ""
         collapsed.remove(section)
@@ -1816,7 +1816,7 @@ final class AppModel {
         if !added.isEmpty {
             openedItems.removeAll { item in added.contains { $0.id == item.id } }
             if let selection, selection.section == .opened, let item = itemsByID[selection.itemID], added.contains(where: { $0.id == item.id }),
-               let section = ListSection.triageSection(of: row(for: item))
+               let section = ListSection.dashboardSection(of: row(for: item))
             {
                 autoSelect(TableSelection(section: section, itemID: item.id))
             }
@@ -1925,7 +1925,7 @@ final class AppModel {
             .prefix(ListSection.recentLimit))
         members[.pinned] = ordered.filter(\.isPinned)
         for row in ordered {
-            if let section = ListSection.triageSection(of: row) { members[section, default: []].append(row) }
+            if let section = ListSection.dashboardSection(of: row), section != .pinned { members[section, default: []].append(row) }
         }
         for section in [ListSection.working, .good, .backlog] {
             members[section] = Self.mineFirst(members[section] ?? [])

@@ -90,11 +90,11 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
         case .recent:
             "The last \(Self.recentLimit) items you opened. Not tied to the board; they also stay in their own section."
         case .pinned:
-            "Items you pinned (p). Kept on this Mac, not on the board; they also stay in their own section."
+            "Items you pinned (p), the board's Pinned field. Pinned items on the Desk (and Good) show only here; the others also stay in their own section."
         case .working:
-            "Status Desk on the board (old Working, Good and Pending count too, and Merging, set on 🚀 and by Merger while it merges a PR), except approved PRs, and your own items without a Status. Your own items go first. The subscription is left alone."
+            "Status Desk on the board (old Working, Good and Pending count too, and Merging, set on 🚀 and by Merger while it merges a PR), except approved PRs, and your own items without a Status. Pinned ones show in Pinned instead. Your own items go first. The subscription is left alone."
         case .good:
-            "Status Desk (or Good) and approved: waiting to be merged. A PR you approve (here or on the web) goes on the board as Good if it isn't on it yet. Your own items go first; PRs Merger is merging (Status Merging, a purple icon) go last."
+            "Status Desk (or Good) and approved: waiting to be merged. A PR you approve (here or on the web) goes on the board as Good if it isn't on it yet. Pinned ones show in Pinned instead. Your own items go first; PRs Merger is merging (Status Merging, a purple icon) go last."
         case .triage:
             "No Status yet: not on the board, on it without a Status, or Done but open again. Also Shelf items someone asked you about since, with the reason. Your own items count as Desk instead."
         case .backlog:
@@ -135,6 +135,16 @@ enum ListSection: String, CaseIterable, Codable, Sendable {
     /// items the app leaves alone or lists in the Parity tab.
     static func triageSection(of row: ItemRow) -> ListSection? {
         row.item.isParity ? nil : statusSection(of: row)
+    }
+
+    /// The section of the dashboard an item is listed in besides Recently viewed: Pinned stands in
+    /// for Good and Desk, which sit right under it, so a pinned item there isn't listed twice.
+    /// Pinned items elsewhere stay in their own section too (Triage still waits on a decision,
+    /// and the collapsed ones say where an item goes back to).
+    static func dashboardSection(of row: ItemRow) -> ListSection? {
+        let section = triageSection(of: row)
+        if row.isPinned, section == .working || section == .good { return .pinned }
+        return section
     }
 
     /// The dashboard section an item's Status and state put it in, parity PRs included (which the
