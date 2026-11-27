@@ -34,7 +34,7 @@ struct StackPanel: View {
                 }
             }
         }
-        .font(.callout)
+        .font(Self.font)
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 6))
         .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.quaternary))
@@ -90,7 +90,7 @@ struct StackPanel: View {
                 Text("#\(String(entry.number))")
                     .foregroundStyle(.secondaryText)
                     .monospacedDigit()
-                Text(itemTitle: entry.title, shortenedTags: shortensTags)
+                Text(itemTitle: entry.title, shortenedTags: shortensTags, codeFont: Self.codeFont)
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .fontWeight(isCurrent ? .semibold : .regular)
@@ -168,7 +168,7 @@ struct StackPanel: View {
     /// full, as the list does, so a tag reads the same in every row.
     private var shortensTags: Bool {
         guard width > 0 else { return false }
-        let body = PlatformFont.preferredFont(forTextStyle: .callout)
+        let body = PlatformFont.preferredFont(forTextStyle: Self.textStyle)
         let bold = PlatformFont.systemFont(ofSize: body.pointSize, weight: .semibold)
         let caption = PlatformFont.preferredFont(forTextStyle: .caption1)
         let digits = PlatformFont.monospacedDigitSystemFont(ofSize: body.pointSize, weight: .regular)
@@ -206,6 +206,18 @@ struct StackPanel: View {
     }
 
     static let rowHeight = RowMetrics.stackRowHeight
+
+    /// The rows' text: on iOS the list's titles' size (`ItemRowView`), so a PR reads the same in
+    /// the stack as in the list; callout's was a size up from it there.
+    #if os(macOS)
+        private static let font = Font.callout
+        private static let textStyle = PlatformFont.TextStyle.callout
+        private static let codeFont = Font.callout.monospaced()
+    #else
+        private static let font = Font.subheadline
+        private static let textStyle = PlatformFont.TextStyle.subheadline
+        private static let codeFont = Font.footnote.monospaced()
+    #endif
 
     private func row(@ViewBuilder _ content: () -> some View) -> some View {
         // A fixed height, so the rail's lines meet from row to row.
