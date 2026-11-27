@@ -14,8 +14,8 @@ indirect enum CellRun {
     case symbol(String, color: NSColor, pointSize: CGFloat = 11)
     /// An item state icon (asset template or SF Symbol), tinted.
     case icon(StateIcon, color: NSColor)
-    /// A state icon with a symbol in its bottom-trailing corner (an agent session), cut out of
-    /// the icon around the mark so it reads on any row's color, as the iPad's and iPhone's rows
+    /// A state icon with a symbol in its bottom-trailing corner (an agent session, an adoption),
+    /// the icon cut away around the symbol's outline so it reads on any row's color, as the iPad's and iPhone's rows
     /// draw it. Laid out as wide as the icon alone: the mark reaches into the spacing after it.
     case markedIcon(StateIcon, color: NSColor, mark: String, markColor: NSColor)
     /// Differently styled pieces of one string that truncate together, e.g. a dimmed title prefix.
@@ -422,23 +422,25 @@ final class RunsCellView: NSTableCellView {
                 let iconRect = NSRect(x: 0, y: bounds.height - size, width: size, height: size)
                 Self.drawStateIcon(icon, tint: tint, in: iconRect)
                 let markRect = NSRect(x: bounds.width - m.size.width, y: 0, width: m.size.width, height: m.size.height)
-                if let context = NSGraphicsContext.current?.cgContext {
-                    context.saveGState()
-                    context.setBlendMode(.clear)
-                    let cut = markRect.insetBy(dx: -m.gap, dy: -m.gap)
-                    context.addPath(CGPath(roundedRect: cut, cornerWidth: m.radius, cornerHeight: m.radius, transform: nil))
-                    context.fillPath()
-                    context.restoreGState()
-                }
                 guard let image = NSImage(systemSymbolName: mark, accessibilityDescription: nil)?
                     .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 8, weight: .bold).applying(.init(paletteColors: [markTint]))) else { return }
                 // Fitted into the mark's box, centered, as `scaledToFit` does on iOS.
                 let scale = min(markRect.width / image.size.width, markRect.height / image.size.height)
                 let fitted = NSSize(width: image.size.width * scale, height: image.size.height * scale)
-                image.draw(in: NSRect(
+                let glyph = NSRect(
                     x: markRect.midX - fitted.width / 2, y: markRect.midY - fitted.height / 2,
                     width: fitted.width, height: fitted.height
-                ))
+                )
+                // The icon is cut away around the glyph's own outline, grown by the gap: the glyph
+                // drawn out of it at points on two circles. A rectangle around the glyph took a
+                // corner of the icon that a diagonal mark (the link) leaves alone.
+                for radius in [m.gap / 2, m.gap] {
+                    for step in 0 ..< 24 {
+                        let angle = CGFloat(step) / 24 * 2 * .pi
+                        image.draw(in: glyph.offsetBy(dx: cos(angle) * radius, dy: sin(angle) * radius), from: .zero, operation: .destinationOut, fraction: 1)
+                    }
+                }
+                image.draw(in: glyph)
             }
         }
     }
@@ -447,7 +449,7 @@ final class RunsCellView: NSTableCellView {
     /// icon), the gap scaled to this 13-point one and the mark a little larger than that, as small
     /// as the icon is. `offset` is how far the mark's corner is past the icon's.
     private static let cornerMark = (
-        size: NSSize(width: 9.25, height: 7.75), offset: NSSize(width: 3.25, height: 2.75), gap: CGFloat(1.25), radius: CGFloat(2.5)
+        size: NSSize(width: 9.25, height: 7.75), offset: NSSize(width: 3.25, height: 2.75), gap: CGFloat(1.25)
     )
 
     /// A state icon tinted, into the current (bitmap) context.

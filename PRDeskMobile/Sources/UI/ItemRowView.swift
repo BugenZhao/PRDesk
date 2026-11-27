@@ -219,8 +219,10 @@ struct ItemRowView: View {
 
     /// The state icon, marked in its corner for an agent session on the board or an adoption
     /// (`ItemRow.cornerMark`): beside the title a mark took room the title is short of, on a
-    /// phone most of all. The corner is cut out of the icon around the mark rather than laid on a
-    /// ground of its own, so it reads on any row's color (a selected, flagged or faded row).
+    /// phone most of all. The icon is cut away around the mark's own outline (grown by a gap)
+    /// rather than the mark laid on a ground of its own, so it reads on any row's color (a
+    /// selected, flagged or faded row); a rectangle around it took a corner of the icon that a
+    /// diagonal mark (the link) leaves alone.
     @ViewBuilder private var stateIcon: some View {
         let icon = StateIconView(item: item, size: 15 * scale, isMerging: row.isMerging)
         if let corner = row.cornerMark {
@@ -229,14 +231,24 @@ struct ItemRowView: View {
             let gap = 1.5 * scale
             icon
                 .mask {
-                    Rectangle()
-                        .overlay(alignment: .bottomTrailing) {
-                            RoundedRectangle(cornerRadius: 2.5 * scale)
-                                .frame(width: mark.width + 2 * gap, height: mark.height + 2 * gap)
-                                .offset(x: offset.width + gap, y: offset.height + gap)
-                                .blendMode(.destinationOut)
+                    // The glyph drawn out of the icon at points on two circles: its outline grown
+                    // by the gap. Where the mark's box is, as the overlay below places it.
+                    Canvas { context, size in
+                        context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.black))
+                        context.blendMode = .destinationOut
+                        let glyph = context.resolve(Image(systemName: corner.symbol))
+                        let fit = min(mark.width / glyph.size.width, mark.height / glyph.size.height)
+                        let fitted = CGSize(width: glyph.size.width * fit, height: glyph.size.height * fit)
+                        let center = CGPoint(x: size.width + offset.width - mark.width / 2, y: size.height + offset.height - mark.height / 2)
+                        let rect = CGRect(x: center.x - fitted.width / 2, y: center.y - fitted.height / 2, width: fitted.width, height: fitted.height)
+                        for radius in [gap / 2, gap] {
+                            for step in 0 ..< 24 {
+                                let angle = Double(step) / 24 * 2 * .pi
+                                context.draw(glyph, in: rect.offsetBy(dx: cos(angle) * radius, dy: sin(angle) * radius))
+                            }
                         }
-                        .compositingGroup()
+                    }
+                    .fontWeight(.bold)
                 }
                 .overlay(alignment: .bottomTrailing) {
                     Image(systemName: corner.symbol)
