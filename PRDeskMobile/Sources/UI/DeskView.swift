@@ -109,10 +109,16 @@ struct DeskView: View {
             if layout.listFloats, model.selection != nil { showsFloatingList = false }
             showChosenColumns()
         }
+        // The selection from last time didn't come back after all: nothing to look at.
+        .onChange(of: model.awaitsRestoredSelection) { showChosenColumns() }
         // The window is arranged another way (turned, resized), or the app is back in front:
         // the system has had its say about the columns, and the viewer's choice goes back in.
         .onChange(of: arrangement, initial: true) { settle() }
-        .onChange(of: scenePhase) { if scenePhase == .active { settle() } }
+        .onChange(of: scenePhase) { old, new in
+            // On its way back in front: the columns as the viewer left them, before the first frame.
+            if old == .background, new == .inactive { showChosenColumns() }
+            if new == .active { settle() }
+        }
         .focusedSceneValue(\.deskActions, DeskActions(
             toggleList: { withAnimation { setListShown(!isListShown(layout), layout) } },
             toggleTable: { setTable(!layout.isTable, layout) }
@@ -133,9 +139,10 @@ struct DeskView: View {
     // MARK: The list as a sidebar
 
     /// Beside the detail the sidebar stays as the viewer left it; floating over it, it is out
-    /// while asked for, and while there is nothing selected to look at instead.
+    /// while asked for, and while there is nothing selected to look at instead (not while the
+    /// selection from last time is on its way back, as the app starts).
     private func isListShown(_ layout: DeskLayout) -> Bool {
-        layout.listFloats ? showsFloatingList || model.selection == nil : showsList
+        layout.listFloats ? showsFloatingList || model.selection == nil && !model.awaitsRestoredSelection : showsList
     }
 
     private func setListShown(_ shown: Bool, _ layout: DeskLayout) {
@@ -181,6 +188,9 @@ struct DeskView: View {
     /// width is taken away for a moment and given again.
     private func settle() {
         rearrangements += 1
+        // In the background the system lays the window out for its snapshots; what the viewer
+        // sees is put right on the way back (`scenePhase`).
+        guard scenePhase != .background else { return }
         showChosenColumns()
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(500))

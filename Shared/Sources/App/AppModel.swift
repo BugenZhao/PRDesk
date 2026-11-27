@@ -127,7 +127,13 @@ final class AppModel {
     }
 
     /// The selection when the app last quit, put back once the list first has rows.
-    @ObservationIgnored private var restoredSelection: TableSelection? = Defaults.get(.selection)
+    @ObservationIgnored private var restoredSelection: TableSelection? = Defaults.get(.selection) {
+        didSet { if restoredSelection == nil, awaitsRestoredSelection { awaitsRestoredSelection = false } }
+    }
+    /// The selection from last time is about to be put back: nothing is selected yet, but
+    /// there will be. The iPad's sidebar floating over the detail stays put away for it, rather
+    /// than coming out for the empty selection and going away again as the app starts.
+    private(set) var awaitsRestoredSelection = (Defaults.get(.selection) as TableSelection?) != nil
     /// The stored items have been read once.
     @ObservationIgnored private var hasSnapshot = false
     /// A link asked for before that (Handoff or the hot key starting the app), opened once they
@@ -472,6 +478,7 @@ final class AppModel {
                         }
                     }
                     restoreSelection()
+                    if awaitsRestoredSelection { stopAwaitingRestoredSelection() }
                     if let item = selectedItem, let detail, detail.id == item.id, detail.itemUpdatedAt < item.updatedAt {
                         loadDetail()
                     }
@@ -1518,6 +1525,19 @@ final class AppModel {
         // Its section may be collapsed or the item gone by now; then start without a selection.
         guard rows.contains(where: { $0.selectionID == restored }) else { return }
         autoSelect(restored)
+    }
+
+    /// The stored items are read and the selection from last time isn't back: it won't be soon.
+    /// One of the Inbox comes back once the Inbox is synced, so that is waited for a little.
+    private func stopAwaitingRestoredSelection() {
+        guard restoredSelection?.section == .inbox, !rows.isEmpty else {
+            awaitsRestoredSelection = false
+            return
+        }
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(3))
+            self?.awaitsRestoredSelection = false
+        }
     }
 
     func autoSelect(_ selection: TableSelection?) {
