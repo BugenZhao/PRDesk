@@ -3,6 +3,7 @@ import SwiftUI
 @main
 struct PRDeskApp: App {
     @State private var model: AppModel
+    @NSApplicationDelegateAdaptor(PushDelegate.self) private var delegate
     /// Set in General settings; ⌘-dragging the icon out of the menu bar clears it too.
     @AppStorage("showsMenuBarExtra") private var showsMenuBarExtra = true
 

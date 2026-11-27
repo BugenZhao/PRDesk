@@ -5,6 +5,7 @@ import SwiftUI
 @main
 struct PRDeskMobileApp: App {
     @State private var model: AppModel
+    @UIApplicationDelegateAdaptor(PushDelegate.self) private var delegate
     @Environment(\.scenePhase) private var scenePhase
 
     init() {

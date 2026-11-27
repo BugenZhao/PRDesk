@@ -58,6 +58,8 @@ actor CloudHints: CKSyncEngineDelegate {
     private let logger = Logger(subsystem: "com.bugenzhao.PRDesk", category: "Hints")
     private let stateURL: URL
     private let receive: @Sendable ([ChangeHint]) async -> Void
+    /// The latest failure (nil once something went through), for Settings.
+    private let report: @Sendable (String?) async -> Void
     private var engine: CKSyncEngine?
     /// Hints waiting to go out, by record id.
     private var outgoing: [CKRecord.ID: CKRecord] = [:]
@@ -68,19 +70,51 @@ actor CloudHints: CKSyncEngineDelegate {
     private struct Saved: Codable {
         var engine: CKSyncEngine.State.Serialization?
         var ownHints: [String: Date] = [:]
+        /// The latest few things that happened, newest last: a device's log can't be read without
+        /// root, and this file can (`devicectl device copy from`).
+        var trace: [String]?
     }
 
     /// Nil where the app isn't signed for iCloud (test copies, simulators, a Mac without a
     /// development certificate).
-    static func make(directory: URL, receive: @escaping @Sendable ([ChangeHint]) async -> Void) -> CloudHints? {
+    static func make(
+        directory: URL,
+        receive: @escaping @Sendable ([ChangeHint]) async -> Void,
+        report: @escaping @Sendable (String?) async -> Void
+    ) -> CloudHints? {
         guard isEntitled else { return nil }
-        return CloudHints(stateURL: directory.appending(path: "cloud-hints.json"), receive: receive)
+        return CloudHints(stateURL: directory.appending(path: "cloud-hints.json"), receive: receive, report: report)
     }
 
-    private init(stateURL: URL, receive: @escaping @Sendable ([ChangeHint]) async -> Void) {
+    private init(stateURL: URL, receive: @escaping @Sendable ([ChangeHint]) async -> Void, report: @escaping @Sendable (String?) async -> Void) {
         self.stateURL = stateURL
         self.receive = receive
+        self.report = report
         saved = (try? JSONDecoder().decode(Saved.self, from: Data(contentsOf: stateURL))) ?? Saved()
+    }
+
+    /// Hints are what the viewer just did, and are wanted within seconds. CloudKit's default
+    /// quality of service is discretionary: the system runs such work when it likes, and on an
+    /// iPhone not at all in Low Power Mode. The engine's own sends and fetches (after a push)
+    /// were left waiting so on a phone, with the hints pending and no request made.
+    private static func urgent(_ name: String) -> CKOperationGroup {
+        let group = CKOperationGroup()
+        group.name = "Hints-\(name)"
+        group.defaultConfiguration.qualityOfService = .userInitiated
+        return group
+    }
+
+    private func note(_ line: String) {
+        var trace = saved.trace ?? []
+        trace.append("\(Date().formatted(.iso8601)) \(line)")
+        saved.trace = Array(trace.suffix(40))
+        save()
+    }
+
+    private func failed(_ what: String, _ error: any Error) async {
+        logger.error("\(what, privacy: .public) failed: \(String(describing: error), privacy: .public)")
+        note("\(what) failed: \(error.localizedDescription)")
+        await report("\(what) failed: \(error.localizedDescription)")
     }
 
     /// Whether this copy is signed with CloudKit. The Mac asks its own signature; iOS has no
@@ -107,7 +141,14 @@ actor CloudHints: CKSyncEngineDelegate {
         if saved.engine == nil {
             engine.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: Self.zoneID))])
         }
+        note("started")
         deleteExpired()
+        Task {
+            // Pending hints from before (left waiting, or the app stopped), and what the others
+            // wrote meanwhile, at once rather than on the engine's schedule.
+            await sendNow()
+            await fetchNow()
+        }
     }
 
     /// Fetches what the others wrote now, for when the app comes back to the front: a push that
@@ -115,9 +156,31 @@ actor CloudHints: CKSyncEngineDelegate {
     func fetchNow() async {
         guard let engine else { return }
         do {
-            try await engine.fetchChanges()
+            try await engine.fetchChanges(CKSyncEngine.FetchChangesOptions(operationGroup: Self.urgent("Fetch")))
+            await report(nil)
         } catch {
-            logger.error("Fetching hints failed: \(String(describing: error), privacy: .public)")
+            await failed("Fetching hints", error)
+        }
+    }
+
+    /// Records something the app saw, for the trace.
+    func noted(_ line: String) {
+        note(line)
+    }
+
+    /// For a silent push the app was handed (the engine may only schedule its own fetch).
+    func pushed() async {
+        note("push")
+        await fetchNow()
+    }
+
+    private func sendNow() async {
+        guard let engine, !engine.state.pendingRecordZoneChanges.isEmpty || !engine.state.pendingDatabaseChanges.isEmpty else { return }
+        do {
+            try await engine.sendChanges(CKSyncEngine.SendChangesOptions(operationGroup: Self.urgent("Send")))
+            await report(nil)
+        } catch {
+            await failed("Sending hints", error)
         }
     }
 
@@ -132,12 +195,9 @@ actor CloudHints: CKSyncEngineDelegate {
         record["at"] = hint.at
         outgoing[record.recordID] = record
         engine.state.add(pendingRecordZoneChanges: [.saveRecord(record.recordID)])
+        note("send \(hint.parts.rawValue) for \(hint.itemIDs.count) items")
         // At once, rather than when the engine's own schedule gets to it.
-        do {
-            try await engine.sendChanges()
-        } catch {
-            logger.error("Sending a hint failed: \(String(describing: error), privacy: .public)")
-        }
+        await sendNow()
     }
 
     /// Deletes this install's hints that are a day old.
@@ -173,6 +233,7 @@ actor CloudHints: CKSyncEngineDelegate {
         case let .fetchedRecordZoneChanges(changes):
             await received(changes.modifications.map(\.record), syncEngine: syncEngine)
         case let .sentRecordZoneChanges(sent):
+            if !sent.savedRecords.isEmpty { note("sent \(sent.savedRecords.count)") }
             for record in sent.savedRecords {
                 outgoing[record.recordID] = nil
                 saved.ownHints[record.recordID.recordName] = (record["at"] as? Date) ?? Date()
@@ -184,7 +245,7 @@ actor CloudHints: CKSyncEngineDelegate {
                     syncEngine.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: Self.zoneID))])
                     syncEngine.state.add(pendingRecordZoneChanges: [.saveRecord(id)])
                 } else {
-                    logger.error("A hint wasn't saved: \(String(describing: failure.error), privacy: .public)")
+                    await failed("Saving a hint", failure.error)
                     outgoing[id] = nil
                     syncEngine.state.remove(pendingRecordZoneChanges: [.saveRecord(id)])
                 }
@@ -204,6 +265,13 @@ actor CloudHints: CKSyncEngineDelegate {
         default:
             break
         }
+    }
+
+    /// The engine's own fetches (at launch, after a push) as urgent as ours.
+    func nextFetchChangesOptions(_ context: CKSyncEngine.FetchChangesContext, syncEngine: CKSyncEngine) async -> CKSyncEngine.FetchChangesOptions {
+        var options = context.options
+        options.operationGroup = Self.urgent("Fetch")
+        return options
     }
 
     func nextRecordZoneChangeBatch(_ context: CKSyncEngine.SendChangesContext, syncEngine: CKSyncEngine) async -> CKSyncEngine.RecordZoneChangeBatch? {
@@ -238,6 +306,7 @@ actor CloudHints: CKSyncEngineDelegate {
         if !expired.isEmpty {
             syncEngine.state.add(pendingRecordZoneChanges: expired.map { .deleteRecord($0) })
         }
+        note("fetched \(records.count), \(hints.count) fresh from others")
         guard !hints.isEmpty else { return }
         logger.info("Received \(hints.count) hints")
         await receive(hints)

@@ -104,8 +104,12 @@ struct OtherDevicesRow: View {
 
     var body: some View {
         LabeledContent("Other Devices") {
-            TimelineView(.periodic(from: .now, by: 30)) { _ in
-                Text(text).foregroundStyle(.secondaryText)
+            if let error = model.hintsStatus.lastError {
+                Text(error).foregroundStyle(.red).lineLimit(2)
+            } else {
+                TimelineView(.periodic(from: .now, by: 30)) { _ in
+                    Text(text).foregroundStyle(.secondaryText)
+                }
             }
         }
     }

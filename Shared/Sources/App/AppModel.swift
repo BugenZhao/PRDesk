@@ -347,6 +347,8 @@ final class AppModel {
         collapsed = Self.loadCollapsed()
         hints = CloudHints.make(directory: AppDatabase.directory) { [weak self] hints in
             await self?.receive(hints)
+        } report: { [weak self] error in
+            await MainActor.run { if self?.hintsStatus.lastError != error { self?.hintsStatus.lastError = error } }
         }
         hintsStatus.isOn = hints != nil
     }
@@ -463,6 +465,7 @@ final class AppModel {
         #endif
         if let hints {
             // CloudKit's silent pushes say when another device wrote a hint.
+            PushDelegate.handler = { [weak self] in await self?.pushEvent($0) }
             Platform.registerForRemoteNotifications()
             tasks.append(Task { await hints.start() })
         }
@@ -655,6 +658,8 @@ final class AppModel {
         var lastReceived: Date?
         /// The kind of device the last hint came from ("iPad").
         var lastSender: String?
+        /// Why the last send or fetch failed, until one goes through.
+        var lastError: String?
     }
 
     private(set) var hintsStatus = HintsStatus()
@@ -681,6 +686,17 @@ final class AppModel {
     func fetchHints() {
         guard let hints else { return }
         Task { await hints.fetchNow() }
+    }
+
+    /// What the app's delegate was told about pushes: one came (CloudKit's, saying another
+    /// device wrote a hint), or registering for them went through or failed.
+    func pushEvent(_ event: PushDelegate.Event) async {
+        guard let hints else { return }
+        switch event {
+        case .push: await hints.pushed()
+        case .registered: await hints.noted("registered for pushes")
+        case let .failed(reason): await hints.noted("registering for pushes failed: \(reason)")
+        }
     }
 
     /// Fetches again what other devices changed: the stored items (and items another device put
