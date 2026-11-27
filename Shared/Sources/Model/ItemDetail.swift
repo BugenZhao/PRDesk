@@ -204,10 +204,87 @@ struct PRCommit: Codable, Equatable, Identifiable, Sendable {
     var ciState: String?
     var additions: Int
     var deletions: Int
+    /// The whole message; nil in details cached before it was fetched.
+    var message: String? = nil
 
     var id: String { oid }
 
     var isMerge: Bool { (parentCount ?? 1) > 1 }
+
+    /// The message's first line in full: GitHub cuts a long headline short with "…".
+    var messageTitle: String {
+        guard let message else { return headline }
+        let first = message.prefix { $0 != "\n" }.trimmingCharacters(in: .whitespaces)
+        return first.isEmpty ? headline : first
+    }
+
+    /// The message after its first line, trimmed; empty when there is none (or isn't known).
+    var messageBody: String {
+        guard let message, let newline = message.firstIndex(of: "\n") else { return "" }
+        return message[message.index(after: newline)...].trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// The body with each paragraph's hard-wrapped lines joined (see `reflowed`), for views that
+    /// wrap it at their own width.
+    var reflowedBody: String { Self.reflowed(messageBody) }
+
+    /// The whole message for a tooltip, at most `maxLines` lines of its reflowed body.
+    func tooltipMessage(maxLines: Int = 30) -> String {
+        let body = reflowedBody
+        guard !body.isEmpty else { return messageTitle }
+        var lines = body.components(separatedBy: "\n")
+        if lines.count > maxLines { lines = lines.prefix(maxLines) + ["…"] }
+        return messageTitle + "\n\n" + lines.joined(separator: "\n")
+    }
+
+    /// Commit messages are wrapped by hand at about 72 columns, which re-wrapped at another width
+    /// leaves every other line short. Joins a line to the one before it, unless either is blank,
+    /// in a code block, or a line that stands alone: a list item, an indented or quoted line, a
+    /// table row, a trailer (`Signed-off-by: …`).
+    static func reflowed(_ text: String) -> String {
+        var lines: [String] = []
+        var inFence = false
+        var joinable = false
+        for raw in text.components(separatedBy: "\n") {
+            let line = raw.trimmingCharacters(in: .init(charactersIn: "\r"))
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("```") {
+                inFence.toggle()
+                lines.append(line)
+                joinable = false
+                continue
+            }
+            if inFence || trimmed.isEmpty {
+                lines.append(line)
+                joinable = false
+                continue
+            }
+            let standsAlone = line.first?.isWhitespace == true || isListItem(trimmed)
+                || trimmed.hasPrefix(">") || trimmed.hasPrefix("|") || isTrailer(trimmed)
+            if joinable, !standsAlone, let last = lines.popLast() {
+                lines.append(last + " " + trimmed)
+            } else {
+                lines.append(line)
+            }
+            // A trailer is never continued; a list item's own wrapped lines are.
+            joinable = !isTrailer(trimmed) && !trimmed.hasPrefix("|")
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    private static func isListItem(_ line: String) -> Bool {
+        if line.hasPrefix("- ") || line.hasPrefix("* ") || line.hasPrefix("+ ") || line.hasPrefix("• ") { return true }
+        let digits = line.prefix { $0.isASCII && $0.isNumber }
+        guard !digits.isEmpty, digits.count < 4 else { return false }
+        let rest = line.dropFirst(digits.count)
+        return rest.hasPrefix(". ") || rest.hasPrefix(") ")
+    }
+
+    private static func isTrailer(_ line: String) -> Bool {
+        guard let colon = line.firstIndex(of: ":"), line[line.index(after: colon)...].hasPrefix(" ") else { return false }
+        let key = line[..<colon]
+        return !key.isEmpty && key.count < 40 && key.allSatisfy { $0.isLetter || $0 == "-" } && key.contains("-")
+    }
 }
 
 struct Check: Codable, Equatable, Identifiable, Sendable {

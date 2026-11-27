@@ -150,20 +150,16 @@ struct CommitsView: View {
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { listWidth = $0 }
         #else
             // No selection without edit mode here: a tap picks one row (again to go back to the
-            // preset), and a row's menu extends the selection to it.
+            // preset), and a row's menu extends the selection to it. A commit's menu shows its
+            // whole message above it, what the pointer's tooltip shows on the Mac.
             List {
                 ForEach(history.rows) { row in
-                    rowView(row)
+                    rowView(row, extend: canExtend(to: row) ? { selection.insert(row.id) } : nil)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .contentShape(Rectangle())
                         .onTapGesture {
                             guard isSelectable(row) else { return }
                             selection = selection == [row.id] ? [] : [row.id]
-                        }
-                        .contextMenu {
-                            if isSelectable(row), !selection.isEmpty, !selection.contains(row.id) {
-                                Button("Extend Selection to Here", systemImage: "arrow.up.and.down") { selection.insert(row.id) }
-                            }
                         }
                         .listRowBackground(selection.contains(row.id) ? Color.accentColor.opacity(0.18) : Color.clear)
                         .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12))
@@ -178,14 +174,22 @@ struct CommitsView: View {
         #endif
     }
 
+    /// A row's menu offers to extend the selection to it.
     @ViewBuilder
-    private func rowView(_ row: CommitHistory.Row) -> some View {
+    private func rowView(_ row: CommitHistory.Row, extend: (() -> Void)? = nil) -> some View {
         switch row {
         case let .commit(commit, isNew):
-            CommitRow(commit: commit, isNew: isNew, shortensTags: shortensTags, pullURL: item.url)
+            CommitRow(commit: commit, isNew: isNew, shortensTags: shortensTags, pullURL: item.url, extend: extend)
         case let .push(push):
             PushRow(push: push)
+                .contextMenu {
+                    if let extend { ExtendSelectionButton(action: extend) }
+                }
         }
+    }
+
+    private func canExtend(to row: CommitHistory.Row) -> Bool {
+        isSelectable(row) && !selection.isEmpty && !selection.contains(row.id)
     }
 
     /// A force push whose ends aren't known has nothing to compare.
@@ -345,8 +349,39 @@ private struct CommitRow: View {
     let isNew: Bool
     let shortensTags: Bool
     let pullURL: String
+    var extend: (() -> Void)?
 
     var body: some View {
+        #if os(macOS)
+            line
+                .help("\(commit.tooltipMessage())\n\n\(byline)")
+                .contextMenu { menu }
+        #else
+            line
+                .contextMenu { menu } preview: {
+                    CommitMessageCard(commit: commit, byline: byline)
+                }
+        #endif
+    }
+
+    /// Who made it and how big it is.
+    private var byline: String {
+        "\(commit.shortOid) · \(commit.authorName ?? commit.author ?? "Unknown") · +\(commit.additions) −\(commit.deletions)"
+    }
+
+    @ViewBuilder
+    private var menu: some View {
+        if let extend { ExtendSelectionButton(action: extend) }
+        Button("Open on GitHub", systemImage: "safari") {
+            if let url = URL(string: "\(pullURL)/commits/\(commit.oid)") { Platform.open(url) }
+        }
+        Button("Copy SHA", systemImage: "doc.on.doc") { Platform.copy(commit.oid) }
+        if commit.message != nil {
+            Button("Copy Message", systemImage: "text.quote") { Platform.copy(commit.message ?? "") }
+        }
+    }
+
+    private var line: some View {
         HStack(spacing: 6) {
             if commit.isMerge {
                 Image(systemName: "arrow.triangle.merge")
@@ -380,13 +415,6 @@ private struct CommitRow: View {
                 .monospacedDigit()
         }
         .font(.callout)
-        .help("\(commit.headline)\n\(commit.authorName ?? commit.author ?? "") · +\(commit.additions) −\(commit.deletions)")
-        .contextMenu {
-            Button("Open on GitHub") {
-                if let url = URL(string: "\(pullURL)/commits/\(commit.oid)") { Platform.open(url) }
-            }
-            Button("Copy SHA") { Platform.copy(commit.oid) }
-        }
     }
 
     private var ciColor: Color {
@@ -398,6 +426,52 @@ private struct CommitRow: View {
         }
     }
 }
+
+private struct ExtendSelectionButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button("Extend Selection to Here", systemImage: "arrow.up.and.down", action: action)
+    }
+}
+
+#if os(iOS)
+    /// A commit's whole message, over its row's menu: who made it, the headline, and the body
+    /// (its paragraphs reflowed), cut short where the room ends.
+    private struct CommitMessageCard: View {
+        let commit: PRCommit
+        let byline: String
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 6) {
+                    AvatarView(login: commit.author, size: 20)
+                    Text(byline)
+                        .font(.footnote.monospacedDigit())
+                        .foregroundStyle(.secondaryText)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    Text(commit.committedAt.compactAge())
+                        .font(.footnote.monospacedDigit())
+                        .foregroundStyle(.secondaryText)
+                }
+                Text(commit.messageTitle)
+                    .font(.headline)
+                    .layoutPriority(1)
+                let body = commit.reflowedBody
+                if !body.isEmpty {
+                    Text(body)
+                        .font(.subheadline)
+                        .lineLimit(40)
+                }
+            }
+            .padding(16)
+            // Flexible: the system gives the preview what room is left beside the menu, often
+            // less than it asked for, and a card of fixed size was clipped on every side.
+            .frame(maxWidth: 400, maxHeight: .infinity, alignment: .topLeading)
+        }
+    }
+#endif
 
 private struct PushRow: View {
     let push: CommitHistory.Push

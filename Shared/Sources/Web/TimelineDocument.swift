@@ -27,7 +27,9 @@ struct TimelineDocument {
     private static let descriptionID = "description"
 
     init(item: Item, detail: ItemDetail, previousSeenAt: Date?, showAutomated: Bool, people: some TimelinePeople) {
-        let builder = Builder(people: people, previousSeenAt: previousSeenAt)
+        // A pushed commit's line names it by its short sha, which the Commits tab's list has too.
+        let commits = Dictionary((detail.commits ?? []).map { ($0.shortOid, $0) }) { first, _ in first }
+        let builder = Builder(people: people, previousSeenAt: previousSeenAt, commits: commits)
         // On a staging PR the parity agent is who the viewer is talking to.
         func shows(_ actor: String?, automated: Bool) -> Bool {
             showAutomated || !automated || item.isParityStaging && Parity.isBot(actor)
@@ -164,6 +166,8 @@ struct TimelineDocument {
     private struct Builder<People: TimelinePeople> {
         let people: People
         let previousSeenAt: Date?
+        /// The PR's commits by short sha, for each pushed commit's whole message.
+        let commits: [String: PRCommit]
 
         func isNew(_ entry: TimelineEntry) -> Bool {
             guard let previousSeenAt else { return false }
@@ -276,8 +280,10 @@ struct TimelineDocument {
             html += #"<span class="text">pushed \#(count) commit\#(count == 1 ? "" : "s")</span>"#
             html += age(entries[count - 1].at, cls: "age") + "</div>"
             for entry in entries.suffix(6) {
-                let headline = (entry.detail ?? "").htmlEscaped
-                html += #"<div class="commit" title="\#(headline)">\#(headline)</div>"#
+                let line = entry.detail ?? ""
+                let sha = line.prefix { $0 != " " }
+                let title = commits[String(sha)].map { "\(sha) \($0.tooltipMessage())" } ?? line
+                html += #"<div class="commit" title="\#(title.htmlEscaped)">\#(line.htmlEscaped)</div>"#
             }
             if count > 6 {
                 html += #"<div class="more">and \#(count - 6) earlier</div>"#

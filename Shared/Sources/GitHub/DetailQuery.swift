@@ -149,7 +149,7 @@ enum DetailQuery {
           commits(last: 100) {
             nodes {
               commit {
-                oid abbreviatedOid messageHeadline committedDate url additions deletions
+                oid abbreviatedOid messageHeadline message committedDate url additions deletions
                 parents(first: 1) { totalCount nodes { oid } }
                 author { user { login } name }
                 statusCheckRollup { state }
@@ -175,6 +175,7 @@ enum DetailQuery {
                 let oid: String
                 let abbreviatedOid: String
                 let messageHeadline: String
+                let message: String?
                 let committedDate: Date
                 let url: String
                 let additions: Int
@@ -192,7 +193,8 @@ enum DetailQuery {
                     committedAt: commit.committedDate, url: commit.url,
                     parentOid: commit.parents.nodes?.first??.oid, parentCount: commit.parents.totalCount,
                     author: commit.author?.user?.login, authorName: commit.author?.name,
-                    ciState: commit.statusCheckRollup?.state, additions: commit.additions, deletions: commit.deletions
+                    ciState: commit.statusCheckRollup?.state, additions: commit.additions, deletions: commit.deletions,
+                    message: commit.message
                 )
             }
         }
