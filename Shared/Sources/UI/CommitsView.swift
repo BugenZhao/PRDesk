@@ -66,7 +66,7 @@ struct CommitsView: View {
                     if showsList {
                         Divider()
                         list(history)
-                            .frame(height: min(CGFloat(history.rows.count) * RowMetrics.commitRowHeight + 10, 200))
+                            .frame(height: min(CGFloat(listRowCount(history)) * RowMetrics.commitRowHeight + 10, 200))
                     }
                 }
             }
@@ -149,19 +149,20 @@ struct CommitsView: View {
             .environment(\.defaultMinListRowHeight, 22)
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { listWidth = $0 }
         #else
-            // No selection without edit mode here: a tap picks one row (again to go back to the
-            // preset), and a row's menu extends the selection to it. A commit's menu shows its
-            // whole message above it, what the pointer's tooltip shows on the Mac.
+            // No selection without edit mode here: a tap picks one commit (again to go back to the
+            // preset), and its menu extends the selection to it or picks a force push folded
+            // into it. The menu shows the commit's whole message above it, what the pointer's
+            // tooltip shows on the Mac.
             List {
-                ForEach(history.rows) { row in
-                    rowView(row, extend: canExtend(to: row) ? { selection.insert(row.id) } : nil)
+                ForEach(history.compactRows) { row in
+                    compactRowView(row)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            guard isSelectable(row) else { return }
-                            selection = selection == [row.id] ? [] : [row.id]
+                            guard let commit = row.commit else { return }
+                            selection = selection == [commit.oid] ? [] : [commit.oid]
                         }
-                        .listRowBackground(selection.contains(row.id) ? Color.accentColor.opacity(0.18) : Color.clear)
+                        .listRowBackground(rowBackground(row))
                         .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12))
                 }
             }
@@ -174,23 +175,52 @@ struct CommitsView: View {
         #endif
     }
 
-    /// A row's menu offers to extend the selection to it.
-    @ViewBuilder
-    private func rowView(_ row: CommitHistory.Row, extend: (() -> Void)? = nil) -> some View {
-        switch row {
-        case let .commit(commit, isNew):
-            CommitRow(commit: commit, isNew: isNew, shortensTags: shortensTags, pullURL: item.url, extend: extend)
-        case let .push(push):
-            PushRow(push: push)
-                .contextMenu {
-                    if let extend { ExtendSelectionButton(action: extend) }
-                }
-        }
+    private func listRowCount(_ history: CommitHistory) -> Int {
+        #if os(macOS)
+            history.rows.count
+        #else
+            history.compactRows.count
+        #endif
     }
 
-    private func canExtend(to row: CommitHistory.Row) -> Bool {
-        isSelectable(row) && !selection.isEmpty && !selection.contains(row.id)
-    }
+    #if os(macOS)
+        @ViewBuilder
+        private func rowView(_ row: CommitHistory.Row) -> some View {
+            switch row {
+            case let .commit(commit, isNew):
+                CommitRow(commit: commit, isNew: isNew, shortensTags: shortensTags, pullURL: item.url)
+            case let .push(push):
+                PushRow(push: push)
+            }
+        }
+    #endif
+
+    #if os(iOS)
+        @ViewBuilder
+        private func compactRowView(_ row: CommitHistory.CompactRow) -> some View {
+            let selectPush: (CommitHistory.Push) -> Void = { selection = [CommitHistory.Row.pushPrefix + $0.id] }
+            if let commit = row.commit {
+                let canExtend = !selection.isEmpty && !selection.contains(commit.oid)
+                    && !selection.contains { $0.hasPrefix(CommitHistory.Row.pushPrefix) }
+                CommitRow(
+                    commit: commit, isNew: row.isNew, shortensTags: shortensTags, pullURL: item.url,
+                    pushes: row.pushes, selectPush: selectPush,
+                    extend: canExtend ? { selection.insert(commit.oid) } : nil
+                )
+            } else {
+                EarlierPushesRow(pushes: row.pushes, select: selectPush)
+            }
+        }
+
+        /// A chosen commit in the accent's tint; a row holding the chosen force push in orange.
+        private func rowBackground(_ row: CommitHistory.CompactRow) -> Color {
+            if let commit = row.commit, selection.contains(commit.oid) { return Color.accentColor.opacity(0.18) }
+            if row.pushes.contains(where: { selection.contains(CommitHistory.Row.pushPrefix + $0.id) }) {
+                return Color.orange.opacity(0.15)
+            }
+            return .clear
+        }
+    #endif
 
     /// A force push whose ends aren't known has nothing to compare.
     private func isSelectable(_ row: CommitHistory.Row) -> Bool {
@@ -202,21 +232,33 @@ struct CommitsView: View {
     /// as the stack does, so a tag reads the same in every row.
     private var shortensTags: Bool {
         guard listWidth > 0 else { return false }
-        let body = PlatformFont.preferredFont(forTextStyle: .callout)
+        let body = PlatformFont.preferredFont(forTextStyle: CommitRow.textStyle)
         let mono = PlatformFont.monospacedSystemFont(ofSize: body.pointSize, weight: .regular)
-        let caption = PlatformFont.preferredFont(forTextStyle: .caption1)
+        let caption = PlatformFont.preferredFont(forTextStyle: CommitRow.badgeStyle)
         let digits = PlatformFont.monospacedDigitSystemFont(ofSize: body.pointSize, weight: .regular)
         func measure(_ text: String, _ font: PlatformFont) -> CGFloat {
             ceil((text as NSString).size(withAttributes: [.font: font]).width)
         }
-        return history.rows.contains { row in
-            guard case let .commit(commit, isNew) = row else { return false }
-            // The row's insets, then CI dot, avatar, sha, headline, "new" and age with their gaps.
+        func needed(_ commit: PRCommit, isNew: Bool, pushes: Int) -> CGFloat {
+            // The row's insets, then CI dot, avatar, sha, headline, "new", pushes and age with
+            // their gaps.
             var needed = 2 * 12 + 7 + 6 + 16 + 6 + measure(commit.shortOid, mono) + 6
                 + measure(commit.headline, body) + 4 + measure(commit.committedAt.compactAge(), digits)
             if isNew { needed += measure("new", caption) + 10 + 6 }
-            return needed > listWidth
+            if pushes > 0 { needed += measure(pushes > 1 ? "\(pushes)" : "", caption) + body.pointSize + 6 }
+            return needed
         }
+        #if os(macOS)
+            return history.rows.contains { row in
+                guard case let .commit(commit, isNew) = row else { return false }
+                return needed(commit, isNew: isNew, pushes: 0) > listWidth
+            }
+        #else
+            return history.compactRows.contains { row in
+                guard let commit = row.commit else { return false }
+                return needed(commit, isNew: row.isNew, pushes: row.pushes.count) > listWidth
+            }
+        #endif
     }
 
     // MARK: Toolbar
@@ -349,7 +391,24 @@ private struct CommitRow: View {
     let isNew: Bool
     let shortensTags: Bool
     let pullURL: String
+    /// The force pushes folded into the row (iOS lists them in the commit's menu, not as rows).
+    var pushes: [CommitHistory.Push] = []
+    var selectPush: ((CommitHistory.Push) -> Void)?
     var extend: (() -> Void)?
+
+    /// A size under the page's text on iOS, as the diff's file headers below are; the Mac's
+    /// rows are a size up from those, as its list rows are.
+    #if os(macOS)
+        static let font = Font.callout
+        static let textStyle = PlatformFont.TextStyle.callout
+        static let badgeFont = Font.caption
+        static let badgeStyle = PlatformFont.TextStyle.caption1
+    #else
+        static let font = Font.footnote
+        static let textStyle = PlatformFont.TextStyle.footnote
+        static let badgeFont = Font.caption2
+        static let badgeStyle = PlatformFont.TextStyle.caption2
+    #endif
 
     var body: some View {
         #if os(macOS)
@@ -371,7 +430,10 @@ private struct CommitRow: View {
 
     @ViewBuilder
     private var menu: some View {
-        if let extend { ExtendSelectionButton(action: extend) }
+        if let extend { Button("Extend Selection to Here", systemImage: "arrow.up.and.down", action: extend) }
+        if let selectPush, !pushes.isEmpty {
+            Section { PushButtons(pushes: pushes, select: selectPush) }
+        }
         Button("Open on GitHub", systemImage: "safari") {
             if let url = URL(string: "\(pullURL)/commits/\(commit.oid)") { Platform.open(url) }
         }
@@ -395,7 +457,7 @@ private struct CommitRow: View {
             }
             AvatarView(login: commit.author, size: 16)
             Text(commit.shortOid)
-                .font(.callout.monospaced())
+                .font(Self.font.monospaced())
                 .foregroundStyle(.secondaryText)
             // Merges in gray: they are rarely what a review is about.
             Text(itemTitle: commit.headline, shortenedTags: shortensTags)
@@ -403,9 +465,17 @@ private struct CommitRow: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: 4)
+            if !pushes.isEmpty {
+                HStack(spacing: 1) {
+                    Image(systemName: "arrow.triangle.branch")
+                    if pushes.count > 1 { Text("\(pushes.count)").font(Self.badgeFont.monospacedDigit()) }
+                }
+                .foregroundStyle(.orange)
+                .accessibilityLabel(pushes.count == 1 ? "Force-pushed" : "Force-pushed \(pushes.count) times")
+            }
             if isNew {
                 Text("new")
-                    .font(.caption)
+                    .font(Self.badgeFont)
                     .foregroundStyle(.tint)
                     .padding(.horizontal, 5)
                     .background(.tint.opacity(0.15), in: .capsule)
@@ -414,7 +484,7 @@ private struct CommitRow: View {
                 .foregroundStyle(.secondaryText)
                 .monospacedDigit()
         }
-        .font(.callout)
+        .font(Self.font)
     }
 
     private var ciColor: Color {
@@ -427,15 +497,53 @@ private struct CommitRow: View {
     }
 }
 
-private struct ExtendSelectionButton: View {
-    let action: () -> Void
+/// A button for each force push whose ends are known, to see what it changed.
+private struct PushButtons: View {
+    let pushes: [CommitHistory.Push]
+    let select: (CommitHistory.Push) -> Void
 
     var body: some View {
-        Button("Extend Selection to Here", systemImage: "arrow.up.and.down", action: action)
+        ForEach(pushes) { push in
+            if let before = push.before, let after = push.after {
+                Button { select(push) } label: {
+                    Label("Force Push \(before.prefix(7)) → \(after.prefix(7))", systemImage: "arrow.triangle.branch")
+                    Text("\(push.actor ?? "Someone"), \(push.at.compactAge())")
+                }
+            }
+        }
     }
 }
 
 #if os(iOS)
+    /// The force pushes older than every commit listed (heads a rebase has rewritten since), as one
+    /// row whose menu picks one.
+    private struct EarlierPushesRow: View {
+        let pushes: [CommitHistory.Push]
+        let select: (CommitHistory.Push) -> Void
+
+        var body: some View {
+            Menu {
+                PushButtons(pushes: pushes, select: select)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.triangle.branch")
+                        .frame(width: 7 + 6 + 16)
+                    Text(pushes.count == 1 ? "1 earlier force push" : "\(pushes.count) earlier force pushes")
+                    Spacer(minLength: 4)
+                    if let last = pushes.last, let first = pushes.first {
+                        Text(first.at.compactAge() == last.at.compactAge()
+                            ? first.at.compactAge() : "\(first.at.compactAge())–\(last.at.compactAge())")
+                            .monospacedDigit()
+                    }
+                }
+                .font(CommitRow.font)
+                .foregroundStyle(.orange)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
     /// A commit's whole message, over its row's menu: who made it, the headline, and the body
     /// (its paragraphs reflowed), cut short where the room ends.
     private struct CommitMessageCard: View {
@@ -473,24 +581,27 @@ private struct ExtendSelectionButton: View {
     }
 #endif
 
-private struct PushRow: View {
-    let push: CommitHistory.Push
+#if os(macOS)
+    /// A force push as a row of its own: the Mac's list is close enough to spare it one.
+    private struct PushRow: View {
+        let push: CommitHistory.Push
 
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "arrow.triangle.branch")
-                .frame(width: 7 + 6 + 16)
-            Text("\(push.actor ?? "Someone") force-pushed")
-            if let before = push.before, let after = push.after {
-                Text("\(before.prefix(7)) → \(after.prefix(7))")
-                    .font(.callout.monospaced())
+        var body: some View {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.triangle.branch")
+                    .frame(width: 7 + 6 + 16)
+                Text("\(push.actor ?? "Someone") force-pushed")
+                if let before = push.before, let after = push.after {
+                    Text("\(before.prefix(7)) → \(after.prefix(7))")
+                        .font(.callout.monospaced())
+                }
+                Spacer(minLength: 4)
+                Text(push.at.compactAge())
+                    .monospacedDigit()
             }
-            Spacer(minLength: 4)
-            Text(push.at.compactAge())
-                .monospacedDigit()
+            .font(.callout)
+            .foregroundStyle(.orange)
+            .help(push.before == nil || push.after == nil ? "" : "Select to see what the push changed")
         }
-        .font(.callout)
-        .foregroundStyle(.orange)
-        .help(push.before == nil || push.after == nil ? "" : "Select to see what the push changed")
     }
-}
+#endif

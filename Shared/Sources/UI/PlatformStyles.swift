@@ -55,7 +55,7 @@ enum RowMetrics {
         static let commitRowHeight: CGFloat = 24
         static let stackRowHeight: CGFloat = 20
     #else
-        static let commitRowHeight: CGFloat = 36
+        static let commitRowHeight: CGFloat = 32
         static let stackRowHeight: CGFloat = 30
     #endif
 }

@@ -43,6 +43,18 @@ struct CommitHistory: Sendable {
         static let pushPrefix = "push:"
     }
 
+    /// A commit with the force pushes listed just above it folded in (the head a push left, or
+    /// where it falls in time), for a list without rows of their own for pushes; a last row with
+    /// no commit holds the pushes older than every commit (heads a rebase rewrote since).
+    struct CompactRow: Identifiable, Sendable {
+        var commit: PRCommit?
+        var isNew: Bool
+        /// Newest first.
+        var pushes: [Push]
+
+        var id: String { commit?.oid ?? Row.pushPrefix + "earlier" }
+    }
+
     /// The ranges the menu offers, in its order; the tab opens on everything.
     enum Preset: CaseIterable, Sendable {
         case all, sinceReview, sinceViewed
@@ -99,6 +111,22 @@ struct CommitHistory: Sendable {
             rows.insert(.push(push), at: index)
         }
         self.rows = rows
+    }
+
+    var compactRows: [CompactRow] {
+        var result: [CompactRow] = []
+        var pending: [Push] = []
+        for row in rows {
+            switch row {
+            case let .push(push):
+                pending.append(push)
+            case let .commit(commit, isNew):
+                result.append(CompactRow(commit: commit, isNew: isNew, pushes: pending))
+                pending = []
+            }
+        }
+        if !pending.isEmpty { result.append(CompactRow(commit: nil, isNew: false, pushes: pending)) }
+        return result
     }
 
     /// The preset's range, or nil when it has none (no review, nothing seen, nothing new).
