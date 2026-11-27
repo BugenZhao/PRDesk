@@ -99,6 +99,7 @@ struct DeskView: View {
         .sheet(isPresented: $showsSettings) { SettingsView() }
         .background(ItemHandoff())
         .modifier(ModelAlerts())
+        .modifier(ExternalLinks())
         // The filter is the list's: asked for by key while the list is away, it comes back.
         .onChange(of: model.filterFocusRequest) {
             withAnimation { setListShown(true, layout) }

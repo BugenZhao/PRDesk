@@ -916,6 +916,11 @@ final class AppModel {
         selection = TableSelection(section: .opened, itemID: item.id)
     }
 
+    /// The item a link names, if it is here: stored, or opened from a link before.
+    func item(for link: ItemLink) -> Item? {
+        snapshot.items.first { $0.repoNumber == link.key } ?? openedItems.first { $0.repoNumber == link.key }
+    }
+
     /// Whether the item is only in Opened: fetched from a link and not stored, so not on the desk.
     func isOpenedOnly(_ item: Item) -> Bool {
         !snapshot.items.contains { $0.id == item.id }

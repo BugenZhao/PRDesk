@@ -64,12 +64,17 @@ let project = Project(
                 "LSApplicationQueriesSchemes": ["grokbot"],
                 // Handoff of the item being looked at (`ItemHandoff`), as in the Mac's Info.plist.
                 "NSUserActivityTypes": ["com.bugenzhao.PRDesk.item"],
+                // `prdesk://open?url=` and a GitHub link, from the share sheet's action (`ExternalLinks`).
+                "CFBundleURLTypes": [
+                    ["CFBundleURLName": "com.bugenzhao.PRDesk.mobile", "CFBundleURLSchemes": ["prdesk"]],
+                ],
                 "PRDeskCommit": "$(PRDESK_COMMIT)",
             ]),
             sources: ["PRDeskMobile/Sources/**", "Shared/Sources/**"],
             resources: ["Shared/Resources/AppIcon.icon", "Shared/Resources/Assets.xcassets", "Shared/Resources/Web/**"],
             dependencies: [
                 .package(product: "GRDB"),
+                .target(name: "PRDeskMobileOpen"),
             ],
             settings: .settings(
                 base: [
@@ -80,6 +85,41 @@ let project = Project(
                     "CURRENT_PROJECT_VERSION": "1",
                     // The commit an install is built from (`AppVersion`), set by the install scripts.
                     "PRDESK_COMMIT": "",
+                ]
+            )
+        ),
+        // "Open in PR Desk" in the share sheet (Safari, the GitHub app): an action that hands a
+        // GitHub link to the app by its URL scheme. It shares nothing else with the app.
+        .target(
+            name: "PRDeskMobileOpen",
+            destinations: [.iPhone, .iPad],
+            product: .appExtension,
+            bundleId: "com.bugenzhao.PRDesk.mobile.open",
+            deploymentTargets: .iOS("27.0"),
+            infoPlist: .extendingDefault(with: [
+                "CFBundleDisplayName": "Open in PR Desk",
+                "NSExtension": [
+                    "NSExtensionPointIdentifier": "com.apple.ui-services",
+                    "NSExtensionPrincipalClass": "$(PRODUCT_MODULE_NAME).OpenActionViewController",
+                    "NSExtensionAttributes": [
+                        "NSExtensionActionWantsFullScreenPresentation": false,
+                        "NSExtensionServiceAllowsFinderPreviewItem": false,
+                        // A single web page: Safari's, or a link the GitHub app shares.
+                        "NSExtensionActivationRule": [
+                            "NSExtensionActivationSupportsWebURLWithMaxCount": 1,
+                        ],
+                    ],
+                ],
+            ]),
+            sources: ["PRDeskMobileOpen/Sources/**"],
+            // iOS draws an action's icon from its alpha, as a template: a black glyph on clear.
+            resources: ["PRDeskMobileOpen/Resources/Assets.xcassets"],
+            settings: .settings(
+                base: [
+                    "SWIFT_VERSION": "6.0",
+                    "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
+                    "MARKETING_VERSION": "0.1",
+                    "CURRENT_PROJECT_VERSION": "1",
                 ]
             )
         ),
