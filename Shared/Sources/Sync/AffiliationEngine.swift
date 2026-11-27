@@ -27,6 +27,11 @@ actor AffiliationEngine {
     private let db: AppDatabase
     private let logger = Logger(subsystem: "com.bugenzhao.PRDesk", category: "Affiliations")
     private var isRefreshing = false
+    /// When a list's fetch last failed, by its key: not tried again for `listRetryInterval`, or a
+    /// list that can't be read (an org's members refused) would be paged through again at each
+    /// refresh, after each sync and each detail, before failing again.
+    private var listFailedAt: [String: Date] = [:]
+    private static let listRetryInterval: TimeInterval = 3600
 
     init(client: GitHubClient, db: AppDatabase) {
         self.client = client
@@ -43,16 +48,23 @@ actor AffiliationEngine {
         // No code owners entry means the lists predate them; fetch them now.
         let predatesCodeOwners = try await db.meta(Affiliations.codeOwnersKey) == nil
         let predatesLLMD = try await db.meta(Affiliations.llmdMaintainersKey) == nil
-        if force || committersStale || predatesCodeOwners || predatesLLMD {
-            try await db.setMetaJSON(Affiliations.committersKey, fetchCommitters())
-            try await db.setMetaJSON(Affiliations.codeOwnersKey, fetchCodeOwners())
+        if force || (committersStale || predatesCodeOwners || predatesLLMD) && mayRetryList(Self.committersFetchedKey) {
             do {
-                try await db.setMetaJSON(Affiliations.llmdMaintainersKey, fetchLLMDMaintainers())
+                try await db.setMetaJSON(Affiliations.committersKey, fetchCommitters())
+                try await db.setMetaJSON(Affiliations.codeOwnersKey, fetchCodeOwners())
+                do {
+                    try await db.setMetaJSON(Affiliations.llmdMaintainersKey, fetchLLMDMaintainers())
+                } catch {
+                    logger.error("llm-d maintainers unavailable: \(error.localizedDescription)")
+                    if predatesLLMD { try await db.setMetaJSON(Affiliations.llmdMaintainersKey, [String: [String]]()) }
+                }
+                try await db.setMeta(Self.committersFetchedKey, SyncEngine.format(Date()))
+                listFailedAt[Self.committersFetchedKey] = nil
             } catch {
-                logger.error("llm-d maintainers unavailable: \(error.localizedDescription)")
-                if predatesLLMD { try await db.setMetaJSON(Affiliations.llmdMaintainersKey, [String: [String]]()) }
+                // The people below still get their badges from what is stored.
+                logger.error("Committers and code owners unavailable: \(String(describing: error), privacy: .public)")
+                listFailedAt[Self.committersFetchedKey] = Date()
             }
-            try await db.setMeta(Self.committersFetchedKey, SyncEngine.format(Date()))
         }
         let membersStale = try await isStale(Self.membersFetchedKey, Self.listRefreshInterval)
         // No collaborators entry means the lists predate the vLLM member tier; fetch them now.
@@ -61,15 +73,21 @@ actor AffiliationEngine {
         let listed: [String: [String]] = try await db.meta(Affiliations.membersKey)
             .flatMap { try? JSONDecoder().decode([String: [String]].self, from: Data($0.utf8)) } ?? [:]
         let predatesOrg = Org.allCases.contains { $0.listsMembers && listed[$0.rawValue] == nil }
-        if force || membersStale || predatesTier || predatesOrg {
-            try await db.setMetaJSON(Affiliations.membersKey, fetchMembers())
+        if force || (membersStale || predatesTier || predatesOrg) && mayRetryList(Self.membersFetchedKey) {
             do {
-                try await db.setMetaJSON(Affiliations.collaboratorsKey, fetchCollaborators())
+                try await db.setMetaJSON(Affiliations.membersKey, fetchMembers())
+                do {
+                    try await db.setMetaJSON(Affiliations.collaboratorsKey, fetchCollaborators())
+                } catch {
+                    logger.error("Collaborators unavailable: \(error.localizedDescription)")
+                    if predatesTier { try await db.setMetaJSON(Affiliations.collaboratorsKey, [String: String]()) }
+                }
+                try await db.setMeta(Self.membersFetchedKey, SyncEngine.format(Date()))
+                listFailedAt[Self.membersFetchedKey] = nil
             } catch {
-                logger.error("Collaborators unavailable: \(error.localizedDescription)")
-                if predatesTier { try await db.setMetaJSON(Affiliations.collaboratorsKey, [String: String]()) }
+                logger.error("Org members unavailable: \(String(describing: error), privacy: .public)")
+                listFailedAt[Self.membersFetchedKey] = Date()
             }
-            try await db.setMeta(Self.membersFetchedKey, SyncEngine.format(Date()))
         }
 
         let people = logins.map { $0.lowercased() }.filter { !Item.Event.isAutomationLogin($0) }.sorted()
@@ -141,6 +159,11 @@ actor AffiliationEngine {
     }
 
     // MARK: Lists
+
+    /// Whether the list under `key` may be fetched: not within `listRetryInterval` of a failure.
+    private func mayRetryList(_ key: String) -> Bool {
+        listFailedAt[key].map { Date().timeIntervalSince($0) >= Self.listRetryInterval } ?? true
+    }
 
     private struct FileContent: Decodable, Sendable {
         let content: String

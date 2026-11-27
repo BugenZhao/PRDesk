@@ -346,6 +346,8 @@ final class AppModel {
     @ObservationIgnored private var detailFetchedFor: (id: Item.ID, updatedAt: Date)?
     /// Cached details older than this are refreshed when shown, even if the item looks unchanged.
     private static let detailMaxAge: TimeInterval = 120
+    /// How long a detail fetch that wasn't asked for waits for the selection to settle.
+    private static let detailFetchDelay: Duration = .milliseconds(200)
     @ObservationIgnored let logger = Logger(subsystem: "com.bugenzhao.PRDesk", category: "App")
 
     init(db: AppDatabase) {
@@ -629,12 +631,18 @@ final class AppModel {
     private func syncInbox() async {
         do {
             let notes = try await engine.fetchInbox()
-            // Notifications can be for items no tracking search found; fetch a few at a time.
+            // Notifications can be for items no tracking search found; fetch a few at a time. One
+            // that can't be fetched, or comes back as another (a transferred issue), is tried again
+            // only once its notification moves on, not at every sync.
             let known = Set(snapshot.items.map(\.repoNumber))
             var seen = Set<String>()
-            let missing = notes.filter { !known.contains($0.repoNumber) && seen.insert($0.repoNumber).inserted }
+            let missing = notes.filter {
+                !known.contains($0.repoNumber) && unfetchableInbox[$0.repoNumber] != $0.updatedAt
+                    && seen.insert($0.repoNumber).inserted
+            }
             for note in missing.prefix(10) {
-                _ = try? await engine.fetchItem(repo: note.repo, number: note.number)
+                let fetched = try? await engine.fetchItem(repo: note.repo, number: note.number)
+                if fetched?.repoNumber != note.repoNumber { unfetchableInbox[note.repoNumber] = note.updatedAt }
             }
             let threads = await recentThreads()
             await followNotificationReads(threads)
@@ -1584,6 +1592,14 @@ final class AppModel {
             {
                 return
             }
+            if !force, self?.detail != nil, let chain = self?.autoSelectChain, chain > Self.autoSelectFetchLimit {
+                self?.logger.info("Not fetching #\(item.number): selected by the app \(chain) times in a row")
+                return
+            }
+            // Moving through the list (a key held down) selects row after row: a request sent
+            // for each would be cancelled by the next selection after GitHub had already done the
+            // work. The cache is shown meanwhile; a refresh asked for goes at once.
+            if !force { try? await Task.sleep(for: Self.detailFetchDelay) }
             guard !Task.isCancelled else { return }
             self?.detailState = .loading
             self?.fetchingDetailID = item.id
@@ -1631,6 +1647,8 @@ final class AppModel {
     }
 
     @ObservationIgnored private var prefetchTask: Task<Void, Never>?
+    /// Inbox items that couldn't be fetched, with their notification's update then.
+    @ObservationIgnored private var unfetchableInbox: [String: Date] = [:]
     /// Items whose prefetch failed, with the update it failed at: not tried again until the item
     /// moves on, or one that always fails (gone, transferred) would be fetched at every sync.
     @ObservationIgnored private var prefetchFailed: [Item.ID: Date] = [:]
@@ -1665,8 +1683,10 @@ final class AppModel {
             defer { self?.prefetchTask = nil }
             let cached = (try? await db.cachedDetailTimes()) ?? [:]
             let failed = self?.prefetchFailed ?? [:]
+            // The open item's detail is loadDetail's to fetch: fetched here too, it went twice.
+            let open = self?.selectedItem?.id
             let stale = candidates.filter { item in
-                failed[item.id] != item.updatedAt && (cached[item.id].map { $0 < item.updatedAt } ?? true)
+                item.id != open && failed[item.id] != item.updatedAt && (cached[item.id].map { $0 < item.updatedAt } ?? true)
             }
             guard !stale.isEmpty else { return }
             logger.info("Prefetching \(stale.count) details")
@@ -1704,6 +1724,11 @@ final class AppModel {
     }
 
     @ObservationIgnored private var isAutoSelecting = false
+    /// Selections the app made in a row since the user's last. An item the table selected for
+    /// one that left its section is fetched, and its fresher row can leave too, and so on down
+    /// the section: after `autoSelectFetchLimit` of them, one with a cached detail shows that.
+    @ObservationIgnored private var autoSelectChain = 0
+    private static let autoSelectFetchLimit = 3
 
     /// Selects without counting as the user opening the item: nothing is marked viewed or read.
     /// Otherwise each read Inbox row leaving the list would select (and then read) the next one.
@@ -1747,6 +1772,7 @@ final class AppModel {
         if let linkedCommit, selectedItem?.repoNumber != linkedCommit.key { self.linkedCommit = nil }
         openedItemID = nil
         if let item = selectedItem { selectedItemPreviousSeenHead = state(for: item).seenHeadOid }
+        autoSelectChain = isAutoSelecting ? autoSelectChain + 1 : 0
         loadDetail()
         guard let item = selectedItem else {
             selectedItemPreviousSeenAt = nil
