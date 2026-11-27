@@ -468,6 +468,17 @@ final class AppModel {
             PushDelegate.handler = { [weak self] in await self?.pushEvent($0) }
             Platform.registerForRemoteNotifications()
             tasks.append(Task { await hints.start() })
+            #if os(macOS)
+                // CloudKit's pushes reach a Mac late (40 s and more) or not at all, where an
+                // iPhone's came within a second: the Mac also looks every half minute, which
+                // costs one small CloudKit request and nothing of GitHub's quota.
+                tasks.append(Task {
+                    while !Task.isCancelled {
+                        try? await Task.sleep(for: Self.hintsPollInterval)
+                        await hints.poll()
+                    }
+                })
+            #endif
         }
         tasks.append(Task { [weak self, db] in
             do {
@@ -663,6 +674,10 @@ final class AppModel {
     }
 
     private(set) var hintsStatus = HintsStatus()
+
+    #if os(macOS)
+        private static let hintsPollInterval: Duration = .seconds(30)
+    #endif
 
     /// What this device is called in the others' Settings.
     private static var deviceKind: String {

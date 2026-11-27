@@ -326,7 +326,15 @@ are used off the main actor); no glass on content (cards, chips, rows).
   Xcode's automatic signing in the install scripts, which needs an account in Xcode › Settings ›
   Accounts; a container can't be deleted once made. `xcodebuild` takes an empty
   `CODE_SIGN_ENTITLEMENTS=` as no override at all: the scripts sign without iCloud by giving it
-  an empty file. With `-PRDeskDryRunWrites YES` hints are logged, not sent. A hint names items and
+  an empty file. With `-PRDeskDryRunWrites YES` hints are logged, not sent. Measured between an
+  iPhone and the Mac: CloudKit's work at its default priority is discretionary, and on the phone
+  it never ran (hints pending, no request in the container's log), hence the user-initiated
+  operation group on every send and fetch; and a push reached the phone within a second but the
+  Mac 40 s late or not at all, hence the Mac's look every 30 s (`CloudHints.poll`, which reads the
+  zone's changes itself: the engine's `fetchChanges` asks the server only after a push or the app
+  coming to the front, and otherwise says there is nothing to fetch). A device's own log needs root;
+  each copy keeps a short trace in `cloud-hints.json` (`devicectl device copy from` the app's
+  data container), and CloudKit Console's Logs list every request by platform. A hint names items and
   parts only; never put a change's content in one (GitHub is the one source of truth).
 - Handoff (`ItemHandoff`, a view of no size in each app's root background) can't be tried in a
   simulator or a test copy: the system hands off only between apps signed by one team on

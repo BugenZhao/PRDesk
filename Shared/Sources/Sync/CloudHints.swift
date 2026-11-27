@@ -73,7 +73,12 @@ actor CloudHints: CKSyncEngineDelegate {
         /// The latest few things that happened, newest last: a device's log can't be read without
         /// root, and this file can (`devicectl device copy from`).
         var trace: [String]?
+        /// Where `poll` left off in the zone, apart from the engine's own token.
+        var pollToken: Data?
     }
+
+    /// Hints already handed on, by record name: `poll` and the engine may both bring one.
+    private var handedOn: Set<String> = []
 
     /// Nil where the app isn't signed for iCloud (test copies, simulators, a Mac without a
     /// development certificate).
@@ -160,6 +165,41 @@ actor CloudHints: CKSyncEngineDelegate {
             await report(nil)
         } catch {
             await failed("Fetching hints", error)
+        }
+    }
+
+    /// Looks in the zone for new hints, for the Mac, which CloudKit's pushes reach late or not at
+    /// all. The engine's `fetchChanges` asks the server only once it believes something changed (a
+    /// push came, the app was brought to the front), so this reads the zone's changes itself, from
+    /// a change token of its own: one small request, nothing when nothing changed.
+    func poll() async {
+        guard let engine else { return }
+        let database = CKContainer(identifier: Self.containerID).privateCloudDatabase
+        var token = saved.pollToken.flatMap { try? NSKeyedUnarchiver.unarchivedObject(ofClass: CKServerChangeToken.self, from: $0) }
+        do {
+            var records: [CKRecord] = []
+            var moreComing = true
+            while moreComing {
+                let since = token
+                let changes = try await database.configuredWith(group: Self.urgent("Poll")) { database in
+                    try await database.recordZoneChanges(inZoneWith: Self.zoneID, since: since)
+                }
+                records += changes.modificationResultsByID.values.compactMap { try? $0.get().record }
+                token = changes.changeToken
+                moreComing = changes.moreComing
+            }
+            let data = token.flatMap { try? NSKeyedArchiver.archivedData(withRootObject: $0, requiringSecureCoding: true) }
+            if data != saved.pollToken {
+                saved.pollToken = data
+                save()
+            }
+            if !records.isEmpty { await received(records, syncEngine: engine) }
+        } catch let error as CKError where [.changeTokenExpired, .zoneNotFound].contains(error.code) {
+            // Read again from the start; a missing zone is made again with the next hint sent.
+            saved.pollToken = nil
+            save()
+        } catch {
+            await failed("Looking for hints", error)
         }
     }
 
@@ -294,7 +334,9 @@ actor CloudHints: CKSyncEngineDelegate {
                 expired.append(record.recordID)
                 continue
             }
-            guard device != Self.deviceID, now.timeIntervalSince(at) < Self.freshness else { continue }
+            guard device != Self.deviceID, now.timeIntervalSince(at) < Self.freshness,
+                  handedOn.insert(record.recordID.recordName).inserted
+            else { continue }
             hints.append(ChangeHint(
                 itemIDs: record["items"] as? [String] ?? [],
                 parts: ChangeHint.Parts(rawValue: record["parts"] as? Int ?? 0),

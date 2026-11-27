@@ -771,7 +771,8 @@ only sooner: within seconds instead of minutes. A board entry is read alone, and
 a new Status with the subscription at once rather than at its next read of the board; an item
 another device put on the board is fetched as a sync would. The hint is a small record in my
 iCloud's private database (`CloudHints`, with `CKSyncEngine`), and CloudKit's silent push says
-there is one. A push missed while the app was stopped or in the background is caught up when it
+there is one; the Mac, which such pushes reach late or not at all, also looks every half minute.
+A push missed while the app was stopped or in the background is caught up when it
 comes back to the front; a hint older than a quarter of an hour is left to the regular sync, and
 every hint is deleted after a day. Nothing local is shared: what I have seen or read, Recently
 viewed, Grok Bot marks and badges set by hand stay on each device. Only an installed copy signed
