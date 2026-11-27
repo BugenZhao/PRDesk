@@ -307,6 +307,7 @@ actor SyncEngine {
         let q = "\(query) updated:\(range)"
         var after: String?
         var count = 0
+        var pages = 0
         repeat {
             let page = try await client.query(
                 ItemQuery.search,
@@ -326,7 +327,8 @@ actor SyncEngine {
             let items = page.nodes.compactMap { $0?.item(fetchedAt: now) }
             try await db.upsert(items)
             count += items.count
-            after = page.pageInfo.hasNextPage ? page.pageInfo.endCursor : nil
+            // A search gives at most a thousand results: 50 pages of the smallest size.
+            after = nextPageCursor(hasNextPage: page.pageInfo.hasNextPage, endCursor: page.pageInfo.endCursor, after: after, pages: &pages, limit: 60)
         } while after != nil
         return count
     }

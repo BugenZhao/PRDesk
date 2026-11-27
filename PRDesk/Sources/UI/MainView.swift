@@ -212,28 +212,37 @@ private struct SyncStatus: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            switch model.syncState {
-            case .syncing:
-                ProgressView().controlSize(.mini)
-                Text(model.syncLine() ?? "")
-            case let .failed(message):
-                Label(model.syncLine() ?? "", systemImage: "exclamationmark.triangle.fill")
+            if model.requestsStopped {
+                Label(model.syncLine() ?? "", systemImage: "hand.raised.fill")
                     .labelStyle(.titleAndIcon)
                     .foregroundStyle(.red)
-                    .help(message)
-            case .rateLimited:
-                Label(model.syncLine() ?? "", systemImage: "hourglass")
-                    .labelStyle(.titleAndIcon)
-                    .foregroundStyle(.orange)
-                    .help("GitHub refused a sync for its GraphQL budget. The next one waits until then; ⌘R and what you do are still tried.")
-            case .idle:
-                if model.lastSyncedAt != nil {
-                    TimelineView(.periodic(from: .now, by: 5)) { context in
-                        Text(model.syncLine(at: context.date) ?? "")
+                    .help("GitHub's budget fell fast while PR Desk sent many requests, as a loop would: nothing is sent until you resume.")
+                Button("Resume") { model.resumeRequests() }
+                    .buttonStyle(.link)
+            } else {
+                switch model.syncState {
+                case .syncing:
+                    ProgressView().controlSize(.mini)
+                    Text(model.syncLine() ?? "")
+                case let .failed(message):
+                    Label(model.syncLine() ?? "", systemImage: "exclamationmark.triangle.fill")
+                        .labelStyle(.titleAndIcon)
+                        .foregroundStyle(.red)
+                        .help(message)
+                case .rateLimited:
+                    Label(model.syncLine() ?? "", systemImage: "hourglass")
+                        .labelStyle(.titleAndIcon)
+                        .foregroundStyle(.orange)
+                        .help("GitHub refused a sync for its GraphQL budget. The next one waits until then; ⌘R and what you do are still tried.")
+                case .idle:
+                    if model.lastSyncedAt != nil {
+                        TimelineView(.periodic(from: .now, by: 5)) { context in
+                            Text(model.syncLine(at: context.date) ?? "")
+                        }
                     }
                 }
             }
-            if let rateLimit = model.rateLimit, !model.syncState.isRateLimited {
+            if let rateLimit = model.rateLimit, !model.syncState.isRateLimited, !model.requestsStopped {
                 Text("·")
                 Text("API quota \(rateLimit.remaining.formatted()) left")
                     .foregroundStyle(rateLimit.remaining < 500 ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))

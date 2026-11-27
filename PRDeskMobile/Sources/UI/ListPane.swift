@@ -314,10 +314,14 @@ struct SyncStatusButton: View {
     var body: some View {
         Menu {
             Section {
-                Button("Sync Now", systemImage: "arrow.clockwise") {
-                    Task { await model.sync() }
+                if model.requestsStopped {
+                    Button("Resume GitHub Requests", systemImage: "play") { model.resumeRequests() }
+                } else {
+                    Button("Sync Now", systemImage: "arrow.clockwise") {
+                        Task { await model.sync() }
+                    }
+                    .disabled(model.syncState == .syncing)
                 }
-                .disabled(model.syncState == .syncing)
             }
             // Read when the menu opens: plain lines, nothing to touch.
             Section {
@@ -364,6 +368,7 @@ struct SyncStatusButton: View {
         if let activity = model.activity {
             return activity.isDone ? ("checkmark.circle.fill", .green) : ("arrow.up.circle", nil)
         }
+        if model.requestsStopped { return ("hand.raised.fill", .red) }
         switch model.syncState {
         case .syncing: return ("arrow.triangle.2.circlepath", nil)
         case .failed: return ("exclamationmark.arrow.triangle.2.circlepath", .red)

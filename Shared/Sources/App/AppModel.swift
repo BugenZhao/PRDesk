@@ -80,6 +80,10 @@ final class AppModel {
     private(set) var syncState: SyncState = .idle
     private(set) var lastSyncedAt: Date?
     private(set) var rateLimit: RateLimit?
+    /// What the guard against loops last stopped (`RequestGuard`), for an alert; nil once seen.
+    var requestTrip: RequestGuard.Trip?
+    /// The guard stopped every request to GitHub, until the viewer resumes.
+    private(set) var requestsStopped = false
 
     /// The flattened table: section headers and their item rows.
     private(set) var rows: [TableRow] = []
@@ -331,10 +335,15 @@ final class AppModel {
     @ObservationIgnored let engine: SyncEngine
     @ObservationIgnored let affiliationEngine: AffiliationEngine
     @ObservationIgnored private let badgeShare: BadgeShare
+    @ObservationIgnored private let client: GitHubClient
     @ObservationIgnored private var tasks: [Task<Void, Never>] = []
     @ObservationIgnored private var detailTask: Task<Void, Never>?
     /// The item `detailTask` is fetching from GitHub, while it is.
     @ObservationIgnored private var fetchingDetailID: Item.ID?
+    /// The item and its update the last detail fetch started for. The stored items changing asks
+    /// for the shown detail again only for an update it hasn't started for: a fetch that failed,
+    /// or brought a detail still older than the item, isn't started again at each change.
+    @ObservationIgnored private var detailFetchedFor: (id: Item.ID, updatedAt: Date)?
     /// Cached details older than this are refreshed when shown, even if the item looks unchanged.
     private static let detailMaxAge: TimeInterval = 120
     @ObservationIgnored let logger = Logger(subsystem: "com.bugenzhao.PRDesk", category: "App")
@@ -342,6 +351,7 @@ final class AppModel {
     init(db: AppDatabase) {
         self.db = db
         let client = GitHubClient()
+        self.client = client
         engine = SyncEngine(client: client, db: db)
         affiliationEngine = AffiliationEngine(client: client, db: db)
         badgeShare = BadgeShare(client: client, db: db)
@@ -462,6 +472,13 @@ final class AppModel {
 
     func start() {
         guard tasks.isEmpty else { return }
+        tasks.append(Task { [weak self, client] in
+            for await trip in client.trips {
+                guard let self else { return }
+                requestTrip = trip
+                if trip.isPause { requestsStopped = true }
+            }
+        })
         #if os(macOS)
             installMouseMonitor()
         #endif
@@ -512,7 +529,9 @@ final class AppModel {
                     }
                     restoreSelection()
                     if awaitsRestoredSelection { stopAwaitingRestoredSelection() }
-                    if let item = selectedItem, let detail, detail.id == item.id, detail.itemUpdatedAt < item.updatedAt {
+                    if let item = selectedItem, let detail, detail.id == item.id, detail.itemUpdatedAt < item.updatedAt,
+                       detailFetchedFor.map({ $0.id != item.id || $0.updatedAt != item.updatedAt }) ?? true
+                    {
                         loadDetail()
                     }
                 }
@@ -568,9 +587,19 @@ final class AppModel {
         return min(60 * pow(2, Double(syncFailures - 1)), TimeInterval(syncInterval))
     }
 
+    /// Lets requests to GitHub go again after the guard stopped them all, and syncs.
+    func resumeRequests() {
+        requestsStopped = false
+        Task {
+            await client.resumeRequests()
+            await sync()
+        }
+    }
+
     /// Syncs now. Unless it is the timer's round, this also reads the board.
     func sync(includeBoard: Bool = true) async {
-        guard syncState != .syncing else { return }
+        // Nothing would be sent; the status says why.
+        guard syncState != .syncing, !requestsStopped else { return }
         syncState = .syncing
         lastSyncAttemptAt = Date()
         do {
@@ -1558,6 +1587,7 @@ final class AppModel {
             guard !Task.isCancelled else { return }
             self?.detailState = .loading
             self?.fetchingDetailID = item.id
+            self?.detailFetchedFor = (item.id, item.updatedAt)
             do {
                 let (fresh, freshItem) = try await engine.fetchDetail(of: item)
                 try? await db.saveDetail(fresh)
@@ -1577,6 +1607,12 @@ final class AppModel {
                     let actors = Set(fresh.entries.compactMap(\.actor))
                     Task { try? await self.affiliationEngine.refresh(logins: actors, authors: actors) }
                 }
+                // The item moved on while this was on its way: once more, for that update.
+                if let current = selectedItem, current.id == item.id, current.updatedAt > item.updatedAt,
+                   fresh.itemUpdatedAt < current.updatedAt
+                {
+                    loadDetail()
+                }
             } catch is CancellationError {
             } catch {
                 guard !Task.isCancelled else { return }
@@ -1595,6 +1631,15 @@ final class AppModel {
     }
 
     @ObservationIgnored private var prefetchTask: Task<Void, Never>?
+    /// Items whose prefetch failed, with the update it failed at: not tried again until the item
+    /// moves on, or one that always fails (gone, transferred) would be fetched at every sync.
+    @ObservationIgnored private var prefetchFailed: [Item.ID: Date] = [:]
+
+    private enum PrefetchOutcome: Sendable {
+        case fetched(actors: Set<String>)
+        case failed(Item.ID, at: Date)
+        case rateLimited
+    }
     private static let prefetchConcurrency = 2
 
     /// Fetches ahead the details of items likely to be opened (Desk, Good, Triage, the Inbox,
@@ -1619,32 +1664,38 @@ final class AppModel {
         prefetchTask = Task { [weak self, db, engine, logger] in
             defer { self?.prefetchTask = nil }
             let cached = (try? await db.cachedDetailTimes()) ?? [:]
-            let stale = candidates.filter { item in cached[item.id].map { $0 < item.updatedAt } ?? true }
+            let failed = self?.prefetchFailed ?? [:]
+            let stale = candidates.filter { item in
+                failed[item.id] != item.updatedAt && (cached[item.id].map { $0 < item.updatedAt } ?? true)
+            }
             guard !stale.isEmpty else { return }
             logger.info("Prefetching \(stale.count) details")
             var actors: Set<String> = []
-            // nil: GitHub refused for its budget, so the rest wait for the sync after the limit.
-            await withTaskGroup(of: Set<String>?.self) { group in
+            // Refused by GitHub for its budget, the rest wait for the sync after the limit.
+            await withTaskGroup(of: PrefetchOutcome.self) { group in
                 var queue = stale.makeIterator()
                 var isRateLimited = false
-                let fetch = { @Sendable (item: Item) async -> Set<String>? in
+                let fetch = { @Sendable (item: Item) async -> PrefetchOutcome in
                     do {
                         let detail = try await engine.fetchDetail(of: item).detail
                         try await db.saveDetail(detail)
-                        return Set(detail.entries.compactMap(\.actor))
+                        return .fetched(actors: Set(detail.entries.compactMap(\.actor)))
                     } catch GraphQLClientError.rateLimited {
-                        return nil
+                        return .rateLimited
                     } catch {
                         logger.error("Prefetching the detail of #\(item.number) failed: \(String(describing: error), privacy: .public)")
-                        return []
+                        return .failed(item.id, at: item.updatedAt)
                     }
                 }
                 for _ in 0 ..< Self.prefetchConcurrency {
                     if let item = queue.next() { group.addTask { await fetch(item) } }
                 }
-                for await found in group {
-                    guard let found else { isRateLimited = true; continue }
-                    actors.formUnion(found)
+                for await outcome in group {
+                    switch outcome {
+                    case let .fetched(found): actors.formUnion(found)
+                    case let .failed(id, updatedAt): self?.prefetchFailed[id] = updatedAt
+                    case .rateLimited: isRateLimited = true
+                    }
                     if !isRateLimited, let item = queue.next() { group.addTask { await fetch(item) } }
                 }
             }

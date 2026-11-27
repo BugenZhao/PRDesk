@@ -396,6 +396,17 @@ are used off the main actor); no glass on content (cards, chips, rows).
   window taller than the screen. `NSViewRepresentable`s should implement `sizeThatFits`.
 - Don't touch `NSApplication.shared` in `App.init`; the app uses its own `PRDesk/Info.plist`
   (Tuist's default names a storyboard that doesn't exist).
+- Every request passes `RequestGuard` (in `GitHubClient`), the last line against a fetch that
+  re-triggers itself and spends the quota (it happened: a detail fetch stored its item, the
+  change asked for the detail again and restarted the fetch, for good). The same request more
+  than 12 times a minute (writes: 4) is held for 10 minutes; the budget falling by 30% in 10
+  minutes while the app sent 60+ GraphQL requests stops everything until Resume. Either shows an
+  alert and a red sync status. Pressing Refresh a dozen times in a minute trips it too, as it
+  should. Bodies are encoded with sorted keys: `JSONEncoder`'s own order varies between
+  encodings, which hid repeats. A fetch that writes observed state (the item row, the board)
+  writes once it has every part, never before a step that can still fail, and loops over pages
+  go through `nextPageCursor` (a page cap, and a cursor that must move). Writes aren't retried
+  after a 5xx: GitHub may have made them.
 - GitHub GraphQL mutations must be run with `strict: true`: a failed write comes back as `data`
   with `errors`, not an HTTP error.
 - Heavy fields in the list search (e.g. comment bodies) push pages past GitHub's time limit

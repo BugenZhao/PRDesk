@@ -448,11 +448,13 @@ actor AffiliationEngine {
         let fields = safe.enumerated().map { index, login in
             "m\(index): search(query: \"repo:\(SyncEngine.repo) is:pr is:merged author:\(login)\", type: ISSUE, first: 0) { issueCount }"
         }
-        let response = try await client.query("query { \(fields.joined(separator: "\n")) }", variables: [String: String](), as: [String: Count].self)
+        // A search GitHub gave no answer for (a commit's author name that isn't a login) is null:
+        // taken as none, not a failure of the whole batch, which was asked for again each time.
+        let response = try await client.query("query { \(fields.joined(separator: "\n")) }", variables: [String: String](), as: [String: Count?].self)
         var result: [String: Int] = [:]
         for (alias, count) in response {
             guard let index = Int(alias.dropFirst()), safe.indices.contains(index) else { continue }
-            result[safe[index]] = count.issueCount
+            result[safe[index]] = count?.issueCount ?? 0
         }
         return result
     }
@@ -494,12 +496,13 @@ actor AffiliationEngine {
             }
             """
         }
-        let response = try await client.query("query { \(fields.joined(separator: "\n")) }", variables: [String: String](), as: [String: EmailSearch].self)
+        // A null search is none, as for the merged counts.
+        let response = try await client.query("query { \(fields.joined(separator: "\n")) }", variables: [String: String](), as: [String: EmailSearch?].self)
         var result: [String: [String]] = [:]
         for (alias, search) in response {
             guard let index = Int(alias.dropFirst()), safe.indices.contains(index) else { continue }
             let login = safe[index]
-            let domains = search.nodes.compactMap(\.self)
+            let domains = (search?.nodes ?? []).compactMap(\.self)
                 .flatMap { $0.commits?.nodes?.compactMap { $0?.commit.author } ?? [] }
                 .filter { sameLogin($0.user?.login, login) }
                 .compactMap { $0.email?.split(separator: "@").last.map { $0.lowercased() } }

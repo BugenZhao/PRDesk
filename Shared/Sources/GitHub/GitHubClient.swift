@@ -22,6 +22,8 @@ enum GraphQLClientError: LocalizedError {
     case emptyData([GraphQLError])
     /// GitHub refused a query for its GraphQL budget, which is back at `until`.
     case rateLimited(until: Date)
+    /// The app's own guard against loops didn't send it (`RequestGuard`).
+    case refused(RequestGuard.Refusal)
 
     var errorDescription: String? {
         switch self {
@@ -34,6 +36,10 @@ enum GraphQLClientError: LocalizedError {
             errors.map(\.message).joined(separator: "\n")
         case let .rateLimited(until):
             "GitHub refused this for its API limit (back by \(until.formatted(date: .omitted, time: .shortened))). Trying again often works."
+        case let .refused(.held(label, until)):
+            "Not sent: PR Desk sent this request (\(label)) too often, as a loop would, and holds it until \(until.formatted(date: .omitted, time: .shortened))."
+        case .refused(.paused):
+            "Not sent: PR Desk has stopped sending requests to GitHub after its budget fell fast. Resume from the sync status."
         }
     }
 }
@@ -46,10 +52,63 @@ actor GitHubClient {
 
     /// Last rate limit seen in response headers.
     private(set) var rateLimit: RateLimit?
+    /// Holds back requests a loop would send (`RequestGuard`).
+    private var requestGuard = RequestGuard()
+    /// Each time the guard stops something, for the viewer.
+    nonisolated let trips: AsyncStream<RequestGuard.Trip>
+    private let tripsContinuation: AsyncStream<RequestGuard.Trip>.Continuation
 
     init(session: URLSession = .shared) {
         self.session = session
+        (trips, tripsContinuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(8))
     }
+
+    /// Lets requests go again after the guard stopped them all.
+    func resumeRequests() {
+        requestGuard.resume()
+        logger.notice("Requests resumed")
+    }
+
+    /// Counts a request with the guard before it is sent, or throws its refusal.
+    private func admit(method: String, url: URL, body: Data?, label: @autoclosure () -> String, isWrite: Bool, isGraphQL: Bool) throws {
+        let key = RequestGuard.key(method: method, url: url, body: body)
+        let (refusal, trip) = requestGuard.admit(key: key, label: label(), isWrite: isWrite, isGraphQL: isGraphQL)
+        if let trip { report(trip) }
+        if let refusal { throw GraphQLClientError.refused(refusal) }
+    }
+
+    private func report(_ trip: RequestGuard.Trip) {
+        logger.fault("Request guard: \(trip.message, privacy: .public)")
+        tripsContinuation.yield(trip)
+    }
+
+    /// A GraphQL request in a few words: its first fields and the repository and number it names.
+    private static func label(graphQL query: String, body: Data) -> String {
+        let skipped: Set = ["query", "mutation", "fragment", "repository", "include", "skip"]
+        var fields: [String] = []
+        for match in query.matches(of: /([A-Za-z_][A-Za-z0-9_]*)\s*[({]/) {
+            let field = String(match.1)
+            guard !skipped.contains(field), !fields.contains(field) else { continue }
+            fields.append(field)
+            if fields.count == 2 { break }
+        }
+        var label = fields.isEmpty ? "a GraphQL query" : fields.joined(separator: " › ")
+        if let object = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
+           let variables = object["variables"] as? [String: Any],
+           let owner = variables["owner"] as? String, let name = variables["name"] as? String
+        {
+            label += " of \(owner)/\(name)" + ((variables["number"] as? Int).map { "#\($0)" } ?? "")
+        }
+        return label
+    }
+
+    /// Keys sorted, so the same request is always the same bytes: `RequestGuard` tells requests
+    /// apart by them, and JSONEncoder's own order varies from one encoding to the next.
+    private static let encoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        return encoder
+    }()
 
     static let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
@@ -65,18 +124,20 @@ actor GitHubClient {
         as _: Response.Type = Response.self,
         strict: Bool = false
     ) async throws -> Response {
-        let body = try JSONEncoder().encode(Body(query: query, variables: variables))
+        let body = try Self.encoder.encode(Body(query: query, variables: variables))
+        let isWrite = query.drop { $0.isWhitespace }.hasPrefix("mutation")
+        try admit(method: "POST", url: Self.endpoint, body: body, label: Self.label(graphQL: query, body: body), isWrite: isWrite, isGraphQL: true)
         var attempt = 0
         var envelope: Envelope<Response>
         var limit: RateLimit?
         while true {
             attempt += 1
             let data: Data
-            (data, limit) = try await perform(method: "POST", url: Self.endpoint, body: body)
+            (data, limit) = try await perform(method: "POST", url: Self.endpoint, body: body, isWrite: isWrite)
             do {
                 envelope = try await Self.decode(Envelope<Response>.self, from: data)
                 break
-            } catch DecodingError.dataCorrupted where attempt < 3 {
+            } catch DecodingError.dataCorrupted where attempt < 3 && !isWrite {
                 // GitHub sometimes cuts off a slow response mid-body; treat it like a 502.
                 logger.info("Truncated GraphQL response, retrying")
                 try await Task.sleep(for: .seconds(attempt * 2))
@@ -100,8 +161,10 @@ actor GitHubClient {
     func rest(_ method: String, _ path: String, query: [URLQueryItem] = [], json: (any Encodable & Sendable)? = nil) async throws -> Data {
         var components = URLComponents(string: "https://api.github.com" + path)!
         if !query.isEmpty { components.queryItems = query }
-        let body = try json.map { try JSONEncoder().encode($0) }
-        return try await perform(method: method, url: components.url!, body: body).data
+        let body = try json.map { try Self.encoder.encode($0) }
+        let isWrite = method != "GET"
+        try admit(method: method, url: components.url!, body: body, label: "\(method) \(path)", isWrite: isWrite, isGraphQL: false)
+        return try await perform(method: method, url: components.url!, body: body, isWrite: isWrite).data
     }
 
     /// When the budget that refused a query is back: the reset of the window that refused it, or a
@@ -132,8 +195,10 @@ actor GitHubClient {
         try decoder.decode(T.self, from: data)
     }
 
-    /// Sends a request with auth, retrying transient failures and rate limiting.
-    private func perform(method: String, url: URL, body: Data?) async throws -> (data: Data, limit: RateLimit?) {
+    /// Sends a request with auth, retrying transient failures and rate limiting. A write isn't
+    /// retried after a server error: GitHub may have made it before failing to answer, and a
+    /// comment or review would go twice. Refused for its rate, it wasn't made, and is retried.
+    private func perform(method: String, url: URL, body: Data?, isWrite: Bool) async throws -> (data: Data, limit: RateLimit?) {
         var attempt = 0
         while true {
             attempt += 1
@@ -159,7 +224,7 @@ actor GitHubClient {
             case 401 where attempt == 1:
                 // The token may have been rotated (e.g. `gh auth refresh`); resolve it again.
                 token = nil
-            case 403 where attempt < 4 && Self.isRateLimited(response), 429 where attempt < 4, 500 ... 599 where attempt < 4:
+            case 403 where attempt < 4 && Self.isRateLimited(response), 429 where attempt < 4, 500 ... 599 where attempt < 4 && !isWrite:
                 let delay = retryDelay(response, attempt: attempt)
                 logger.info("HTTP \(status), retrying in \(delay)s")
                 try await Task.sleep(for: .seconds(delay))
@@ -180,6 +245,9 @@ actor GitHubClient {
               let reset = http.value(forHTTPHeaderField: "x-ratelimit-reset").flatMap(TimeInterval.init)
         else { return nil }
         rateLimit = RateLimit(limit: limit, remaining: remaining, resetAt: Date(timeIntervalSince1970: reset))
+        if let trip = requestGuard.observe(remaining: remaining, limit: limit, resetAt: Date(timeIntervalSince1970: reset)) {
+            report(trip)
+        }
         return rateLimit
     }
 

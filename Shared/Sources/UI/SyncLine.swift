@@ -4,6 +4,7 @@ extension AppModel {
     /// How syncing stands, in a line: syncing, failed, rate limited, or how long ago it last
     /// went through; nil before the first sync.
     func syncLine(at now: Date = Date()) -> String? {
+        if requestsStopped { return "GitHub requests stopped" }
         switch syncState {
         case .syncing: return "Syncing…"
         case .failed: return "Sync failed"

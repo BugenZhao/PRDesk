@@ -235,12 +235,15 @@ extension SyncEngine {
         let startedAt = Date()
         var entries: [BoardEntry] = []
         var after: String?
+        var pages = 0
         repeat {
             let response = try await client.query(BoardQuery.items, variables: BoardQuery.Variables(after: after), as: BoardQuery.Response.self)
             guard let project = response.organization?.projectV2 else { throw BoardError.missingProject }
             if after == nil { boardSchema = BoardQuery.Schema(project) }
             entries += project.items.nodes.compactMap { $0?.entry }
-            after = project.items.pageInfo.hasNextPage ? project.items.pageInfo.endCursor : nil
+            after = nextPageCursor(
+                hasNextPage: project.items.pageInfo.hasNextPage, endCursor: project.items.pageInfo.endCursor, after: after, pages: &pages, limit: 100
+            )
         } while after != nil
         // Writes made while the board was being read would be undone by what it read.
         let recent = Set(boardWrites.filter { $0.value > startedAt.addingTimeInterval(-Self.boardWriteGrace) }.keys)

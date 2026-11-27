@@ -597,6 +597,7 @@ extension SyncEngine {
         var entries: [TimelineEntry] = []
         var first: DetailQuery.Subject?
         var fresh: Item?
+        var pages = 0
         repeat {
             let response = try await client.query(
                 DetailQuery.text,
@@ -607,14 +608,19 @@ extension SyncEngine {
             if first == nil { fresh = response.repository?.item?.item(fetchedAt: Date()) }
             first = first ?? subject
             entries += subject.timelineItems.nodes.compactMap { $0?.entry }
-            after = subject.timelineItems.pageInfo.hasNextPage ? subject.timelineItems.pageInfo.endCursor : nil
+            let pageInfo = subject.timelineItems.pageInfo
+            after = nextPageCursor(hasNextPage: pageInfo.hasNextPage, endCursor: pageInfo.endCursor, after: after, pages: &pages, limit: 40)
         } while after != nil && entries.count < 2000
 
         let subject = first!
-        if let fresh { try await db.refreshStored(fresh) }
         let (checks, threads) = try await checksAndThreads
+        let commitList = try await commits
         if item.kind == .pullRequest { entries = entries.threaded(threads) }
-        let detail = try await ItemDetail(
+        // Stored only once every part is in: a write is a change of the stored items, which asks
+        // for the shown item's detail again while it is older than the item, so a fetch that
+        // stored and then failed would be asked for again at once, and fail again, for good.
+        if let fresh { try await db.refreshStored(fresh) }
+        let detail = ItemDetail(
             number: number,
             id: subject.id,
             bodyHTML: subject.bodyHTML,
@@ -625,7 +631,7 @@ extension SyncEngine {
             reactions: DetailQuery.ReactionGroup.reactions(subject.reactionGroups),
             entries: entries,
             checks: checks,
-            commits: commits,
+            commits: commitList,
             itemUpdatedAt: subject.updatedAt,
             fetchedAt: Date()
         )
@@ -648,6 +654,7 @@ extension SyncEngine {
         var threads: [ReviewThread] = []
         var threadsAfter: String?
         var after: String?
+        var pages = 0
         repeat {
             let response = try await client.query(
                 DetailQuery.checks,
@@ -661,9 +668,12 @@ extension SyncEngine {
             }
             let contexts = pullRequest?.commits.values.last?.commit.statusCheckRollup?.contexts
             checks += contexts?.checks ?? []
-            after = contexts.flatMap { $0.pageInfo.hasNextPage ? $0.pageInfo.endCursor : nil }
+            after = contexts.flatMap {
+                nextPageCursor(hasNextPage: $0.pageInfo.hasNextPage, endCursor: $0.pageInfo.endCursor, after: after, pages: &pages, limit: 20)
+            }
         } while after != nil && checks.count < 1000
         // Rare: a PR with more than a hundred threads.
+        var threadPages = 1
         while let cursor = threadsAfter, threads.count < 500 {
             let response = try await client.query(
                 DetailQuery.threads,
@@ -672,7 +682,9 @@ extension SyncEngine {
             )
             guard let page = response.repository?.pullRequest?.reviewThreads else { break }
             threads += page.threads
-            threadsAfter = page.pageInfo.hasNextPage ? page.pageInfo.endCursor : nil
+            threadsAfter = nextPageCursor(
+                hasNextPage: page.pageInfo.hasNextPage, endCursor: page.pageInfo.endCursor, after: cursor, pages: &threadPages, limit: 10
+            )
         }
         return (checks, threads)
     }

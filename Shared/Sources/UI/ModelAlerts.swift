@@ -24,6 +24,20 @@ struct ModelAlerts: ViewModifier {
                 actions: { Button("OK") {} },
                 message: { Text(model.linkError ?? "") }
             )
+            .alert(
+                model.requestTrip?.isPause == true ? "GitHub requests stopped" : "A repeating request stopped",
+                isPresented: Binding(get: { model.requestTrip != nil }, set: { if !$0 { model.requestTrip = nil } }),
+                presenting: model.requestTrip,
+                actions: { trip in
+                    if trip.isPause {
+                        Button("Resume") { model.resumeRequests() }
+                        Button("Keep Stopped", role: .cancel) {}
+                    } else {
+                        Button("OK") {}
+                    }
+                },
+                message: { trip in Text(trip.message) }
+            )
             .sheet(item: Binding(get: { model.pendingBotSend }, set: { model.pendingBotSend = $0 })) { pending in
                 BotSendSheet(pending: pending)
             }
