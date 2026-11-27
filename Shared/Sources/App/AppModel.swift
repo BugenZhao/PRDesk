@@ -333,6 +333,8 @@ final class AppModel {
     @ObservationIgnored private let badgeShare: BadgeShare
     @ObservationIgnored private var tasks: [Task<Void, Never>] = []
     @ObservationIgnored private var detailTask: Task<Void, Never>?
+    /// The item `detailTask` is fetching from GitHub, while it is.
+    @ObservationIgnored private var fetchingDetailID: Item.ID?
     /// Cached details older than this are refreshed when shown, even if the item looks unchanged.
     private static let detailMaxAge: TimeInterval = 120
     @ObservationIgnored let logger = Logger(subsystem: "com.bugenzhao.PRDesk", category: "App")
@@ -1525,7 +1527,13 @@ final class AppModel {
 
     /// Shows the cached detail of the selected item at once, then fetches a fresh one if needed.
     func loadDetail(force: Bool = false) {
+        // A fetch of this item is under way: let it finish. The fetch stores the item before it
+        // ends, and the stored items changing asks for the detail again while the one shown is
+        // older than the item: restarting here cancelled it each time, and it started over for
+        // good, spending the quota at every turn.
+        if !force, let fetching = fetchingDetailID, fetching == selectedItem?.id { return }
         detailTask?.cancel()
+        fetchingDetailID = nil
         guard let item = selectedItem else {
             detail = nil
             detailState = .idle
@@ -1547,11 +1555,14 @@ final class AppModel {
             {
                 return
             }
+            guard !Task.isCancelled else { return }
             self?.detailState = .loading
+            self?.fetchingDetailID = item.id
             do {
                 let (fresh, freshItem) = try await engine.fetchDetail(of: item)
                 try? await db.saveDetail(fresh)
                 guard !Task.isCancelled, let self else { return }
+                fetchingDetailID = nil
                 detail = fresh
                 // A stored item's row follows from the database; one only opened from a link is here.
                 if let freshItem, let index = openedItems.firstIndex(where: { $0.id == freshItem.id }), isOpenedOnly(freshItem) {
@@ -1569,6 +1580,7 @@ final class AppModel {
             } catch is CancellationError {
             } catch {
                 guard !Task.isCancelled else { return }
+                self?.fetchingDetailID = nil
                 self?.logger.error("Detail of #\(item.number) failed: \(String(describing: error), privacy: .public)")
                 self?.detailState = .failed(error.localizedDescription)
             }
