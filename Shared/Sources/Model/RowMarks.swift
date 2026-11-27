@@ -22,6 +22,36 @@ extension ItemRow {
 
     /// Unread activity, or an unread notification in the Inbox.
     var showsUnread: Bool { insight.isUnread || (note.map { !$0.isRead } ?? false) }
+
+    /// The symbol in the state icon's corner: an upstream PR the parity agent is adopting (or
+    /// adopted), so in Landed too it stands apart from the viewer's own; else an agent session on
+    /// the board. 🫴 both adopts a PR and opens a session on it, so most adopted PRs have both:
+    /// the adoption says more, and the session is still there (`t`, the tooltip, the detail).
+    var cornerMark: CornerMark? {
+        if adoption != nil { return .adoption }
+        if board?.sessionLinks.isEmpty == false { return .session }
+        return nil
+    }
+}
+
+/// What the state icon's corner can say about a row (`ItemRow.cornerMark`).
+enum CornerMark: Sendable {
+    case session, adoption
+
+    var symbol: String {
+        switch self {
+        case .session: "terminal.fill"
+        case .adoption: "link"
+        }
+    }
+
+    /// For VoiceOver, after the state.
+    var label: String {
+        switch self {
+        case .session: "agent session"
+        case .adoption: "adopted by the parity agent"
+        }
+    }
 }
 
 extension ReviewMark {

@@ -217,13 +217,13 @@ struct ItemRowView: View {
             .layoutPriority(1)
     }
 
-    /// The state icon, marked in its corner when the board has an agent session for the item:
-    /// beside the title the mark took room the title is short of, on a phone most of all. The
-    /// corner is cut out of the icon around the mark rather than laid on a ground of its own,
-    /// so it reads on any row's color (a selected, flagged or faded row).
+    /// The state icon, marked in its corner for an agent session on the board or an adoption
+    /// (`ItemRow.cornerMark`): beside the title a mark took room the title is short of, on a
+    /// phone most of all. The corner is cut out of the icon around the mark rather than laid on a
+    /// ground of its own, so it reads on any row's color (a selected, flagged or faded row).
     @ViewBuilder private var stateIcon: some View {
         let icon = StateIconView(item: item, size: 15 * scale, isMerging: row.isMerging)
-        if row.board?.sessionLinks.isEmpty == false {
+        if let corner = row.cornerMark {
             let mark = CGSize(width: 9.5 * scale, height: 8 * scale)
             let offset = CGSize(width: 3.5 * scale, height: 3 * scale)
             let gap = 1.5 * scale
@@ -239,27 +239,26 @@ struct ItemRowView: View {
                         .compositingGroup()
                 }
                 .overlay(alignment: .bottomTrailing) {
-                    Image(systemName: "terminal.fill")
+                    Image(systemName: corner.symbol)
                         .resizable()
+                        // Bold, as on the Mac: the link's rings are thin at this size.
+                        .fontWeight(.bold)
                         .scaledToFit()
                         .frame(width: mark.width, height: mark.height)
                         .foregroundStyle(.secondaryText)
                         .offset(offset)
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("\(item.stateDescription(isMerging: row.isMerging)), agent session")
+                .accessibilityLabel("\(item.stateDescription(isMerging: row.isMerging)), \(corner.label)")
         } else {
             icon
         }
     }
 
-    /// What marks the item beside its title: an adoption, why it is in the Inbox, why a Shelf
-    /// item woke. An agent session marks the state icon instead (`stateIcon`).
+    /// What marks the item beside its title: why it is in the Inbox, why a Shelf item woke. An
+    /// agent session or an adoption marks the state icon instead (`stateIcon`).
     @ViewBuilder
     private func tags(showsWake: Bool) -> some View {
-        if row.adoption != nil {
-            Image(systemName: "link").font(.caption2).foregroundStyle(.secondaryText)
-        }
         if let note = row.note {
             Chip(text: note.reasonLabel, color: .accentColor).fixedSize()
             if let triage = row.triage, density.showsNotes {

@@ -189,27 +189,21 @@ enum ItemColumn: String, CaseIterable {
         }
     }
 
-    /// Marks an upstream PR the parity agent is adopting (or adopted), so in Landed too it stands
-    /// apart from the viewer's own.
-    static func showsAdoption(_ row: ItemRow) -> Bool {
-        row.adoption != nil
-    }
 
     @MainActor private func titleRuns(_ row: ItemRow, now: Date, abbreviatesTags: Bool) -> [CellRun] {
         let item = row.item
-        // An agent session marks the state icon's corner, as on the iPad and iPhone: beside the
-        // title it took room the title is short of.
+        // An agent session or an adoption marks the state icon's corner, as on the iPad and
+        // iPhone: beside the title it took room the title is short of.
         let color = item.stateColor(isMerging: row.isMerging)
-        let icon: CellRun = row.board?.sessionLinks.isEmpty == false
-            ? .markedIcon(item.stateIcon, color: color, mark: "terminal.fill", markColor: .secondaryLabelColor)
-            : .icon(item.stateIcon, color: color)
+        let icon: CellRun = if let mark = row.cornerMark {
+            .markedIcon(item.stateIcon, color: color, mark: mark.symbol, markColor: .secondaryLabelColor)
+        } else {
+            .icon(item.stateIcon, color: color)
+        }
         var runs: [CellRun] = [
             icon,
             titleRun(item.title, bold: row.insight.isUnread, abbreviatesTags: abbreviatesTags),
         ]
-        if Self.showsAdoption(row) {
-            runs.append(.symbol("link", color: .secondaryLabelColor, pointSize: 10))
-        }
         if let note = row.note {
             runs.append(.chip(note.reasonLabel, color: .controlAccentColor))
             // The Inbox has no triage sections, so say where the item stands.

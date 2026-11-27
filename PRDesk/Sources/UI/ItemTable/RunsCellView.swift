@@ -431,7 +431,7 @@ final class RunsCellView: NSTableCellView {
                     context.restoreGState()
                 }
                 guard let image = NSImage(systemSymbolName: mark, accessibilityDescription: nil)?
-                    .withSymbolConfiguration(.init(paletteColors: [markTint])) else { return }
+                    .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 8, weight: .bold).applying(.init(paletteColors: [markTint]))) else { return }
                 // Fitted into the mark's box, centered, as `scaledToFit` does on iOS.
                 let scale = min(markRect.width / image.size.width, markRect.height / image.size.height)
                 let fitted = NSSize(width: image.size.width * scale, height: image.size.height * scale)
