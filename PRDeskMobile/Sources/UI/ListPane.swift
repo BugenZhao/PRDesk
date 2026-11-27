@@ -65,6 +65,8 @@ struct ItemListView: View {
     let highlightsSelection: Bool
     /// The filter the rows were last laid out for.
     @State private var settledFilter = ""
+    /// The list's width, which a held row's preview is sized from.
+    @State private var width: CGFloat = 375
 
     struct Group: Identifiable {
         let section: ListSection
@@ -106,7 +108,7 @@ struct ItemListView: View {
                     ForEach(group.entries) { entry in
                         ItemRowButton(
                             entry: entry, density: density, isParity: isParity,
-                            isSelected: selection == entry.selection
+                            isSelected: selection == entry.selection, previewWidth: previewWidth
                         )
                     }
                 } header: {
@@ -127,6 +129,13 @@ struct ItemListView: View {
         // filter is typed: every keystroke would start another move over the last.
         .animation(model.filterText == settledFilter ? .snappy(duration: 0.25) : nil, value: model.rows)
         .onChange(of: model.filterText) { settledFilter = model.filterText }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+    }
+
+    /// A held row's preview: a little inside the list on a phone, a little past it beside the
+    /// detail (a sidebar is narrow for a long title), never wider than reads well.
+    private var previewWidth: CGFloat {
+        min(max(width - 24, 340), 440)
     }
 }
 
@@ -177,6 +186,7 @@ private struct ItemRowButton: View {
     let density: RowDensity
     let isParity: Bool
     let isSelected: Bool
+    let previewWidth: CGFloat
 
     var body: some View {
         let row = entry.row
@@ -210,7 +220,11 @@ private struct ItemRowButton: View {
                 }
             }
         }
-        .contextMenu { ItemMenu(item: row.item, model: model) }
+        .contextMenu {
+            ItemMenu(item: row.item, model: model)
+        } preview: {
+            ItemPreview(row: row, model: model, width: previewWidth)
+        }
     }
 
     /// Where a swipe sends an item with this Status, the full swipe's first.
