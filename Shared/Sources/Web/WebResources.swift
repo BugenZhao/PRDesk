@@ -28,13 +28,15 @@ enum WebResources {
     }
 
     /// The phone lays the page out at its own width, and sizes text itself rather than letting
-    /// WebKit inflate some paragraphs (see `detail.css`).
+    /// WebKit inflate some paragraphs (see `detail.css`). The page isn't zoomed by a pinch or a
+    /// double tap: it is a pane of the app, scaled with the viewer's text size
+    /// (`PRDesk.setTextScale`), and a page zoomed in had to be pinched back to read the rest.
     #if os(macOS)
         private static let platformAttributes = ""
         private static let viewport = ""
     #else
         private static let platformAttributes = #" data-platform="phone""#
-        private static let viewport = #"<meta name="viewport" content="width=device-width, initial-scale=1">"#
+        private static let viewport = #"<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no">"#
     #endif
 
     private static func text(_ name: String, _ ext: String) -> String {
