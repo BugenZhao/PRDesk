@@ -28,7 +28,7 @@ struct PageMenuView: View {
         Group {
             switch menu.request {
             case let .reaction(subject): reactions(subject)
-            case let .login(login): person(login)
+            case let .login(login): PersonMenuView(login: login)
             case let .file(path, url, viewed): file(path: path, url: url, viewed: viewed)
             }
         }
@@ -60,18 +60,70 @@ struct PageMenuView: View {
         .padding(8)
     }
 
-    // MARK: A person
+    // MARK: A file
 
-    /// Their profile, their name to copy, and the orgs to tie them to by hand (SPEC §5): each
-    /// checked when they have its badge, picking one toggles it.
-    private func person(_ login: String) -> some View {
+    private func file(path: String, url: String, viewed: Bool?) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(path)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondaryText)
+                .lineLimit(2)
+                .truncationMode(.middle)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+            Divider()
+            if let viewed, let literal = WebDocument.jsonLiteral(path) {
+                MenuRow("Viewed", isOn: viewed) {
+                    menu.page.run("PRDesk.toggleViewed(\(literal))")
+                    dismiss()
+                }
+            }
+            MenuRow("Copy Path", systemImage: "doc.on.doc") {
+                Platform.copy(path)
+                dismiss()
+            }
+            if let link = URL(string: url), !url.isEmpty {
+                MenuRow("Open on GitHub", systemImage: "arrow.up.right") {
+                    Platform.open(link)
+                    dismiss()
+                }
+            }
+        }
+        .frame(width: 290)
+    }
+}
+
+/// A person's menu, on holding their name in a page or above it: what hovering it says on the Mac
+/// (`personFacts`), their profile, their name to copy, and the orgs to tie them to by hand
+/// (SPEC §5), each checked when they have its badge, picking one toggles it.
+struct PersonMenuView: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    let login: String
+
+    var body: some View {
         let affiliations = model.affiliations
-        return VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 8) {
-                AvatarView(login: login, size: 26)
-                Text(login).font(.headline).lineLimit(1)
-                BadgeIcons(login: login)
-                Spacer(minLength: 0)
+        let facts = personFacts(contribution: model.contribution(for: login), badges: affiliations.badges(for: login))
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    AvatarView(login: login, size: 26)
+                    Text(login).font(.headline).lineLimit(1)
+                    BadgeIcons(login: login)
+                    Spacer(minLength: 0)
+                }
+                if !facts.isEmpty {
+                    VStack(alignment: .leading, spacing: 3) {
+                        ForEach(facts, id: \.self) { fact in
+                            Text(fact).lineLimit(3)
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                    // Under the name, past the avatar.
+                    .padding(.leading, 34)
+                }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
@@ -109,38 +161,6 @@ struct PageMenuView: View {
                     }
                 }
                 .frame(maxHeight: 260)
-            }
-        }
-        .frame(width: 290)
-    }
-
-    // MARK: A file
-
-    private func file(path: String, url: String, viewed: Bool?) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(path)
-                .font(.caption.monospaced())
-                .foregroundStyle(.secondaryText)
-                .lineLimit(2)
-                .truncationMode(.middle)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-            Divider()
-            if let viewed, let literal = WebDocument.jsonLiteral(path) {
-                MenuRow("Viewed", isOn: viewed) {
-                    menu.page.run("PRDesk.toggleViewed(\(literal))")
-                    dismiss()
-                }
-            }
-            MenuRow("Copy Path", systemImage: "doc.on.doc") {
-                Platform.copy(path)
-                dismiss()
-            }
-            if let link = URL(string: url), !url.isEmpty {
-                MenuRow("Open on GitHub", systemImage: "arrow.up.right") {
-                    Platform.open(link)
-                    dismiss()
-                }
             }
         }
         .frame(width: 290)

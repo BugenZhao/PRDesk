@@ -21,45 +21,64 @@ struct AvatarView: View {
 }
 
 /// A login, in italics for a first-timer nothing vouches for. Click to open their GitHub profile;
-/// right-click to set their affiliation.
+/// right-click to set their affiliation. Under a finger, a tap opens the profile and holding shows
+/// the person's menu (`PersonMenuView`), as holding them in a page does, with what hovering says
+/// on the Mac.
 struct LoginText: View {
     @Environment(AppModel.self) private var model
     let login: String?
     var weight: Font.Weight = .medium
-    @State private var isHovered = false
+    #if os(macOS)
+        @State private var isHovered = false
+    #else
+        @State private var showsMenu = false
+    #endif
 
     var body: some View {
         let contribution = model.contribution(for: login)
         let badges = login.map(model.affiliations.badges(for:)) ?? []
         let unvouched = contribution?.isUnvouched(badges: badges) ?? false
-        HStack(spacing: 3) {
+        let text = Text(login ?? "ghost").fontWeight(weight).italic(unvouched)
+        #if os(macOS)
             Button {
                 if let login { AppModel.openProfile(login) }
             } label: {
-                Text(login ?? "ghost")
-                    .fontWeight(weight)
-                    .italic(unvouched)
-                    .underline(isHovered && login != nil)
+                text.underline(isHovered && login != nil)
             }
             .buttonStyle(.plain)
             .disabled(login == nil)
-            #if os(macOS)
-                .pointerStyle(login == nil ? nil : .link)
-            #endif
+            .pointerStyle(login == nil ? nil : .link)
             .onHover { isHovered = $0 }
             .help((personFacts(contribution: contribution, badges: badges) + (login.map { ["Open \($0)'s profile on GitHub"] } ?? []))
                 .joined(separator: "\n"))
-        }
-        .contextMenu {
-            if let login {
-                #if os(macOS)
+            .contextMenu {
+                if let login {
                     AffiliationSubmenu(login: login)
                     Divider()
-                #endif
-                Button("Open Profile on GitHub") { AppModel.openProfile(login) }
-                Button("Copy Username") { Platform.copy(login) }
+                    Button("Open Profile on GitHub") { AppModel.openProfile(login) }
+                    Button("Copy Username") { Platform.copy(login) }
+                }
             }
-        }
+        #else
+            text
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if let login { AppModel.openProfile(login) }
+                }
+                .onLongPressGesture(minimumDuration: 0.45) {
+                    if login != nil { showsMenu = true }
+                }
+                .sensoryFeedback(.impact, trigger: showsMenu) { _, shown in shown }
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction(named: "Show Menu") { showsMenu = login != nil }
+                .popover(isPresented: $showsMenu) {
+                    if let login {
+                        PersonMenuView(login: login)
+                            .environment(model)
+                            .presentationCompactAdaptation(.popover)
+                    }
+                }
+        #endif
     }
 }
 
