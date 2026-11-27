@@ -40,8 +40,102 @@ const PRDesk = (() => {
       table.replaceWith(box);
       box.append(table);
     }
+    enrich(template.content);
     return template.content;
   }
+
+  // MARK: Diagrams
+
+  // GitHub leaves some code blocks (mermaid, GeoJSON, STL…) for a viewer frame of github.com to
+  // draw, with a spinner meanwhile; here they keep their source, and mermaid is drawn locally.
+  // mermaid.js is a few megabytes, so the app sends it only for a page with a diagram on it.
+  let mermaidLoaded = null;
+  let resolveMermaid = null;
+  let diagramCount = 0;
+  let drawing = Promise.resolve();
+  const darkScheme = matchMedia("(prefers-color-scheme: dark)");
+  const mermaidTheme = () => (darkScheme.matches ? "dark" : "default");
+  // What each source came out as, by theme: `{ svg, id }`, or null for one that doesn't parse. A
+  // block drawn again (a new render of the item, coming back to it) then shows its diagram at once,
+  // without the source showing first and the page's height changing under the reader.
+  const drawnDiagrams = new Map();
+
+  function enrich(content) {
+    for (const section of content.querySelectorAll("section.js-render-needs-enrichment")) {
+      for (const loader of section.querySelectorAll(".js-render-enrichment-loader")) loader.remove();
+      if (section.dataset.type !== "mermaid") continue;
+      const target = section.querySelector(".js-render-enrichment-target");
+      const source = target?.dataset.plain ?? section.querySelector("pre")?.textContent;
+      if (!source) continue;
+      const diagram = document.createElement("div");
+      diagram.className = "diagram";
+      diagram.dataset.source = source;
+      section.append(diagram);
+      const key = mermaidTheme() + "\n" + source;
+      if (drawnDiagrams.has(key)) showDiagram(diagram, drawnDiagrams.get(key)); else draw(diagram);
+    }
+  }
+
+  function loadMermaid() {
+    if (!mermaidLoaded) {
+      mermaidLoaded = new Promise((resolve) => { resolveMermaid = resolve; });
+      post({ type: "loadMermaid" });
+    }
+    return mermaidLoaded;
+  }
+
+  /** Draws a diagram (after the ones before it: mermaid lays out one at a time). */
+  function draw(diagram) {
+    drawing = drawing.then(async () => {
+      await loadMermaid();
+      if (!diagram.isConnected) return;
+      const theme = mermaidTheme();
+      const key = theme + "\n" + diagram.dataset.source;
+      if (!drawnDiagrams.has(key)) {
+        const id = `diagram-${++diagramCount}`;
+        try {
+          mermaid.initialize({ startOnLoad: false, theme, fontFamily: "-apple-system, system-ui, sans-serif" });
+          const { svg } = await mermaid.render(id, diagram.dataset.source, measuringBox());
+          remember(drawnDiagrams, key, { svg, id });
+        } catch (error) {
+          // The source stays, as on GitHub when a diagram doesn't parse.
+          remember(drawnDiagrams, key, null);
+          document.getElementById("d" + id)?.remove();
+        }
+      }
+      if (diagram.isConnected) showDiagram(diagram, drawnDiagrams.get(key));
+    });
+  }
+
+  /** Where mermaid lays a diagram out to measure its labels: at no zoom. Under the page's (the
+      iPad's and iPhone's text size, `setTextScale`) it measured them zoomed, as wider than they
+      are drawn, and cut every label to one size of box. */
+  function measuringBox() {
+    let box = document.getElementById("diagram-measuring");
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "diagram-measuring";
+      box.style.cssText = "position: absolute; top: 0; left: 0; width: 100%; height: 0; overflow: hidden; visibility: hidden; pointer-events: none;";
+      document.body.append(box);
+    }
+    box.style.zoom = 1 / (parseFloat(getComputedStyle(document.documentElement).zoom) || 1);
+    return box;
+  }
+
+  function showDiagram(diagram, drawn) {
+    if (!drawn) {
+      diagram.parentElement?.classList.remove("drawn");
+      diagram.replaceChildren();
+      return;
+    }
+    // Ids of its own (its styles and arrowheads go by them), should the source show twice.
+    diagram.innerHTML = drawn.svg.replaceAll(drawn.id, `diagram-${++diagramCount}`);
+    diagram.parentElement?.classList.add("drawn");
+  }
+
+  darkScheme.addEventListener("change", () => {
+    for (const diagram of document.querySelectorAll(".diagram")) draw(diagram);
+  });
 
   const escapeHTML = (text) => text.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
@@ -201,6 +295,7 @@ const PRDesk = (() => {
     element._block = block;
     element.className = block.cls;
     element.innerHTML = block.html;
+    enrich(element);
     refreshAges(element);
   }
 
@@ -669,6 +764,7 @@ const PRDesk = (() => {
     setAllFiles,
     buildExpandedFiles,
     setViewedFiles,
+    mermaidLoaded() { resolveMermaid?.(); },
     toggleViewed(path) { toggleViewed(files.elements.get(path)); },
     setWrap(wrap) { document.documentElement.classList.toggle("nowrap", !wrap); },
     // `bars`: what stays over the page's top; `total`: with what scrolls away with the page,

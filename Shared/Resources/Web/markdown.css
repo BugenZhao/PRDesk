@@ -19,6 +19,13 @@
 .md .highlight { margin: 0 0 8px; }
 .md kbd { border: 0.5px solid rgba(127, 127, 127, .5); border-bottom-width: 1.5px; border-radius: 4px; padding: 0 4px; }
 .md img, .md video { max-width: 100%; height: auto; }
+/* Code blocks GitHub draws in a frame of its own (mermaid, GeoJSON, STL…) show their source here
+   instead of its spinner; a mermaid diagram the page draws (`detail.js`) takes the source's place. */
+.md .js-render-enrichment-loader { display: none; }
+.md section.drawn > :not(.diagram) { display: none; }
+/* As mermaid measured its labels: outside the body, whose wrapping anywhere would cut them. */
+.md .diagram { overflow-x: auto; text-align: center; margin: 0 0 8px; overflow-wrap: normal; line-height: normal; }
+.md .diagram svg { height: auto; }
 /* A table too wide for the page scrolls sideways, in a box the script puts around it. Its words
    stay whole: breaking anywhere, as the rest of a body may, lets every column shrink to a
    letter's width, and the table then never is too wide (a column of single letters down a phone,

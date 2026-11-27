@@ -220,6 +220,8 @@ extension WebDocument: WKScriptMessageHandler {
         switch type {
         case "ready":
             pageReady()
+        case "loadMermaid":
+            webView.evaluateJavaScript(WebResources.mermaidJS)
         case "loginMenu":
             if let login = body["login"] as? String { showMenu(.login(login), at: point) }
         case "reactionMenu":

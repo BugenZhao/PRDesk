@@ -46,5 +46,6 @@ most of its code with the Mac app (`Shared/`). `AGENTS.md` has how to run it in 
 
 - [GRDB.swift](https://github.com/groue/GRDB.swift) (MIT)
 - [highlight.js](https://highlightjs.org) (BSD-3-Clause, `Shared/Resources/Web/highlight.LICENSE`)
+- [Mermaid](https://mermaid.js.org) for diagrams in bodies (MIT, `Shared/Resources/Web/mermaid.LICENSE`)
 - [Octicons](https://primer.style/octicons) for the PR state icons (MIT, `Shared/Resources/octicons.LICENSE`)
 - [Lobe Icons](https://github.com/lobehub/lobe-icons) for the Cohere and Tencent badges (MIT, `Shared/Resources/lobe-icons.LICENSE`)

@@ -8,6 +8,10 @@ enum WebResources {
     private static let detailJS = text("detail", "js") + "\nwindow.PRDesk = PRDesk;"
     private static let highlightJS = [text("highlight.min", "js"), text("hljs-cmake.min", "js"), text("hljs-dockerfile.min", "js")]
 
+    /// Mermaid, which draws the diagrams in bodies: megabytes, so only sent to a page that has one
+    /// (`loadMermaid` in `detail.js`), and read from the bundle on first use.
+    static let mermaidJS = text("mermaid.min", "js") + "\nPRDesk.mermaidLoaded();"
+
     static func scripts(for kind: WebDocument.Kind) -> [String] {
         (kind == .files ? highlightJS : []) + [detailJS]
     }
