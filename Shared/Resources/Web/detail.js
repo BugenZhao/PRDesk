@@ -619,10 +619,16 @@ const PRDesk = (() => {
       handleLink(event, link);
       return;
     }
-    // A person's name or avatar opens their GitHub profile.
+    // A person's name or avatar opens their GitHub profile; under a finger, where nothing hovers
+    // to say who they are, their menu, which says it and opens the profile.
     const person = event.target.closest("[data-login]");
     if (person) {
-      post({ type: "openProfile", login: person.dataset.login });
+      if (document.documentElement.dataset.platform === "phone") {
+        const rect = person.getBoundingClientRect();
+        post({ type: "loginMenu", login: person.dataset.login, x: rect.left + rect.width / 2, y: rect.bottom });
+      } else {
+        post({ type: "openProfile", login: person.dataset.login });
+      }
       return;
     }
     if (event.target.closest(".login")) return;

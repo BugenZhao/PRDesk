@@ -21,9 +21,9 @@ struct AvatarView: View {
 }
 
 /// A login, in italics for a first-timer nothing vouches for. Click to open their GitHub profile;
-/// right-click to set their affiliation. Under a finger, a tap opens the profile and holding shows
-/// the person's menu (`PersonMenuView`), as holding them in a page does, with what hovering says
-/// on the Mac.
+/// right-click to set their affiliation. Under a finger, where nothing hovers, a tap shows the
+/// person's menu instead (`PersonMenuView`, as a page's names do): what hovering says on the Mac,
+/// and the profile.
 struct LoginText: View {
     @Environment(AppModel.self) private var model
     let login: String?
@@ -60,17 +60,9 @@ struct LoginText: View {
                 }
             }
         #else
-            text
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    if let login { AppModel.openProfile(login) }
-                }
-                .onLongPressGesture(minimumDuration: 0.45) {
-                    if login != nil { showsMenu = true }
-                }
-                .sensoryFeedback(.impact, trigger: showsMenu) { _, shown in shown }
-                .accessibilityAddTraits(.isButton)
-                .accessibilityAction(named: "Show Menu") { showsMenu = login != nil }
+            Button { showsMenu = true } label: { text }
+                .buttonStyle(.plain)
+                .disabled(login == nil)
                 .popover(isPresented: $showsMenu) {
                     if let login {
                         PersonMenuView(login: login)

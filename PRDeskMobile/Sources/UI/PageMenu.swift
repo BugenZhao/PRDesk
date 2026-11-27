@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// A menu a detail page asks for (`WebDocument.MenuRequest`): on a reaction's button, on holding
-/// a person or a file's header. Shown as a popover at the point the page gave.
+/// A menu a detail page asks for (`WebDocument.MenuRequest`): on a reaction's button, on tapping
+/// or holding a person, on holding a file's header. Shown as a popover at the point the page gave.
 struct PageMenu: Identifiable {
     let id = UUID()
     let request: WebDocument.MenuRequest
@@ -93,7 +93,7 @@ struct PageMenuView: View {
     }
 }
 
-/// A person's menu, on holding their name in a page or above it: what hovering it says on the Mac
+/// A person's menu, on tapping their name in a page or above it: what hovering it says on the Mac
 /// (`personFacts`), their profile, their name to copy, and the orgs to tie them to by hand
 /// (SPEC §5), each checked when they have its badge, picking one toggles it.
 struct PersonMenuView: View {
