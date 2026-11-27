@@ -42,15 +42,16 @@ struct InboxNote: Hashable, Sendable {
 
     var isUpstream: Bool { repo.caseInsensitiveCompare(SyncEngine.repo) == .orderedSame }
 
+    /// One word, to keep the chip short beside the title.
     var reasonLabel: String {
         switch reason {
-        case "review_requested": "Review requested"
-        case "team_mention": "Team mention"
-        case "state_change": "State change"
         case "ci_activity": "CI"
+        case "security_advisory_credit": "Credit"
+        case "member_feature_requested": "Feature"
         default:
-            // e.g. "mention" → "Mention", "security_alert" → "Security alert".
-            reason.prefix(1).uppercased() + reason.dropFirst().replacingOccurrences(of: "_", with: " ")
+            // The first word: "mention" → "Mention", "review_requested" → "Review",
+            // "team_mention" → "Team", "state_change" → "State", "security_alert" → "Security".
+            String(reason.split(separator: "_").first ?? Substring(reason)).capitalized
         }
     }
 }
