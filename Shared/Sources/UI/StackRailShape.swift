@@ -17,8 +17,11 @@ enum StackRailShape {
         var opacity: CGFloat = 1
     }
 
-    /// A stub fades out in two pieces this long, stopping short of the row's edge.
+    /// A stub fades out in two pieces, stopping short of the row's edge: this long at least (the
+    /// Mac's rows), and a part of the way from the node to the edge in a taller row, so a row of
+    /// two lines doesn't show a stub as short as one of one.
     private static let stubPiece: CGFloat = 2
+    private static let stubShare: CGFloat = 0.16
 
     /// The lines through a row spanning `rect` (top to bottom, y growing downward) and the
     /// node's frame, with lanes from `rect.minX`.
@@ -52,10 +55,11 @@ enum StackRailShape {
             case let .elsewhereUp(lane), let .elsewhereDown(lane):
                 let sign: CGFloat = if case .elsewhereUp = segment { -1 } else { 1 }
                 let start = mid + sign * radius
+                let length = max(stubPiece, (rect.height / 2 - radius) * stubShare)
                 return [0.8, 0.4].enumerated().map { index, opacity in
                     let piece = CGMutablePath()
-                    piece.move(to: CGPoint(x: x(lane), y: start + sign * stubPiece * CGFloat(index)))
-                    piece.addLine(to: CGPoint(x: x(lane), y: start + sign * stubPiece * CGFloat(index + 1)))
+                    piece.move(to: CGPoint(x: x(lane), y: start + sign * length * CGFloat(index)))
+                    piece.addLine(to: CGPoint(x: x(lane), y: start + sign * length * CGFloat(index + 1)))
                     return Line(path: piece, isDashed: false, opacity: opacity)
                 }
             }
